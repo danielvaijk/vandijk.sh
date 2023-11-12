@@ -1,0 +1,15 @@
+# Build
+/dist
+/lib
+/lib-types
+/server
+
+# Development
+node_modules
+
+# Logs
+npm-debug.log*
+
+# Misc
+.DS_Store
+package-lock.json

@@ -1,0 +1,23 @@
+.article-summary {
+  margin-top: 2rem;
+}
+
+.article-summary:hover {
+  opacity: 0.6;
+  cursor: pointer;
+}
+
+.article-summary a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.article-summary a > h4 {
+  margin: 0 0 0.4rem 0;
+  font-size: 1.125rem;
+  line-height: 1.7777778;
+}
+
+.article-summary a > p {
+  text-align: justify;
+}
