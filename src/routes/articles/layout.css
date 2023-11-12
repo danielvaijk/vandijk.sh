@@ -1,0 +1,25 @@
+article {
+  font-size: 1.125rem;
+  line-height: 1.7777778;
+  max-width: 46rem;
+  padding: 3rem 1rem 2rem;
+}
+
+article h2 {
+  margin: 6rem 0.75rem 0 1rem;
+}
+
+article h2 + p:first-letter {
+  font-size: 200%;
+  line-height: 1;
+  margin-right: 0.1rem;
+}
+
+article h3 {
+  margin: 1rem auto;
+}
+
+article p {
+  text-align: justify;
+  font-size: 1.25rem;
+}
