@@ -10,22 +10,20 @@ interface ArticleSummaryListProps {
   articles: Array<ArticleSummaryProps>;
 }
 
-export const ArticleSummaryList = component$<ArticleSummaryListProps>(
-  ({ articles }) => {
-    useStylesScoped$(styles);
+export const ArticleSummaryList = component$<ArticleSummaryListProps>(({ articles }) => {
+  useStylesScoped$(styles);
 
-    return (
-      <ul class="article-summary-list">
-        {articles.map(({ title, date, path, description }) => (
-          <ArticleSummaryItem
-            key={title}
-            title={title}
-            date={date}
-            path={path}
-            description={description}
-          />
-        ))}
-      </ul>
-    );
-  }
-);
+  return (
+    <ul class="article-summary-list">
+      {articles.map(({ title, date, path, description }) => (
+        <ArticleSummaryItem
+          key={title}
+          title={title}
+          date={date}
+          path={path}
+          description={description}
+        />
+      ))}
+    </ul>
+  );
+});

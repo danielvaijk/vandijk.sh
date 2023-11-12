@@ -7,15 +7,13 @@ interface CenteredTitleProps {
   subtitle: string;
 }
 
-export const CenteredTitle = component$<CenteredTitleProps>(
-  ({ title, subtitle }) => {
-    useStylesScoped$(styles);
+export const CenteredTitle = component$<CenteredTitleProps>(({ title, subtitle }) => {
+  useStylesScoped$(styles);
 
-    return (
-      <div class="centered-title">
-        <h2>{title}</h2>
-        <p>{subtitle}</p>
-      </div>
-    );
-  }
-);
+  return (
+    <div class="centered-title">
+      <h2>{title}</h2>
+      <p>{subtitle}</p>
+    </div>
+  );
+});
