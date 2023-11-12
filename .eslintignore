@@ -1,0 +1,12 @@
+*.log
+.DS_Store
+.vscode
+dist
+dist-dev
+lib
+lib-types
+node_modules
+temp
+vite.config.ts
+package-lock.json
+server
