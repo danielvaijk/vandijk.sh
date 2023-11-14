@@ -40,6 +40,13 @@ body {
 
 a {
   color: #0d47a1;
+  text-decoration: none;
+}
+
+a:hover,
+.clickable:hover {
+  opacity: 0.6;
+  cursor: pointer;
 }
 
 h1 {
@@ -97,17 +104,79 @@ header {
   margin: 0;
 }
 
-header nav > ul {
+header > nav {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  position: relative;
+  margin: 0 0 14px 0;
+}
+
+header > nav > ul {
   list-style: none;
+  text-align: center;
+  display: none;
+  margin: 0;
+  padding: 0.8rem;
+  flex-direction: column;
+  position: absolute;
+  top: 2rem;
+  background-color: white;
+  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.15);
+  border: 1px solid black;
+}
+
+header > nav > ul.is-open {
   display: flex;
 }
 
-header nav > ul > li {
-  text-decoration: underline;
+header > nav > ul > li:not(:last-child) {
+  margin-bottom: 0.8rem;
 }
 
-header nav > ul > li:not(:last-child) {
-  margin-right: 0.8rem;
+header > nav > ul > li a {
+  color: inherit;
+  font-size: 1.2rem;
+  font-weight: bold;
+}
+
+.hamburger {
+  width: 1.6rem;
+  height: 1.6rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.hamburger > hr {
+  height: 4px;
+  width: 100%;
+  margin: 0;
+  border: none;
+  background-color: #212121;
+}
+
+@media screen and (min-width: 46rem) {
+  header > nav > .hamburger {
+    display: none;
+  }
+
+  header > nav > ul {
+    position: unset;
+    top: unset;
+    padding: unset;
+    display: flex;
+    flex-direction: row;
+    background-color: unset;
+    text-align: right;
+    box-shadow: unset;
+    border: unset;
+  }
+
+  header > nav > ul > li:not(:last-child) {
+    margin-bottom: unset;
+    margin-right: 0.8rem;
+  }
 }
 
 footer {
