@@ -1,5 +1,5 @@
 import { component$, Slot, useStylesScoped$ } from "@builder.io/qwik";
-import { Header } from "~/components/header";
+import { NavigationHeader } from "~/components/navigation/navigation-header";
 
 import styles from "./layout.css?inline";
 
@@ -8,7 +8,7 @@ export default component$(() => {
 
   return (
     <>
-      <Header />
+      <NavigationHeader />
 
       <main>
         <Slot />
