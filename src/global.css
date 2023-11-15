@@ -89,6 +89,7 @@ header {
   justify-content: space-between;
   align-items: flex-end;
   padding: 0.8rem 2rem;
+  user-select: none;
 }
 
 #header-name {
@@ -105,11 +106,11 @@ header {
 }
 
 header > nav {
+  position: relative;
+  margin: 0 0 14px 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
-  position: relative;
-  margin: 0 0 14px 0;
 }
 
 header > nav > ul {
@@ -141,19 +142,19 @@ header > nav > ul > li a {
 }
 
 .hamburger {
-  width: 1.6rem;
-  height: 1.6rem;
   display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  padding: 0.6rem;
 }
 
-.hamburger > hr {
-  height: 4px;
-  width: 100%;
-  margin: 0;
-  border: none;
+.hamburger > div {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 100%;
   background-color: #212121;
+}
+
+.hamburger > div:not(:last-child) {
+  margin-right: 0.4rem;
 }
 
 @media screen and (min-width: 46rem) {

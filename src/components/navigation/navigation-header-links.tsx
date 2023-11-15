@@ -56,9 +56,9 @@ export const NavigationHeaderLinks = component$(() => {
           isOpen.value = !isOpen.value;
         }}
       >
-        <hr />
-        <hr />
-        <hr />
+        <div></div>
+        <div></div>
+        <div></div>
       </div>
 
       <ul ref={listRef} class={isOpen.value ? "is-open" : undefined}>
