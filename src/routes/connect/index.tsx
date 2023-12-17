@@ -8,5 +8,5 @@ export default component$(() => {
 });
 
 export const head: DocumentHead = {
-  title: "Daniel van Dijk - Contact",
+  title: "Daniel van Dijk - Connect",
 };
