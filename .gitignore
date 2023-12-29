@@ -12,3 +12,6 @@ npm-debug.log*
 
 # Misc
 .DS_Store
+
+src/routes/articles/*/index.mdx
+src/routes/articles/*/meta.json

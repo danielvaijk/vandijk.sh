@@ -1,11 +1,13 @@
-import { readdir } from "fs/promises";
+import path from "path";
+import { readFile, readdir } from "fs/promises";
+
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 import { routeLoader$ } from "@builder.io/qwik-city";
+
 import type { ArticleSummaryProps } from "~/components/articles/article-summary-item";
 import { ArticleSummaryList } from "~/components/articles/article-summary-list";
 
 import styles from "./index.css?inline";
-import { extractMetadataFromMdxFile } from "~/helpers/parser";
 
 export const useArticleSummaries = routeLoader$(async (): Promise<Array<ArticleSummaryProps>> => {
   const articlesPath = "./src/routes/articles";
@@ -18,7 +20,10 @@ export const useArticleSummaries = routeLoader$(async (): Promise<Array<ArticleS
       continue;
     }
 
-    results.push(await extractMetadataFromMdxFile(articlesPath, entity.name));
+    const metadataFilePath = path.join(articlesPath, entity.name, "meta.json");
+    const metadataContents = await readFile(metadataFilePath, { encoding: "utf-8" });
+
+    results.push(JSON.parse(metadataContents));
   }
 
   return results.sort((a, b) => {
