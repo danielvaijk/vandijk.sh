@@ -32,4 +32,19 @@ article h4 {
 article p {
   text-align: justify;
 }
+
+article > pre {
+  width: 100%;
+  overflow-x: hidden;
+  padding: 0.8rem;
+  border: 1px solid #e0e0e0;
+  background-color: white;
+}
+
+article *:not(pre) > code {
+  padding: 0.125rem;
+  color: #dd4a68;
+  font-weight: 600;
+  border: 1px solid #e0e0e0;
+  background-color: white;
 }

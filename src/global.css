@@ -91,6 +91,11 @@ p {
   margin-inline-end: 0px;
 }
 
+code {
+  font-size: 0.875rem !important;
+  line-height: 0.8 !important;
+}
+
 header {
   width: 100%;
   display: flex;
