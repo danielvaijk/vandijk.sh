@@ -1,8 +1,13 @@
 article {
+  width: 100%;
+  max-width: 46rem;
   font-size: 1.125rem;
   line-height: 1.7777778;
-  max-width: 46rem;
   padding: 3rem 1rem 2rem;
+}
+
+article img {
+  width: 100%;
 }
 
 article h2 {
@@ -10,16 +15,21 @@ article h2 {
 }
 
 article h2 + p:first-letter {
-  font-size: 200%;
+  font-size: 160%;
   line-height: 1;
   margin-right: 0.1rem;
 }
 
 article h3 {
+  margin: 2rem 0 1rem 0;
+  text-align: left;
+}
+
+article h4 {
   margin: 1rem auto;
 }
 
 article p {
   text-align: justify;
-  font-size: 1.25rem;
+}
 }
