@@ -9,7 +9,7 @@ export default defineConfig(() => {
       qwikCity({
         mdxPlugins: {
           remarkGfm: false,
-          rehypeSyntaxHighlight: false,
+          rehypeSyntaxHighlight: true,
           rehypeAutolinkHeadings: false,
         },
       }),
