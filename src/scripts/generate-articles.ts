@@ -276,6 +276,10 @@ for (let index = 0; index < articlesPageContents.length; index++) {
     const childPageBlock = block as NotionChildPageBlock;
     const { title } = childPageBlock.child_page;
 
+    if (title.startsWith("(WIP)")) {
+      continue;
+    }
+
     const article: Article = {
       title,
       id: childPageBlock.id,
