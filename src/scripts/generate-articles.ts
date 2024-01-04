@@ -3,6 +3,7 @@ import { mkdir, writeFile } from "fs/promises";
 import path from "path";
 
 import prettier from "prettier";
+import sharp from "sharp";
 import { formatDateAsString } from "~/utilities/time";
 
 const NOTION_API_VERSION = "2022-06-28";
@@ -20,6 +21,7 @@ enum BlockType {
   BULLETED_LIST_ITEM = "bulleted_list_item",
   IMAGE = "image",
   CODE = "code",
+  COVER = "cover",
 }
 
 interface Article {
@@ -49,7 +51,7 @@ interface NotionRichText {
 
 interface NotionBlockContents {
   language?: string;
-  external: {
+  external?: {
     url: string;
   };
   caption?: Array<{
@@ -155,13 +157,41 @@ function getTextContentFromBlock(block: NotionBlock): string {
   return getContentFromRichText(richText);
 }
 
-function getImageContentFromBlock(block: NotionBlock): string {
+async function getImageContentFromBlock({
+  block,
+  isPriority = false,
+}: {
+  block: NotionBlock;
+  isPriority?: boolean;
+}): Promise<string> {
   const content = block[block.type] as NotionBlockContents;
 
-  const { url } = content.external;
-  const caption = content.caption?.[0].plain_text;
+  const { url } = content.external ?? {};
+  const caption = content.caption?.[0]?.plain_text;
 
-  return `![${caption}](${url})`;
+  if (!url) {
+    return "";
+  }
+
+  const imageResponse = await fetch(url);
+  const imageData = await imageResponse.arrayBuffer();
+  const imageMetadata = await sharp(imageData).metadata();
+
+  return [
+    "<figure>",
+    "<img",
+    `src="${url}"`,
+    caption ? `alt="${caption}"` : undefined,
+    `decoding="${isPriority ? "sync" : "async"}"`,
+    `loading="${isPriority ? "eager" : "lazy"}"`,
+    `width="${imageMetadata.width}"`,
+    `height="${imageMetadata.height}"`,
+    "/>",
+    caption ? `<figcaption>${caption}</figcaption>` : undefined,
+    "</figure>",
+  ]
+    .filter((value) => value)
+    .join("\n");
 }
 
 async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
@@ -224,7 +254,7 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
         break;
 
       case BlockType.IMAGE:
-        content = getImageContentFromBlock(block);
+        content = await getImageContentFromBlock({ block });
         break;
 
       case BlockType.CODE:
@@ -300,29 +330,44 @@ for (let index = 0; index < articlesPageContents.length; index++) {
 for (const article of articles) {
   const page = await fetchPage(article.id);
   const { results: blocks } = await fetchBlockChildren(article.id);
+  const { articleContent, anchorLinks } = await convertBlocksToMarkup(blocks);
 
   const articleRoute = getRouteFromTitle(article.title);
   const articleDirectory = path.join("./src/routes/articles", articleRoute);
   const articleFilePath = path.join(articleDirectory, "index.mdx");
   const articleMetadataPath = path.join(articleDirectory, "meta.json");
 
-  const { articleContent, anchorLinks } = await convertBlocksToMarkup(blocks);
+  // Format the page cover data to be compatible with the existing image
+  // content utility function: getImageContentFromBlock.
+  const pageCoverAsBlock = {
+    id: "",
+    type: BlockType.COVER,
+    [BlockType.COVER]: page.cover,
+  };
 
-  const mdxContents = [
-    "export default function Layout({ children: content }) {",
-    "  return <article>{content}</article>;",
-    "}",
-    "",
-    `![](${page.cover.external.url})`,
-    "",
-    `# ${article.title}`,
-    "",
-    `#### ${formatDateAsString(article.date)}`,
-    "",
-    anchorLinks,
-    "",
-    articleContent,
-  ].join("\n");
+  const mdxContents = await prettier.format(
+    [
+      "export default function Layout({ children: content }) {",
+      "  return <article>{content}</article>;",
+      "}",
+      "",
+      await getImageContentFromBlock({
+        block: pageCoverAsBlock,
+        isPriority: true,
+      }),
+      "",
+      `# ${article.title}`,
+      "",
+      `#### ${formatDateAsString(article.date)}`,
+      "",
+      anchorLinks,
+      "",
+      articleContent,
+    ].join("\n"),
+    {
+      parser: "mdx",
+    }
+  );
 
   const metaContents = await prettier.format(JSON.stringify(article), {
     parser: "json",
