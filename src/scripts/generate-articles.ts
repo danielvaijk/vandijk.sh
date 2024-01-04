@@ -235,12 +235,14 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
         throw new Error(`Block type "${block.type}" is not supported.`);
     }
 
-    if (content.length > 0) {
-      if (prefix) {
-        articleContent += prefix + " " + content + spacer;
-      } else {
-        articleContent += content + spacer;
-      }
+    if (!content.length) {
+      continue;
+    }
+
+    if (prefix) {
+      articleContent += prefix + " " + content + spacer;
+    } else {
+      articleContent += content + spacer;
     }
   }
 
