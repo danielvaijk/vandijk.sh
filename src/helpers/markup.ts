@@ -57,38 +57,43 @@ function getTextContentFromBlock(block: NotionBlock): string {
 
 async function getAndStoreImageContentFromBlock({
   block,
+  captionOverride,
   isPriority = false,
 }: {
   block: NotionBlock;
+  captionOverride?: string;
   isPriority?: boolean;
 }): Promise<string> {
   const content = block[block.type] as NotionBlockContents;
 
   if (typeof content.type === "undefined") {
-    return "";
+    throw new Error("Image content is missing a content type.");
   }
 
   const { url } = content[content.type] ?? {};
-  const caption = content.caption?.[0]?.plain_text;
+  const caption = captionOverride ?? content.caption?.[0]?.plain_text;
 
   if (!url) {
-    return "";
+    throw new Error("Image content is missing a URL.");
+  } else if (!caption) {
+    throw new Error("Image content is missing a caption.");
   }
 
   const image = await fetchAndParseImage(url);
   const imagePath = await saveImageInPublicDirectory(image);
+  const shouldDisplayCaption = !caption.startsWith("(HIDDEN)");
 
   return [
     "<figure>",
     "<img",
     `src="${imagePath}"`,
-    caption ? `alt="${caption}"` : undefined,
+    `alt="${shouldDisplayCaption ? caption : caption.slice("(HIDDEN)".length).trim()}"`,
     `decoding="${isPriority ? "sync" : "async"}"`,
     `loading="${isPriority ? "eager" : "lazy"}"`,
     `width="${image.width}"`,
     `height="${image.height}"`,
     "/>",
-    caption ? `<figcaption>${caption}</figcaption>` : undefined,
+    shouldDisplayCaption ? `<figcaption>${caption}</figcaption>` : undefined,
     "</figure>",
   ]
     .filter((value) => value)

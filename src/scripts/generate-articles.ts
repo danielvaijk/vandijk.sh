@@ -84,6 +84,7 @@ for (const article of articles) {
       "",
       await getAndStoreImageContentFromBlock({
         block: pageCoverAsBlock,
+        captionOverride: "Article cover image",
         isPriority: true,
       }),
       "",
