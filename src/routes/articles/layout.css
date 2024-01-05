@@ -23,7 +23,7 @@ article figure > figcaption {
 }
 
 article h2 {
-  margin: 6rem 0.75rem 0 1rem;
+  margin: 4rem 0.75rem 0 1rem;
 }
 
 article h2 + p:first-letter {
@@ -50,6 +50,11 @@ article > pre {
   overflow-x: hidden;
   padding: 0.8rem;
   border: 1px solid #e0e0e0;
+  margin: 0;
+  margin-block-start: 1em;
+  margin-block-end: 1em;
+  margin-inline-start: 0px;
+  margin-inline-end: 0px;
   background-color: white;
 }
 
