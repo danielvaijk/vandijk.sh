@@ -10,8 +10,10 @@
 .article-summary a > h4 {
   margin: 0 0 0.4rem 0;
   font-size: 1.125rem;
+  font-weight: bold;
   line-height: 1.7777778;
   text-align: left;
+  font-style: normal;
 }
 
 .article-summary a > p {
