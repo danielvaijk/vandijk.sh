@@ -19,12 +19,17 @@ export default component$(() => {
   );
 });
 
-export const head: DocumentHead = {
-  title: "Daniel van Dijk's Blog",
-  links: [
-    {
-      rel: "stylesheet",
-      href: "https://cdnjs.cloudflare.com/ajax/libs/prism/1.27.0/themes/prism.min.css",
-    },
-  ],
+export const head: DocumentHead = ({ head }) => {
+  const titleBase = "Daniel van Dijk's Blog";
+  const title = head.title ? `${titleBase} - ${head.title}` : titleBase;
+
+  return {
+    title,
+    links: [
+      {
+        rel: "stylesheet",
+        href: "https://cdnjs.cloudflare.com/ajax/libs/prism/1.27.0/themes/prism.min.css",
+      },
+    ],
+  };
 };

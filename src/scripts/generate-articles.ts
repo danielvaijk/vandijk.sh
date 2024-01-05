@@ -78,6 +78,11 @@ for (const article of articles) {
 
   const mdxContents = await prettier.format(
     [
+      "---",
+      `title: "${article.title}"`,
+      `description: "${article.description}"`,
+      "---",
+      "",
       "export default function Layout({ children: content }) {",
       "  return <article>{content}</article>;",
       "}",
