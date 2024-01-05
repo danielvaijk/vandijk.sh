@@ -1,5 +1,4 @@
 import prettier from "prettier";
-import sharp from "sharp";
 
 import {
   NotionBlockType,
@@ -8,6 +7,7 @@ import {
   type NotionRichText,
 } from "~/definition/notion";
 import { PRETTIER_CONFIG } from "~/definition/prettier";
+import { fetchAndParseImage, saveImageInPublicDirectory } from "./image";
 
 function isNextIndexBlockOfType(array: Array<NotionBlock>, index: number, type: NotionBlockType) {
   return index < array.length - 1 && array[index + 1].type === type;
@@ -55,7 +55,7 @@ function getTextContentFromBlock(block: NotionBlock): string {
   return getContentFromRichText(richText);
 }
 
-async function getImageContentFromBlock({
+async function getAndStoreImageContentFromBlock({
   block,
   isPriority = false,
 }: {
@@ -64,26 +64,29 @@ async function getImageContentFromBlock({
 }): Promise<string> {
   const content = block[block.type] as NotionBlockContents;
 
-  const { url } = content.external ?? {};
+  if (typeof content.type === "undefined") {
+    return "";
+  }
+
+  const { url } = content[content.type] ?? {};
   const caption = content.caption?.[0]?.plain_text;
 
   if (!url) {
     return "";
   }
 
-  const imageResponse = await fetch(url);
-  const imageData = await imageResponse.arrayBuffer();
-  const imageMetadata = await sharp(imageData).metadata();
+  const image = await fetchAndParseImage(url);
+  const imagePath = await saveImageInPublicDirectory(image);
 
   return [
     "<figure>",
     "<img",
-    `src="${url}"`,
+    `src="${imagePath}"`,
     caption ? `alt="${caption}"` : undefined,
     `decoding="${isPriority ? "sync" : "async"}"`,
     `loading="${isPriority ? "eager" : "lazy"}"`,
-    `width="${imageMetadata.width}"`,
-    `height="${imageMetadata.height}"`,
+    `width="${image.width}"`,
+    `height="${image.height}"`,
     "/>",
     caption ? `<figcaption>${caption}</figcaption>` : undefined,
     "</figure>",
@@ -154,7 +157,7 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
         break;
 
       case NotionBlockType.IMAGE:
-        content = await getImageContentFromBlock({ block });
+        content = await getAndStoreImageContentFromBlock({ block });
         break;
 
       case NotionBlockType.CODE:
@@ -186,5 +189,5 @@ export {
   isNextIndexBlockOfType,
   convertBlocksToMarkup,
   getTextContentFromBlock,
-  getImageContentFromBlock,
+  getAndStoreImageContentFromBlock,
 };

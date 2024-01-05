@@ -28,7 +28,11 @@ interface NotionRichText {
 }
 
 interface NotionBlockContents {
+  type?: "file" | "external";
   language?: string;
+  file?: {
+    url: string;
+  };
   external?: {
     url: string;
   };
