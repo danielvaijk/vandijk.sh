@@ -23,13 +23,16 @@ export const head: DocumentHead = ({ head }) => {
   const titleBase = "Daniel van Dijk's Blog";
   const title = head.title ? `${titleBase} - ${head.title}` : titleBase;
 
-  return {
-    title,
-    links: [
-      {
-        rel: "stylesheet",
-        href: "https://cdnjs.cloudflare.com/ajax/libs/prism/1.27.0/themes/prism.min.css",
-      },
-    ],
-  };
+  const links = [];
+
+  // We only want to include syntax highlighting for code snippets
+  // on actual article pages, which might contain the content.
+  if (head.title) {
+    links.push({
+      rel: "stylesheet",
+      href: "https://cdnjs.cloudflare.com/ajax/libs/prism/1.27.0/themes/prism.min.css",
+    });
+  }
+
+  return { title, links };
 };
