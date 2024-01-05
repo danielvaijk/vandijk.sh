@@ -13,5 +13,7 @@ npm-debug.log*
 # Misc
 .DS_Store
 
+# Generated
+public/assets/*
 src/routes/articles/*/index.mdx
 src/routes/articles/*/meta.json

@@ -14,7 +14,7 @@ import {
 import { getRouteFromText } from "~/helpers/url";
 import {
   convertBlocksToMarkup,
-  getImageContentFromBlock,
+  getAndStoreImageContentFromBlock,
   getTextContentFromBlock,
   isNextIndexBlockOfType,
 } from "~/helpers/markup";
@@ -69,7 +69,7 @@ for (const article of articles) {
   const articleMetadataPath = path.join(articleDirectory, "meta.json");
 
   // Format the page cover data to be compatible with the existing image
-  // content utility function: getImageContentFromBlock.
+  // content utility function: getAndStoreImageContentFromBlock.
   const pageCoverAsBlock = {
     id: "",
     type: NotionBlockType.COVER,
@@ -82,7 +82,7 @@ for (const article of articles) {
       "  return <article>{content}</article>;",
       "}",
       "",
-      await getImageContentFromBlock({
+      await getAndStoreImageContentFromBlock({
         block: pageCoverAsBlock,
         isPriority: true,
       }),
