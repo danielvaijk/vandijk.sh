@@ -73,15 +73,6 @@ h3 {
   font-weight: 600;
 }
 
-h4 {
-  font-size: 1.25rem;
-  max-width: 32rem;
-  line-height: 1.1;
-  text-align: center;
-  font-weight: 400;
-  font-style: italic;
-}
-
 p {
   margin-block-start: 1em;
   margin-block-end: 1em;
