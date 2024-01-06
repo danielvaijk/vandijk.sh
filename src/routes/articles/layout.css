@@ -10,7 +10,7 @@ article figure {
   margin-inline: 0;
 }
 
-article figure > img {
+article figure img {
   width: 100%;
   height: auto; /* Let the browser calculate the height to maintain aspect ratio */
   display: block; /* Removes any extra white space below the image */
