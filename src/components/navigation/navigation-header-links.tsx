@@ -71,7 +71,13 @@ export const NavigationHeaderLinks = component$(() => {
           <Link href="/resume">Resume</Link>
         </li>
         <li>
-          <Link href="/connect">Connect</Link>
+          <Link
+            target="_blank"
+            rel="noopener noreferrer"
+            href="https://www.linkedin.com/in/daniel-vandijk-sh/"
+          >
+            Connect
+          </Link>
         </li>
       </ul>
     </nav>
