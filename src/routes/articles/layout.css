@@ -23,7 +23,7 @@ article figure > figcaption {
 }
 
 article h2 {
-  margin: 4rem 0.75rem 0 1rem;
+  margin: 4rem auto 0 auto;
 }
 
 article h2 + p:first-letter {
@@ -33,12 +33,23 @@ article h2 + p:first-letter {
 }
 
 article h3 {
-  margin: 2rem 0 1rem 0;
+  margin: 2rem auto 1rem 0;
   text-align: left;
 }
 
+article h2,
+article h3 {
+  cursor: pointer;
+  width: max-content;
+}
+
+article h2 > a,
+article h3 > a {
+  color: inherit;
+}
+
 article div[role="doc-subtitle"] {
-  margin: 1rem auto;
+  margin: 1rem auto 4rem auto;
   max-width: 32rem;
   line-height: 1.1;
   text-align: center;
