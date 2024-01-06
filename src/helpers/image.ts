@@ -8,34 +8,44 @@ interface ParsedImage {
   width?: number;
   height?: number;
   format?: string;
-  buffer: ArrayBuffer;
-  text: string;
+  data: Buffer | string;
 }
 
 async function fetchAndParseImage(url: string): Promise<ParsedImage> {
   const response = await fetch(url);
   const blob = await response.blob();
-  const buffer = await blob.arrayBuffer();
-  const text = await blob.text();
+  const arrayBuffer = await blob.arrayBuffer();
 
-  const image = await sharp(buffer).metadata();
-  const { width, height, format } = image;
+  let image = sharp(arrayBuffer);
 
-  return { width, height, format, buffer, text };
+  const isSvg = blob.type.startsWith("image/svg");
+  const metadata = await image.metadata();
+
+  if (!isSvg) {
+    image = image.webp({
+      effort: 6,
+      quality: 80,
+      alphaQuality: 100,
+      smartSubsample: true,
+      nearLossless: true,
+    });
+  }
+
+  return {
+    width: metadata.width,
+    height: metadata.height,
+    format: isSvg ? metadata.format : "webp",
+    data: isSvg ? await blob.text() : await image.toBuffer(),
+  };
 }
 
-async function saveImageInPublicDirectory({ format, text, buffer }: ParsedImage): Promise<string> {
-  const contentHash = createHash("sha256").update(text).digest("hex");
+async function saveImageInPublicDirectory({ format, data }: ParsedImage): Promise<string> {
+  const contentHash = createHash("sha256").update(data).digest("hex");
 
   const fileName = `${contentHash}.${format}`;
   const publicPath = `/assets/${fileName}`;
-  const outputPath = path.join("./public", publicPath);
 
-  if (format === "svg") {
-    await writeFile(outputPath, text);
-  } else {
-    await writeFile(outputPath, Buffer.from(buffer));
-  }
+  await writeFile(path.join("./public", publicPath), data);
 
   return publicPath;
 }
