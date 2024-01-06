@@ -90,7 +90,7 @@ header {
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
-  padding: 0.8rem 2rem;
+  padding: 0.8rem;
   user-select: none;
 }
 
@@ -101,15 +101,18 @@ header {
 
 #header-name img {
   margin-right: 0.4rem;
+  width: 40px;
+  height: auto;
 }
 
 #header-name h2 {
   margin: 0;
+  font-size: 1.6rem;
 }
 
 header > nav {
   position: relative;
-  margin: 0 0 14px 0;
+  margin: 0 0 6px 0;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -160,6 +163,23 @@ header > nav > ul > li a {
 }
 
 @media screen and (min-width: 46rem) {
+  header {
+    padding: 0.8rem 2rem;
+  }
+
+  #header-name img {
+    width: 60px;
+  }
+
+  #header-name h2 {
+    margin: 0;
+    font-size: 2rem;
+  }
+
+  header > nav {
+    margin: 0 0 14px 0;
+  }
+
   header > nav > .hamburger {
     display: none;
   }
