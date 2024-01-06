@@ -7,7 +7,7 @@ import {
   type NotionRichText,
 } from "~/definition/notion";
 import { PRETTIER_CONFIG } from "~/definition/prettier";
-import { fetchAndParseImage, saveImageInPublicDirectory } from "./image";
+import { createImageVariants, fetchAndProcessImage, saveImageInPublicDirectory } from "./image";
 import { getRouteFromText } from "./url";
 
 function isNextIndexBlockOfType(array: Array<NotionBlock>, index: number, type: NotionBlockType) {
@@ -80,19 +80,31 @@ async function getAndStoreImageContentFromBlock({
     throw new Error("Image content is missing a caption.");
   }
 
-  const image = await fetchAndParseImage(url);
-  const imagePath = await saveImageInPublicDirectory(image);
+  const image = await fetchAndProcessImage(url);
+  const variants = await createImageVariants(image);
   const shouldDisplayCaption = !caption.startsWith("(HIDDEN)");
+
+  const imageSources = [];
+
+  for (let index = 0; index < variants.length; index++) {
+    const variant = variants[index];
+    const variantSize = `${variant.width}w`;
+    const variantPath = await saveImageInPublicDirectory(variant);
+
+    imageSources.push([variantPath, variantSize].join(" "));
+  }
 
   return [
     "<figure>",
     "<img",
-    `src="${imagePath}"`,
+    `src="${imageSources[0].split(" ")[0]}"`,
+    `srcset="${imageSources.join(", ")}"`,
+    `sizes="(max-width: 46rem) 90vw, 46rem"`,
     `alt="${shouldDisplayCaption ? caption : caption.slice("(HIDDEN)".length).trim()}"`,
     `decoding="${isPriority ? "sync" : "async"}"`,
     `loading="${isPriority ? "eager" : "lazy"}"`,
-    `width="${image.width}"`,
-    `height="${image.height}"`,
+    `width="${variants[0].width}"`,
+    `height="${variants[0].height}"`,
     "/>",
     shouldDisplayCaption ? `<figcaption>${caption}</figcaption>` : undefined,
     "</figure>",
