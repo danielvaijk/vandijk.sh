@@ -2,7 +2,7 @@ import path from "path";
 import { createHash } from "crypto";
 import { writeFile } from "fs/promises";
 
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 
 interface ParsedImage {
   width?: number;
@@ -11,7 +11,12 @@ interface ParsedImage {
   data: Buffer | string;
 }
 
-async function fetchAndParseImage(url: string): Promise<ParsedImage> {
+interface ProcessedImage {
+  image: Sharp;
+  blob: Blob;
+}
+
+async function fetchAndProcessImage(url: string): Promise<ProcessedImage> {
   // Enforce consistency where we expect images to be uploaded directly to Notion's
   // S3 bucket. This ensures that the image files don't change or get deleted after
   // it's initially downloaded during a build (or referenced for an article).
@@ -22,11 +27,14 @@ async function fetchAndParseImage(url: string): Promise<ParsedImage> {
   const response = await fetch(url);
   const blob = await response.blob();
   const arrayBuffer = await blob.arrayBuffer();
+  const image = sharp(arrayBuffer);
 
-  let image = sharp(arrayBuffer);
+  return { image, blob };
+}
 
-  const isSvg = blob.type.startsWith("image/svg");
+async function createImageVariants({ image, blob }: ProcessedImage): Promise<Array<ParsedImage>> {
   const metadata = await image.metadata();
+  const isSvg = metadata.format === "svg";
 
   if (!isSvg) {
     image = image.webp({
@@ -38,18 +46,49 @@ async function fetchAndParseImage(url: string): Promise<ParsedImage> {
     });
   }
 
-  return {
-    width: metadata.width,
-    height: metadata.height,
-    format: isSvg ? metadata.format : "webp",
-    data: isSvg ? await blob.text() : await image.toBuffer(),
-  };
+  const variants = [];
+  const { width = 0, height = 0 } = metadata;
+
+  for (const resizeWidth of [480, 768, 1024, 1920]) {
+    if (isSvg) {
+      variants.push({
+        width,
+        height,
+        format: metadata.format,
+        data: await blob.text(),
+      });
+
+      break;
+    }
+
+    // The resize method mutates the image object reference, so we need
+    // to call resize with the original width again at one point.
+    const targetWidth = resizeWidth < width ? resizeWidth : width;
+    const resizedImage = image.resize(targetWidth);
+
+    const { data, info } = await resizedImage.toBuffer({
+      resolveWithObject: true,
+    });
+
+    variants.push({
+      format: info.format,
+      width: info.width,
+      height: info.height,
+      data,
+    });
+
+    if (targetWidth === width) {
+      break;
+    }
+  }
+
+  return variants;
 }
 
-async function saveImageInPublicDirectory({ format, data }: ParsedImage): Promise<string> {
+async function saveImageInPublicDirectory({ format, width, data }: ParsedImage): Promise<string> {
   const contentHash = createHash("sha256").update(data).digest("hex");
 
-  const fileName = `${contentHash}.${format}`;
+  const fileName = `${contentHash}-${width}.${format}`;
   const publicPath = `/assets/${fileName}`;
 
   await writeFile(path.join("./public", publicPath), data);
@@ -57,4 +96,4 @@ async function saveImageInPublicDirectory({ format, data }: ParsedImage): Promis
   return publicPath;
 }
 
-export { fetchAndParseImage, saveImageInPublicDirectory };
+export { fetchAndProcessImage, createImageVariants, saveImageInPublicDirectory };
