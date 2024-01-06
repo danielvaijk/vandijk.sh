@@ -95,7 +95,7 @@ for (const article of articles) {
       "",
       `# ${article.title}`,
       "",
-      `#### ${formatDateAsString(article.date)}`,
+      `<div role="doc-subtitle">${formatDateAsString(article.date)}</div>`,
       "",
       anchorLinks,
       "",
