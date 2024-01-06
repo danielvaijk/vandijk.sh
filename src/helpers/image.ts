@@ -12,6 +12,13 @@ interface ParsedImage {
 }
 
 async function fetchAndParseImage(url: string): Promise<ParsedImage> {
+  // Enforce consistency where we expect images to be uploaded directly to Notion's
+  // S3 bucket. This ensures that the image files don't change or get deleted after
+  // it's initially downloaded during a build (or referenced for an article).
+  if (!url.startsWith("https://prod-files-secure.s3.us-west-2.amazonaws.com")) {
+    throw new Error("Only images from Notion's S3 bucket can be loaded.");
+  }
+
   const response = await fetch(url);
   const blob = await response.blob();
   const arrayBuffer = await blob.arrayBuffer();
