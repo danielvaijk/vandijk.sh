@@ -4,6 +4,11 @@ import { writeFile } from "fs/promises";
 
 import sharp, { type Sharp } from "sharp";
 
+enum ImageFormat {
+  WEBP = "webp",
+  AVIF = "avif",
+}
+
 interface ParsedImage {
   width?: number;
   height?: number;
@@ -13,6 +18,7 @@ interface ParsedImage {
 
 interface ProcessedImage {
   image: Sharp;
+  metadata: sharp.Metadata;
   blob: Blob;
 }
 
@@ -28,39 +34,44 @@ async function fetchAndProcessImage(url: string): Promise<ProcessedImage> {
   const blob = await response.blob();
   const arrayBuffer = await blob.arrayBuffer();
   const image = sharp(arrayBuffer);
+  const metadata = await image.metadata();
 
-  return { image, blob };
+  return { image, metadata, blob };
 }
 
-async function createImageVariants({ image, blob }: ProcessedImage): Promise<Array<ParsedImage>> {
-  const metadata = await image.metadata();
-  const isSvg = metadata.format === "svg";
+async function createImageVariants(
+  { image: original, metadata }: ProcessedImage,
+  format: ImageFormat
+): Promise<Array<ParsedImage>> {
+  let image = original.clone();
 
-  if (!isSvg) {
-    image = image.webp({
-      effort: 6,
-      quality: 80,
-      alphaQuality: 100,
-      smartSubsample: true,
-      nearLossless: true,
-    });
+  switch (format) {
+    case ImageFormat.WEBP:
+      image = image.webp({
+        effort: 6,
+        quality: 80,
+        alphaQuality: 100,
+        smartSubsample: true,
+        nearLossless: true,
+      });
+      break;
+
+    case ImageFormat.AVIF:
+      image = image.avif({
+        effort: 9,
+        quality: 80,
+        lossless: false,
+      });
+      break;
+
+    default:
+      throw new Error(`Image format '${format}' is not supported.`);
   }
 
   const variants = [];
-  const { width = 0, height = 0 } = metadata;
+  const { width = 0 } = metadata;
 
   for (const resizeWidth of [480, 768, 1024, 1920]) {
-    if (isSvg) {
-      variants.push({
-        width,
-        height,
-        format: metadata.format,
-        data: await blob.text(),
-      });
-
-      break;
-    }
-
     // The resize method mutates the image object reference, so we need
     // to call resize with the original width again at one point.
     const targetWidth = resizeWidth < width ? resizeWidth : width;
@@ -96,4 +107,5 @@ async function saveImageInPublicDirectory({ format, width, data }: ParsedImage):
   return publicPath;
 }
 
-export { fetchAndProcessImage, createImageVariants, saveImageInPublicDirectory };
+export { ImageFormat, fetchAndProcessImage, createImageVariants, saveImageInPublicDirectory };
+export type { ParsedImage };
