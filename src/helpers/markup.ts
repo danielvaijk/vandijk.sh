@@ -8,6 +8,7 @@ import {
 } from "~/definition/notion";
 import { PRETTIER_CONFIG } from "~/definition/prettier";
 import { fetchAndParseImage, saveImageInPublicDirectory } from "./image";
+import { getRouteFromText } from "./url";
 
 function isNextIndexBlockOfType(array: Array<NotionBlock>, index: number, type: NotionBlockType) {
   return index < array.length - 1 && array[index + 1].type === type;
@@ -152,13 +153,15 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
       case NotionBlockType.HEADING_TWO:
         prefix = "##";
         content = getTextContentFromBlock(block);
-        anchorLinks += "- " + content + "\n";
+        content = `[${content}](#${getRouteFromText(content)})`;
+        anchorLinks += `- ${content}\n`;
         break;
 
       case NotionBlockType.HEADING_THREE:
         prefix = "###";
         content = getTextContentFromBlock(block);
-        anchorLinks += "  - " + content + "\n";
+        content = `[${content}](#${getRouteFromText(content)})`;
+        anchorLinks += `  - ${content}\n`;
         break;
 
       case NotionBlockType.IMAGE:
