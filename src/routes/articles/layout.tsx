@@ -29,8 +29,14 @@ export const head: DocumentHead = ({ head }) => {
   // on actual article pages, which might contain the content.
   if (head.title) {
     links.push({
-      rel: "stylesheet",
-      href: "https://cdnjs.cloudflare.com/ajax/libs/prism/1.27.0/themes/prism.min.css",
+      rel: "preload",
+      as: "style",
+      onload: "this.onload=null;this.rel='stylesheet'",
+      href: "https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css",
+      integrity:
+        "sha512-vswe+cgvic/XBoF1OcM/TeJ2FW0OofqAVdCZiEYkd6dwGXthvkSFWOoGGJgS2CW70VK5dQM5Oh+7ne47s74VTg==",
+      crossorigin: "anonymous",
+      referrerpolicy: "no-referrer",
     });
   }
 

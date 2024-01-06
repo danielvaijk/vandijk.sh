@@ -18,6 +18,7 @@ export const DocumentHead = component$(() => {
 
       <link rel="canonical" href={location.url.href} />
       <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+      <link rel="preconnect" href="https://cdnjs.cloudflare.com" />
 
       {head.links.map(({ key, ...props }) => (
         <link key={key} {...props} />
