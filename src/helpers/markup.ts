@@ -7,8 +7,19 @@ import {
   type NotionRichText,
 } from "~/definition/notion";
 import { PRETTIER_CONFIG } from "~/definition/prettier";
-import { createImageVariants, fetchAndProcessImage, saveImageInPublicDirectory } from "./image";
+import {
+  ImageFormat,
+  type ParsedImage,
+  createImageVariants,
+  fetchAndProcessImage,
+  saveImageInPublicDirectory,
+} from "./image";
 import { getRouteFromText } from "./url";
+
+interface SourceSet {
+  path: string;
+  size: string;
+}
 
 function isNextIndexBlockOfType(array: Array<NotionBlock>, index: number, type: NotionBlockType) {
   return index < array.length - 1 && array[index + 1].type === type;
@@ -56,6 +67,26 @@ function getTextContentFromBlock(block: NotionBlock): string {
   return getContentFromRichText(richText);
 }
 
+async function createSourceSetsFromImageVariants(
+  variants: Array<ParsedImage>
+): Promise<Array<SourceSet>> {
+  const imageSources = [];
+
+  for (let index = 0; index < variants.length; index++) {
+    const variant = variants[index];
+    const variantSize = `${variant.width}w`;
+    const variantPath = await saveImageInPublicDirectory(variant);
+
+    imageSources.push({ size: variantSize, path: variantPath });
+  }
+
+  return imageSources;
+}
+
+function createSourceSetAttribute(sources: Array<SourceSet>): string {
+  return `srcset="${sources.map(({ path, size }) => [path, size].join(" ")).join(", ")}"`;
+}
+
 async function getAndStoreImageContentFromBlock({
   block,
   captionOverride,
@@ -81,32 +112,47 @@ async function getAndStoreImageContentFromBlock({
   }
 
   const image = await fetchAndProcessImage(url);
-  const variants = await createImageVariants(image);
+  const { width, height, format } = image.metadata;
+
   const shouldDisplayCaption = !caption.startsWith("(HIDDEN)");
 
-  const imageSources = [];
+  const widthAttribute = `width="${width}"`;
+  const heightAttribute = `height="${height}"`;
+  const decoding = `decoding="${isPriority ? "sync" : "async"}"`;
+  const loading = `loading="${isPriority ? "eager" : "lazy"}"`;
+  const alt = `alt="${shouldDisplayCaption ? caption : caption.slice("(HIDDEN)".length).trim()}"`;
 
-  for (let index = 0; index < variants.length; index++) {
-    const variant = variants[index];
-    const variantSize = `${variant.width}w`;
-    const variantPath = await saveImageInPublicDirectory(variant);
+  if (format === "svg") {
+    const data = await image.blob.text();
+    const publicPath = await saveImageInPublicDirectory({ width, height, format, data });
 
-    imageSources.push([variantPath, variantSize].join(" "));
+    return [
+      "<figure>",
+      `<img src="${publicPath}" ${widthAttribute} ${heightAttribute} ${alt} ${decoding} ${loading} />`,
+      shouldDisplayCaption && `<figcaption>${caption}</figcaption>`,
+      "</figure>",
+    ]
+      .filter((value) => value)
+      .join("\n");
   }
+
+  const avifVariants = await createImageVariants(image, ImageFormat.AVIF);
+  const webpVariants = await createImageVariants(image, ImageFormat.WEBP);
+
+  const avifSourceSets = await createSourceSetsFromImageVariants(avifVariants);
+  const webpSourceSets = await createSourceSetsFromImageVariants(webpVariants);
+
+  const sizes = `sizes="(max-width: 46rem) 90vw, 46rem"`;
+  const fallbackSource = `src="${webpSourceSets[0].path}"`;
 
   return [
     "<figure>",
-    "<img",
-    `src="${imageSources[0].split(" ")[0]}"`,
-    `srcset="${imageSources.join(", ")}"`,
-    `sizes="(max-width: 46rem) 90vw, 46rem"`,
-    `alt="${shouldDisplayCaption ? caption : caption.slice("(HIDDEN)".length).trim()}"`,
-    `decoding="${isPriority ? "sync" : "async"}"`,
-    `loading="${isPriority ? "eager" : "lazy"}"`,
-    `width="${variants[0].width}"`,
-    `height="${variants[0].height}"`,
-    "/>",
-    shouldDisplayCaption ? `<figcaption>${caption}</figcaption>` : undefined,
+    "<picture>",
+    `<source ${sizes} ${createSourceSetAttribute(avifSourceSets)} />`,
+    `<source ${sizes} ${createSourceSetAttribute(webpSourceSets)} />`,
+    `<img ${fallbackSource} ${widthAttribute} ${heightAttribute} ${alt} ${decoding} ${loading} />`,
+    "</picture>",
+    shouldDisplayCaption && `<figcaption>${caption}</figcaption>`,
     "</figure>",
   ]
     .filter((value) => value)
