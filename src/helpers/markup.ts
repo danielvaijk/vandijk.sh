@@ -122,9 +122,29 @@ async function getAndStoreImageContentFromBlock({
   const loading = `loading="${isPriority ? "eager" : "lazy"}"`;
   const alt = `alt="${shouldDisplayCaption ? caption : caption.slice("(HIDDEN)".length).trim()}"`;
 
-  if (format === "svg") {
-    const data = await image.blob.text();
-    const publicPath = await saveImageInPublicDirectory({ width, height, format, data });
+  let data;
+
+  switch (format) {
+    case "svg":
+      data = await image.blob.text();
+      break;
+
+    case "gif":
+      data = Buffer.from(await image.blob.arrayBuffer());
+      break;
+
+    default:
+      data = null;
+      break;
+  }
+
+  if (data) {
+    const publicPath = await saveImageInPublicDirectory({
+      width,
+      height,
+      format,
+      data,
+    });
 
     return [
       "<figure>",
