@@ -62,7 +62,13 @@ export const NavigationHeaderLinks = component$(() => {
 
       <ul ref={listRef} class={isOpen.value ? "is-open" : undefined}>
         <li>
-          <Link href="/">Projects</Link>
+          <Link
+            target="_blank"
+            rel="noopener noreferrer"
+            href="https://github.com/danielvaijk?tab=repositories"
+          >
+            Projects
+          </Link>
         </li>
         <li>
           <Link href="/articles">Articles</Link>

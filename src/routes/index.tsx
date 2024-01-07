@@ -1,12 +1,9 @@
-import { component$ } from "@builder.io/qwik";
-import type { DocumentHead } from "@builder.io/qwik-city";
+import type { DocumentHead, RequestHandler } from "@builder.io/qwik-city";
 
-import { CenteredTitle } from "~/components/centered-title";
-
-export default component$(() => {
-  return <CenteredTitle title="TODO" subtitle="Nothing to see here yet." />;
-});
+export const onGet: RequestHandler = async ({ redirect, url }) => {
+  throw redirect(307, new URL("/articles/", url).toString());
+};
 
 export const head: DocumentHead = {
-  title: "Daniel van Dijk's Portfolio",
+  title: "Daniel van Dijk",
 };
