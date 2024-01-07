@@ -7,6 +7,8 @@ import sharp, { type Sharp } from "sharp";
 enum ImageFormat {
   WEBP = "webp",
   AVIF = "avif",
+  GIF = "gif",
+  SVG = "svg",
 }
 
 interface ParsedImage {
@@ -81,7 +83,7 @@ async function createImageVariants(
     });
 
     variants.push({
-      format: info.format,
+      format,
       width: info.width,
       height: info.height,
       data,
