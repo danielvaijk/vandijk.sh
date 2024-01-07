@@ -32,8 +32,7 @@ async function fetchAndProcessImage(url: string): Promise<ProcessedImage> {
 
   const response = await fetch(url);
   const blob = await response.blob();
-  const arrayBuffer = await blob.arrayBuffer();
-  const image = sharp(arrayBuffer);
+  const image = sharp(await blob.arrayBuffer());
   const metadata = await image.metadata();
 
   return { image, metadata, blob };
