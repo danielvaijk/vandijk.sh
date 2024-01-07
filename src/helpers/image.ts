@@ -72,7 +72,7 @@ async function createImageVariants(
   const variants = [];
   const { width = 0 } = metadata;
 
-  for (const resizeWidth of [480, 768, 1024, 1920]) {
+  for (const resizeWidth of [480, 705, 960, 1410, 1440, 2115]) {
     // The resize method mutates the image object reference, so we need
     // to call resize with the original width again at one point.
     const targetWidth = resizeWidth < width ? resizeWidth : width;
