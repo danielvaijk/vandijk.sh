@@ -59,6 +59,11 @@ article div[role="doc-subtitle"] {
   font-style: italic;
 }
 
+/* the heading anchor list */
+article div[role="doc-subtitle"] + ul a {
+  color: inherit;
+}
+
 article p {
   text-align: justify;
 }
