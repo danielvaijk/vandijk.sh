@@ -125,11 +125,11 @@ async function getAndStoreImageContentFromBlock({
   let data;
 
   switch (format) {
-    case "svg":
+    case ImageFormat.SVG:
       data = await image.blob.text();
       break;
 
-    case "gif":
+    case ImageFormat.GIF:
       data = Buffer.from(await image.blob.arrayBuffer());
       break;
 
