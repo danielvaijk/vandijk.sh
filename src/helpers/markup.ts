@@ -9,16 +9,18 @@ import {
 import { PRETTIER_CONFIG } from "~/definition/prettier";
 import {
   ImageFormat,
-  type ParsedImage,
   createImageVariants,
   fetchAndProcessImage,
-  saveImageInPublicDirectory,
+  type ProcessedImage,
+  type ImageSourceSet,
+  createSourceSetsFromImageVariants,
+  saveImage,
 } from "./image";
 import { getRouteFromText } from "./url";
 
-interface SourceSet {
-  path: string;
-  size: string;
+interface ImageContent {
+  url: string;
+  caption: string;
 }
 
 function isNextIndexBlockOfType(array: Array<NotionBlock>, index: number, type: NotionBlockType) {
@@ -67,35 +69,13 @@ function getTextContentFromBlock(block: NotionBlock): string {
   return getContentFromRichText(richText);
 }
 
-async function createSourceSetsFromImageVariants(
-  variants: Array<ParsedImage>
-): Promise<Array<SourceSet>> {
-  const imageSources = [];
-
-  for (let index = 0; index < variants.length; index++) {
-    const variant = variants[index];
-    const variantSize = `${variant.width}w`;
-    const variantPath = await saveImageInPublicDirectory(variant);
-
-    imageSources.push({ size: variantSize, path: variantPath });
-  }
-
-  return imageSources;
-}
-
-function createSourceSetAttribute(sources: Array<SourceSet>): string {
-  return `srcset="${sources.map(({ path, size }) => [path, size].join(" ")).join(", ")}"`;
-}
-
-async function getAndStoreImageContentFromBlock({
+function getImageContentFromBlock({
   block,
   captionOverride,
-  isPriority = false,
 }: {
   block: NotionBlock;
   captionOverride?: string;
-  isPriority?: boolean;
-}): Promise<string> {
+}): ImageContent {
   const content = block[block.type] as NotionBlockContents;
 
   if (typeof content.type === "undefined") {
@@ -111,41 +91,36 @@ async function getAndStoreImageContentFromBlock({
     throw new Error("Image content is missing a caption.");
   }
 
-  const image = await fetchAndProcessImage(url);
-  const { width, height, format } = image.metadata;
+  return { url, caption };
+}
 
+function createMarkupForImage({
+  image,
+  caption,
+  publicPath,
+  isPriority = false,
+  avifSourceSets = [],
+  webpSourceSets = [],
+}: {
+  image: ProcessedImage;
+  caption: string;
+  publicPath: string;
+  isPriority?: boolean;
+  avifSourceSets?: Array<ImageSourceSet>;
+  webpSourceSets?: Array<ImageSourceSet>;
+}): string {
+  const { width, height } = image.metadata;
   const shouldDisplayCaption = !caption.startsWith("(HIDDEN)");
+  const isSingleImage = avifSourceSets.length + webpSourceSets.length === 0;
 
   const widthAttribute = `width="${width}"`;
   const heightAttribute = `height="${height}"`;
   const decoding = `decoding="${isPriority ? "sync" : "async"}"`;
   const loading = `loading="${isPriority ? "eager" : "lazy"}"`;
   const alt = `alt="${shouldDisplayCaption ? caption : caption.slice("(HIDDEN)".length).trim()}"`;
+  const sizes = `sizes="(max-width: 46rem) 90vw, 46rem"`;
 
-  let data;
-
-  switch (format) {
-    case ImageFormat.SVG:
-      data = await image.blob.text();
-      break;
-
-    case ImageFormat.GIF:
-      data = Buffer.from(await image.blob.arrayBuffer());
-      break;
-
-    default:
-      data = null;
-      break;
-  }
-
-  if (data) {
-    const publicPath = await saveImageInPublicDirectory({
-      width,
-      height,
-      format,
-      data,
-    });
-
+  if (isSingleImage) {
     return [
       "<figure>",
       `<img src="${publicPath}" ${widthAttribute} ${heightAttribute} ${alt} ${decoding} ${loading} />`,
@@ -156,21 +131,16 @@ async function getAndStoreImageContentFromBlock({
       .join("\n");
   }
 
-  const avifVariants = await createImageVariants(image, ImageFormat.AVIF);
-  const webpVariants = await createImageVariants(image, ImageFormat.WEBP);
-
-  const avifSourceSets = await createSourceSetsFromImageVariants(avifVariants);
-  const webpSourceSets = await createSourceSetsFromImageVariants(webpVariants);
-
-  const sizes = `sizes="(max-width: 46rem) 90vw, 46rem"`;
-  const fallbackSource = `src="${webpSourceSets[0].path}"`;
+  const createSourceSetAttribute = (sources: Array<ImageSourceSet>): string => {
+    return `srcset="${sources.map(({ path, size }) => [path, size].join(" ")).join(", ")}"`;
+  };
 
   return [
     "<figure>",
     "<picture>",
     `<source ${sizes} ${createSourceSetAttribute(avifSourceSets)} />`,
     `<source ${sizes} ${createSourceSetAttribute(webpSourceSets)} />`,
-    `<img ${fallbackSource} ${widthAttribute} ${heightAttribute} ${alt} ${decoding} ${loading} />`,
+    `<img src="${publicPath}" ${widthAttribute} ${heightAttribute} ${alt} ${decoding} ${loading} />`,
     "</picture>",
     shouldDisplayCaption && `<figcaption>${caption}</figcaption>`,
     "</figure>",
@@ -243,7 +213,34 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
         break;
 
       case NotionBlockType.IMAGE:
-        content = await getAndStoreImageContentFromBlock({ block });
+        {
+          const imageContent = getImageContentFromBlock({ block });
+          const imageData = await fetchAndProcessImage(imageContent.url);
+
+          const options = {
+            image: imageData,
+            caption: imageContent.caption,
+          };
+
+          if (imageData.output) {
+            content = createMarkupForImage({ ...options, publicPath: await saveImage(imageData) });
+          } else {
+            const avifVariants = await createImageVariants(imageData, ImageFormat.AVIF);
+            const webpVariants = await createImageVariants(imageData, ImageFormat.WEBP);
+
+            const avifSourceSets = await createSourceSetsFromImageVariants(avifVariants);
+            const webpSourceSets = await createSourceSetsFromImageVariants(webpVariants);
+
+            const publicPath = webpSourceSets[0].path;
+
+            content = createMarkupForImage({
+              ...options,
+              publicPath,
+              avifSourceSets,
+              webpSourceSets,
+            });
+          }
+        }
         break;
 
       case NotionBlockType.CODE:
@@ -273,7 +270,8 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
 
 export {
   isNextIndexBlockOfType,
+  getImageContentFromBlock,
   convertBlocksToMarkup,
+  createMarkupForImage,
   getTextContentFromBlock,
-  getAndStoreImageContentFromBlock,
 };
