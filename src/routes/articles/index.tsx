@@ -6,6 +6,7 @@ import { routeLoader$ } from "@builder.io/qwik-city";
 
 import type { ArticleSummaryProps } from "~/components/articles/article-summary-item";
 import { ArticleSummaryList } from "~/components/articles/article-summary-list";
+import { CenteredTitle } from "~/components/centered-title";
 
 import styles from "./index.css?inline";
 
@@ -38,6 +39,10 @@ export default component$(() => {
   useStylesScoped$(styles);
 
   const { value: articles } = useArticleSummaries();
+
+  if (!articles.length) {
+    return <CenteredTitle title="Oh!" subtitle="There's nothing here yet." />;
+  }
 
   return (
     <>
