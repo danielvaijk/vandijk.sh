@@ -14,10 +14,18 @@ import {
 import { getRouteFromText } from "~/helpers/url";
 import {
   convertBlocksToMarkup,
-  getAndStoreImageContentFromBlock,
+  createMarkupForImage,
+  getImageContentFromBlock,
   getTextContentFromBlock,
   isNextIndexBlockOfType,
 } from "~/helpers/markup";
+import {
+  ImageFormat,
+  createImageVariants,
+  createSourceSetsFromImageVariants,
+  fetchAndProcessImage,
+  saveImage,
+} from "~/helpers/image";
 
 interface Article {
   id: string;
@@ -68,13 +76,37 @@ for (const article of articles) {
   const articleFilePath = path.join(articleDirectory, "index.mdx");
   const articleMetadataPath = path.join(articleDirectory, "meta.json");
 
-  // Format the page cover data to be compatible with the existing image
-  // content utility function: getAndStoreImageContentFromBlock.
-  const pageCoverAsBlock = {
-    id: "",
-    type: NotionBlockType.COVER,
-    [NotionBlockType.COVER]: page.cover,
-  };
+  const coverImageContent = getImageContentFromBlock({
+    // Convert the cover object into a "fake" block so it can be pass in here.
+    block: { id: "", type: NotionBlockType.COVER, [NotionBlockType.COVER]: page.cover },
+    captionOverride: "(HIDDEN) Article cover image.",
+  });
+
+  const coverImageData = await fetchAndProcessImage(coverImageContent.url);
+  const options = { isPriority: true, image: coverImageData, caption: coverImageContent.caption };
+
+  let coverImageMarkup;
+  let coverImagePublicPath;
+
+  if (coverImageData.output) {
+    coverImagePublicPath = await saveImage(coverImageData);
+    coverImageMarkup = createMarkupForImage({ ...options, publicPath: coverImagePublicPath });
+  } else {
+    const avifVariants = await createImageVariants(coverImageData, ImageFormat.AVIF);
+    const webpVariants = await createImageVariants(coverImageData, ImageFormat.WEBP);
+
+    const avifSourceSets = await createSourceSetsFromImageVariants(avifVariants);
+    const webpSourceSets = await createSourceSetsFromImageVariants(webpVariants);
+
+    coverImagePublicPath = webpSourceSets[0].path;
+
+    coverImageMarkup = createMarkupForImage({
+      ...options,
+      avifSourceSets,
+      webpSourceSets,
+      publicPath: coverImagePublicPath,
+    });
+  }
 
   const mdxContents = await prettier.format(
     [
@@ -87,11 +119,7 @@ for (const article of articles) {
       "  return <article>{content}</article>;",
       "}",
       "",
-      await getAndStoreImageContentFromBlock({
-        block: pageCoverAsBlock,
-        captionOverride: "(HIDDEN) Article cover image.",
-        isPriority: true,
-      }),
+      coverImageMarkup,
       "",
       `# ${article.title}`,
       "",

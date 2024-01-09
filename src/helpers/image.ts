@@ -11,17 +11,21 @@ enum ImageFormat {
   SVG = "svg",
 }
 
-interface ParsedImage {
-  width?: number;
-  height?: number;
-  format?: string;
-  data: Buffer | string;
+interface ImageMetadata {
+  format: string;
+  width: number;
+  height: number;
 }
 
 interface ProcessedImage {
   image: Sharp;
-  metadata: sharp.Metadata;
-  blob: Blob;
+  metadata: ImageMetadata;
+  output: string | Buffer | null;
+}
+
+interface ImageSourceSet {
+  path: string;
+  size: string;
 }
 
 async function fetchAndProcessImage(url: string): Promise<ProcessedImage> {
@@ -35,15 +39,32 @@ async function fetchAndProcessImage(url: string): Promise<ProcessedImage> {
   const response = await fetch(url);
   const blob = await response.blob();
   const image = sharp(await blob.arrayBuffer());
-  const metadata = await image.metadata();
+  const { format = "unknown", width = 0, height = 0 } = await image.metadata();
+  const metadata = { format, width, height };
 
-  return { image, metadata, blob };
+  let output;
+
+  switch (format) {
+    case ImageFormat.SVG:
+      output = await blob.text();
+      break;
+
+    case ImageFormat.GIF:
+      output = Buffer.from(await blob.arrayBuffer());
+      break;
+
+    default:
+      output = null;
+      break;
+  }
+
+  return { image, metadata, output };
 }
 
 async function createImageVariants(
   { image: original, metadata }: ProcessedImage,
   format: ImageFormat
-): Promise<Array<ParsedImage>> {
+): Promise<Array<ProcessedImage>> {
   let image = original.clone();
 
   switch (format) {
@@ -69,7 +90,7 @@ async function createImageVariants(
       throw new Error(`Image format '${format}' is not supported.`);
   }
 
-  const variants = [];
+  const variants: Array<ProcessedImage> = [];
   const { width = 0 } = metadata;
 
   for (const resizeWidth of [480, 705, 960, 1410, 1440, 2115]) {
@@ -82,11 +103,16 @@ async function createImageVariants(
       resolveWithObject: true,
     });
 
-    variants.push({
+    const newMetadata = {
       format,
       width: info.width,
       height: info.height,
-      data,
+    };
+
+    variants.push({
+      image,
+      metadata: newMetadata,
+      output: data,
     });
 
     if (targetWidth === width) {
@@ -97,16 +123,43 @@ async function createImageVariants(
   return variants;
 }
 
-async function saveImageInPublicDirectory({ format, width, data }: ParsedImage): Promise<string> {
-  const contentHash = createHash("sha256").update(data).digest("hex");
+async function createSourceSetsFromImageVariants(
+  variants: Array<ProcessedImage>
+): Promise<Array<ImageSourceSet>> {
+  const imageSources = [];
+
+  for (let index = 0; index < variants.length; index++) {
+    const variant = variants[index];
+    const variantSize = `${variant.metadata.width}w`;
+    const variantPath = await saveImage(variant);
+
+    imageSources.push({ size: variantSize, path: variantPath });
+  }
+
+  return imageSources;
+}
+
+async function saveImage({ metadata, output }: ProcessedImage): Promise<string> {
+  if (!output) {
+    throw new Error("Cannot create public path for image with missing output.");
+  }
+
+  const { format, width } = metadata;
+  const contentHash = createHash("sha256").update(output).digest("hex");
 
   const fileName = `${contentHash}-${width}.${format}`;
   const publicPath = `/assets/${fileName}`;
 
-  await writeFile(path.join("./public", publicPath), data);
+  await writeFile(path.join("./public", publicPath), output);
 
   return publicPath;
 }
 
-export { ImageFormat, fetchAndProcessImage, createImageVariants, saveImageInPublicDirectory };
-export type { ParsedImage };
+export {
+  ImageFormat,
+  fetchAndProcessImage,
+  createImageVariants,
+  createSourceSetsFromImageVariants,
+  saveImage,
+};
+export type { ProcessedImage, ImageSourceSet };
