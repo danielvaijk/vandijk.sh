@@ -162,4 +162,4 @@ export {
   createSourceSetsFromImageVariants,
   saveImage,
 };
-export type { ProcessedImage, ImageSourceSet };
+export type { ProcessedImage, ImageMetadata, ImageSourceSet };
