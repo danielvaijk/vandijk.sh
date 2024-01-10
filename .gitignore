@@ -16,5 +16,10 @@ npm-debug.log*
 
 # Generated
 public/assets/*
+!public/assets/.gitkeep
+
 src/routes/articles/*/index.mdx
 src/routes/articles/*/meta.json
+
+# Cloudflare
+functions/**/*.js
