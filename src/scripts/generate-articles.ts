@@ -21,6 +21,7 @@ import {
 } from "~/helpers/markup";
 import {
   ImageFormat,
+  type ImageMetadata,
   createImageVariants,
   createSourceSetsFromImageVariants,
   fetchAndProcessImage,
@@ -85,12 +86,27 @@ for (const article of articles) {
   const coverImageData = await fetchAndProcessImage(coverImageContent.url);
   const options = { isPriority: true, image: coverImageData, caption: coverImageContent.caption };
 
+  const { CF_PAGES_URL, PREVIEW_BUILD } = process.env;
+  const baseUrl = CF_PAGES_URL ?? `http://localhost:${PREVIEW_BUILD ? 4173 : 5173}`;
+
+  const getOpenGraphMetadataForImage = (metadata: ImageMetadata, publicPath: string) =>
+    [
+      `  - image: ${path.join(baseUrl, publicPath)}`,
+      `    image:alt: ${coverImageContent.caption.text}`,
+      `    image:type: image/${metadata.format}`,
+      `    image:width: ${metadata.width}`,
+      `    image:height: ${metadata.height}`,
+    ].join("\n");
+
   let coverImageMarkup;
-  let coverImagePublicPath;
+  let coverImageOpenGraphMetadata;
 
   if (coverImageData.output) {
-    coverImagePublicPath = await saveImage(coverImageData);
-    coverImageMarkup = createMarkupForImage({ ...options, publicPath: coverImagePublicPath });
+    const publicPath = await saveImage(coverImageData);
+    const { metadata } = coverImageData;
+
+    coverImageOpenGraphMetadata = getOpenGraphMetadataForImage(metadata, publicPath);
+    coverImageMarkup = createMarkupForImage({ ...options, publicPath });
   } else {
     const avifVariants = await createImageVariants(coverImageData, ImageFormat.AVIF);
     const webpVariants = await createImageVariants(coverImageData, ImageFormat.WEBP);
@@ -98,13 +114,24 @@ for (const article of articles) {
     const avifSourceSets = await createSourceSetsFromImageVariants(avifVariants);
     const webpSourceSets = await createSourceSetsFromImageVariants(webpVariants);
 
-    coverImagePublicPath = webpSourceSets[0].path;
+    for (let index = 0; index < webpVariants.length; index++) {
+      const { metadata } = webpVariants[index];
+      const { path: publicPath } = webpSourceSets[index];
+      const openGraphContent = getOpenGraphMetadataForImage(metadata, publicPath);
+
+      if (coverImageOpenGraphMetadata) {
+        coverImageOpenGraphMetadata += "\n" + openGraphContent;
+      } else {
+        coverImageOpenGraphMetadata = openGraphContent;
+      }
+    }
 
     coverImageMarkup = createMarkupForImage({
       ...options,
       avifSourceSets,
       webpSourceSets,
-      publicPath: coverImagePublicPath,
+      // Default/fallback is the smallest WebP cover image variant.
+      publicPath: webpSourceSets[0].path,
     });
   }
 
@@ -113,6 +140,16 @@ for (const article of articles) {
       "---",
       `title: "${article.title}"`,
       `description: "${article.description}"`,
+      "opengraph:",
+      "  - title: true",
+      "  - description: true",
+      "  - type: article",
+      `  - url: ${path.join(baseUrl, "articles", articleRoute)}`,
+      "  - article:author: Daniel van Dijk",
+      `  - article:published_time: ${article.date.toISOString()}`,
+      "  - locale: en_US",
+      "  - site_name: Daniel van Dijk",
+      coverImageOpenGraphMetadata,
       "---",
       "",
       "export default function Layout({ children: content }) {",

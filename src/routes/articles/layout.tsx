@@ -22,6 +22,9 @@ export default component$(() => {
 });
 
 export const head: DocumentHead = ({ head }) => {
+  // For article pages the title is set in the MDX frontmatter, but we override it
+  // to include a base title. The original title (without the base) is still used
+  // for the Open Graph title, so it's not completely useless.
   const titleBase = "Daniel van Dijk's Blog";
   const title = head.title ? `${titleBase} - ${head.title}` : titleBase;
 
