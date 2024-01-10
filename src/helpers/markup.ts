@@ -18,9 +18,14 @@ import {
 } from "./image";
 import { getRouteFromText } from "./url";
 
+interface ImageCaption {
+  text: string;
+  isHidden: boolean;
+}
+
 interface ImageContent {
   url: string;
-  caption: string;
+  caption: ImageCaption;
 }
 
 function isNextIndexBlockOfType(array: Array<NotionBlock>, index: number, type: NotionBlockType) {
@@ -91,7 +96,16 @@ function getImageContentFromBlock({
     throw new Error("Image content is missing a caption.");
   }
 
-  return { url, caption };
+  const isCaptionHidden = caption.startsWith("(HIDDEN)");
+  const captionWithoutTag = isCaptionHidden ? caption.slice("(HIDDEN)".length).trim() : caption;
+
+  return {
+    url,
+    caption: {
+      isHidden: isCaptionHidden,
+      text: captionWithoutTag,
+    },
+  };
 }
 
 function createMarkupForImage({
@@ -103,28 +117,27 @@ function createMarkupForImage({
   webpSourceSets = [],
 }: {
   image: ProcessedImage;
-  caption: string;
+  caption: ImageCaption;
   publicPath: string;
   isPriority?: boolean;
   avifSourceSets?: Array<ImageSourceSet>;
   webpSourceSets?: Array<ImageSourceSet>;
 }): string {
   const { width, height } = image.metadata;
-  const shouldDisplayCaption = !caption.startsWith("(HIDDEN)");
   const isSingleImage = avifSourceSets.length + webpSourceSets.length === 0;
 
   const widthAttribute = `width="${width}"`;
   const heightAttribute = `height="${height}"`;
   const decoding = `decoding="${isPriority ? "sync" : "async"}"`;
   const loading = `loading="${isPriority ? "eager" : "lazy"}"`;
-  const alt = `alt="${shouldDisplayCaption ? caption : caption.slice("(HIDDEN)".length).trim()}"`;
+  const alt = `alt="${caption.text}"`;
   const sizes = `sizes="(max-width: 46rem) 90vw, 46rem"`;
 
   if (isSingleImage) {
     return [
       "<figure>",
       `<img src="${publicPath}" ${widthAttribute} ${heightAttribute} ${alt} ${decoding} ${loading} />`,
-      shouldDisplayCaption && `<figcaption>${caption}</figcaption>`,
+      !caption.isHidden && `<figcaption>${caption.text}</figcaption>`,
       "</figure>",
     ]
       .filter((value) => value)
@@ -142,7 +155,7 @@ function createMarkupForImage({
     `<source ${sizes} ${createSourceSetAttribute(webpSourceSets)} />`,
     `<img src="${publicPath}" ${widthAttribute} ${heightAttribute} ${alt} ${decoding} ${loading} />`,
     "</picture>",
-    shouldDisplayCaption && `<figcaption>${caption}</figcaption>`,
+    !caption.isHidden && `<figcaption>${caption.text}</figcaption>`,
     "</figure>",
   ]
     .filter((value) => value)
