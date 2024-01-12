@@ -1,5 +1,5 @@
 import type { NotionBlock } from "~/definition/notion";
-import { joinPathNames } from "~/utilities/path";
+import { joinPathNames } from "~/utilities/url";
 
 const NOTION_API_VERSION = "2022-06-28";
 const NOTION_API_TOKEN = `Bearer ${process.env.NOTION_TOKEN}`;

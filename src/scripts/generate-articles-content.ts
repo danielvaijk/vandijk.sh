@@ -10,7 +10,7 @@ import {
   fetchNotionBlockChildren,
   fetchNotionPage,
 } from "~/helpers/notion";
-import { joinPathNames, slugify } from "~/utilities/path";
+import { joinPathNames, slugify, determineOriginUrl } from "~/utilities/url";
 import {
   convertBlocksToMarkup,
   createMarkupForImage,
@@ -34,6 +34,8 @@ interface Article {
   path: string;
   description?: string;
 }
+
+const originUrl = determineOriginUrl();
 
 const articlesPageResponse = await fetchNotionBlockChildren(NOTION_ARTICLES_PAGE_ID);
 const articlesPageContents = articlesPageResponse.results;
@@ -66,20 +68,6 @@ for (let index = 0; index < articlesPageContents.length; index++) {
   }
 }
 
-function determineOriginUrl(): string {
-  const { CF_PAGES_BRANCH, CF_PAGES_URL, PREVIEW_BUILD } = process.env;
-
-  if (CF_PAGES_BRANCH === "main") {
-    return "https://daniel.vandijk.sh";
-  } else if (CF_PAGES_URL) {
-    return CF_PAGES_URL;
-  } else if (PREVIEW_BUILD) {
-    return "http://localhost:4173";
-  } else {
-    return "http://localhost:5173";
-  }
-}
-
 for (const article of articles) {
   const page = await fetchNotionPage(article.id);
   const { results: blocks } = await fetchNotionBlockChildren(article.id);
@@ -99,7 +87,6 @@ for (const article of articles) {
   const coverImageData = await fetchAndProcessImage(coverImageContent.url);
   const options = { isPriority: true, image: coverImageData, caption: coverImageContent.caption };
 
-  const originUrl = determineOriginUrl();
 
   const getOpenGraphMetadataForImage = (metadata: ImageMetadata, publicPath: string) =>
     [
