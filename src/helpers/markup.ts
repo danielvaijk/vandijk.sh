@@ -235,7 +235,7 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
             caption: imageContent.caption,
           };
 
-          if (imageData.output) {
+          if (imageData.willUseOriginal) {
             content = createMarkupForImage({ ...options, publicPath: await saveImage(imageData) });
           } else {
             const avifVariants = await createImageVariants(imageData, ImageFormat.AVIF);
