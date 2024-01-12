@@ -16,7 +16,7 @@ import {
   createSourceSetsFromImageVariants,
   saveImage,
 } from "./image";
-import { slugify } from "../utilities/path";
+import { slugify } from "../utilities/url";
 
 interface ImageCaption {
   text: string;

@@ -30,4 +30,18 @@ function joinPathNames(...segments: Array<string>): string {
   return result;
 }
 
-export { slugify, joinPathNames };
+function determineOriginUrl(): string {
+  const { CF_PAGES_BRANCH, CF_PAGES_URL, PREVIEW_BUILD } = process.env;
+
+  if (CF_PAGES_BRANCH === "main") {
+    return "https://daniel.vandijk.sh";
+  } else if (CF_PAGES_URL) {
+    return CF_PAGES_URL;
+  } else if (PREVIEW_BUILD) {
+    return "http://localhost:4173";
+  } else {
+    return "http://localhost:5173";
+  }
+}
+
+export { slugify, joinPathNames, determineOriginUrl };

@@ -3,7 +3,7 @@ import { writeFile } from "node:fs/promises";
 
 import sharp, { type Sharp } from "sharp";
 
-import { joinPathNames } from "~/utilities/path";
+import { joinPathNames } from "~/utilities/url";
 
 enum ImageFormat {
   WEBP = "webp",

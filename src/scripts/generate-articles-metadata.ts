@@ -3,7 +3,7 @@ import { readFile, readdir, writeFile } from "node:fs/promises";
 import prettier from "prettier";
 
 import { PRETTIER_CONFIG } from "~/definition/prettier";
-import { joinPathNames } from "~/utilities/path";
+import { joinPathNames } from "~/utilities/url";
 
 const ARTICLES_METADATA_FILE_PATH = "./src/media/articles.json";
 const ARTICLES_DIRECTORY = "./src/routes/articles";
