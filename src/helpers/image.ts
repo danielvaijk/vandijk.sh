@@ -21,7 +21,8 @@ interface ImageMetadata {
 interface ProcessedImage {
   image: Sharp;
   metadata: ImageMetadata;
-  output: string | Buffer | null;
+  willUseOriginal?: boolean;
+  output: string | Buffer;
 }
 
 interface ImageSourceSet {
@@ -44,22 +45,26 @@ async function fetchAndProcessImage(url: string): Promise<ProcessedImage> {
   const metadata = { format, width, height };
 
   let output;
+  let willUseOriginal;
 
   switch (format) {
     case ImageFormat.SVG:
+      willUseOriginal = true;
       output = await blob.text();
       break;
 
     case ImageFormat.GIF:
+      willUseOriginal = true;
       output = Buffer.from(await blob.arrayBuffer());
       break;
 
     default:
-      output = null;
+      willUseOriginal = false;
+      output = Buffer.from(await blob.arrayBuffer());
       break;
   }
 
-  return { image, metadata, output };
+  return { image, metadata, output, willUseOriginal };
 }
 
 async function createImageVariants(
@@ -141,10 +146,6 @@ async function createSourceSetsFromImageVariants(
 }
 
 async function saveImage({ metadata, output }: ProcessedImage): Promise<string> {
-  if (!output) {
-    throw new Error("Cannot create public path for image with missing output.");
-  }
-
   const { format, width } = metadata;
   const contentHash = createHash("sha256").update(output).digest("hex");
 

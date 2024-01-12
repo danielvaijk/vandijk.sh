@@ -111,32 +111,21 @@ for (const article of articles) {
     ].join("\n");
 
   let coverImageMarkup;
-  let coverImageOpenGraphMetadata;
 
-  if (coverImageData.output) {
-    const publicPath = await saveImage(coverImageData);
-    const { metadata } = coverImageData;
+  const coverImagePublicPath = await saveImage(coverImageData);
+  const coverImageOpenGraphMetadata = getOpenGraphMetadataForImage(
+    coverImageData.metadata,
+    coverImagePublicPath
+  );
 
-    coverImageOpenGraphMetadata = getOpenGraphMetadataForImage(metadata, publicPath);
-    coverImageMarkup = createMarkupForImage({ ...options, publicPath });
+  if (coverImageData.willUseOriginal) {
+    coverImageMarkup = createMarkupForImage({ ...options, publicPath: coverImagePublicPath });
   } else {
     const avifVariants = await createImageVariants(coverImageData, ImageFormat.AVIF);
     const webpVariants = await createImageVariants(coverImageData, ImageFormat.WEBP);
 
     const avifSourceSets = await createSourceSetsFromImageVariants(avifVariants);
     const webpSourceSets = await createSourceSetsFromImageVariants(webpVariants);
-
-    for (let index = 0; index < webpVariants.length; index++) {
-      const { metadata } = webpVariants[index];
-      const { path: publicPath } = webpSourceSets[index];
-      const openGraphContent = getOpenGraphMetadataForImage(metadata, publicPath);
-
-      if (coverImageOpenGraphMetadata) {
-        coverImageOpenGraphMetadata += "\n" + openGraphContent;
-      } else {
-        coverImageOpenGraphMetadata = openGraphContent;
-      }
-    }
 
     coverImageMarkup = createMarkupForImage({
       ...options,
