@@ -25,6 +25,7 @@ import {
   createSourceSetsFromImageVariants,
   fetchAndProcessImage,
   saveImage,
+  ImagePurpose,
 } from "~/helpers/image";
 
 interface Article {
@@ -84,9 +85,16 @@ for (const article of articles) {
     captionOverride: "(HIDDEN) Article cover image.",
   });
 
-  const coverImageData = await fetchAndProcessImage(coverImageContent.url);
-  const options = { isPriority: true, image: coverImageData, caption: coverImageContent.caption };
+  const coverImageData = await fetchAndProcessImage(
+    coverImageContent.url,
+    ImagePurpose.ARTICLE_COVER
+  );
 
+  const options = {
+    isPriority: true,
+    image: coverImageData,
+    caption: coverImageContent.caption,
+  };
 
   const getOpenGraphMetadataForImage = (metadata: ImageMetadata, publicPath: string) =>
     [

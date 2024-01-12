@@ -10,6 +10,13 @@ enum ImageFormat {
   AVIF = "avif",
   GIF = "gif",
   SVG = "svg",
+  PNG = "png",
+  JPEG = "jpeg",
+}
+
+enum ImagePurpose {
+  ARTICLE_COVER = 1,
+  OTHER = 2,
 }
 
 interface ImageMetadata {
@@ -30,7 +37,10 @@ interface ImageSourceSet {
   size: string;
 }
 
-async function fetchAndProcessImage(url: string): Promise<ProcessedImage> {
+async function fetchAndProcessImage(
+  url: string,
+  purpose = ImagePurpose.OTHER
+): Promise<ProcessedImage> {
   // Enforce consistency where we expect images to be uploaded directly to Notion's
   // S3 bucket. This ensures that the image files don't change or get deleted after
   // it's initially downloaded during a build (or referenced for an article).
@@ -43,6 +53,17 @@ async function fetchAndProcessImage(url: string): Promise<ProcessedImage> {
   const image = sharp(await blob.arrayBuffer());
   const { format = "unknown", width = 0, height = 0 } = await image.metadata();
   const metadata = { format, width, height };
+
+  if (ImagePurpose.ARTICLE_COVER === purpose) {
+    switch (format) {
+      case ImageFormat.JPEG:
+      case ImageFormat.PNG:
+        break;
+
+      default:
+        throw new Error("Cover images must be either in JPEG or PNG format.");
+    }
+  }
 
   let output;
   let willUseOriginal;
@@ -159,6 +180,7 @@ async function saveImage({ metadata, output }: ProcessedImage): Promise<string> 
 
 export {
   ImageFormat,
+  ImagePurpose,
   fetchAndProcessImage,
   createImageVariants,
   createSourceSetsFromImageVariants,
