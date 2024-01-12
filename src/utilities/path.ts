@@ -1,4 +1,4 @@
-function getRouteFromText(text: string): string {
+function slugify(text: string): string {
   return (
     text
       .trim()
@@ -12,4 +12,8 @@ function getRouteFromText(text: string): string {
   );
 }
 
-export { getRouteFromText };
+function joinPathNames(...paths: Array<string>): string {
+  return paths.join("/").replaceAll("//", "/");
+}
+
+export { slugify, joinPathNames };

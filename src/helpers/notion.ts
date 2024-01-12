@@ -1,5 +1,5 @@
-import path from "path";
 import type { NotionBlock } from "~/definition/notion";
+import { joinPathNames } from "~/utilities/path";
 
 const NOTION_API_VERSION = "2022-06-28";
 const NOTION_API_TOKEN = `Bearer ${process.env.NOTION_TOKEN}`;
@@ -22,7 +22,7 @@ interface NotionPageResponse {
 }
 
 async function createNotionRequest<ResponseBody>(endpoint: string): Promise<ResponseBody> {
-  const url = path.join("https://api.notion.com/v1", endpoint);
+  const url = joinPathNames("https://api.notion.com/v1", endpoint);
   const headers = {
     "Content-Type": "application/json",
     "Authorization": NOTION_API_TOKEN,

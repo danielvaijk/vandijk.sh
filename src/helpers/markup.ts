@@ -16,7 +16,7 @@ import {
   createSourceSetsFromImageVariants,
   saveImage,
 } from "./image";
-import { getRouteFromText } from "./url";
+import { slugify } from "../utilities/path";
 
 interface ImageCaption {
   text: string;
@@ -214,14 +214,14 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
       case NotionBlockType.HEADING_TWO:
         prefix = "##";
         content = getTextContentFromBlock(block);
-        content = `[${content}](#${getRouteFromText(content)})`;
+        content = `[${content}](#${slugify(content)})`;
         anchorLinks += `- ${content}\n`;
         break;
 
       case NotionBlockType.HEADING_THREE:
         prefix = "###";
         content = getTextContentFromBlock(block);
-        content = `[${content}](#${getRouteFromText(content)})`;
+        content = `[${content}](#${slugify(content)})`;
         anchorLinks += `  - ${content}\n`;
         break;
 
