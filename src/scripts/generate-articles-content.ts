@@ -66,6 +66,20 @@ for (let index = 0; index < articlesPageContents.length; index++) {
   }
 }
 
+function determineOriginUrl(): string {
+  const { CF_PAGES_BRANCH, CF_PAGES_URL, PREVIEW_BUILD } = process.env;
+
+  if (CF_PAGES_BRANCH === "main") {
+    return "https://daniel.vandijk.sh";
+  } else if (CF_PAGES_URL) {
+    return CF_PAGES_URL;
+  } else if (PREVIEW_BUILD) {
+    return "http://localhost:4173";
+  } else {
+    return "http://localhost:5173";
+  }
+}
+
 for (const article of articles) {
   const page = await fetchNotionPage(article.id);
   const { results: blocks } = await fetchNotionBlockChildren(article.id);
@@ -85,12 +99,11 @@ for (const article of articles) {
   const coverImageData = await fetchAndProcessImage(coverImageContent.url);
   const options = { isPriority: true, image: coverImageData, caption: coverImageContent.caption };
 
-  const { CF_PAGES_URL, PREVIEW_BUILD } = process.env;
-  const baseUrl = CF_PAGES_URL ?? `http://localhost:${PREVIEW_BUILD ? 4173 : 5173}`;
+  const originUrl = determineOriginUrl();
 
   const getOpenGraphMetadataForImage = (metadata: ImageMetadata, publicPath: string) =>
     [
-      `  - image: ${joinPathNames(baseUrl, publicPath)}`,
+      `  - image: ${joinPathNames(originUrl, publicPath)}`,
       `    image:alt: ${coverImageContent.caption.text}`,
       `    image:type: image/${metadata.format}`,
       `    image:width: ${metadata.width}`,
@@ -144,7 +157,7 @@ for (const article of articles) {
       "  - title: true",
       "  - description: true",
       "  - type: article",
-      `  - url: ${joinPathNames(baseUrl, "articles", articleRoute)}`,
+      `  - url: ${joinPathNames(originUrl, "articles", articleRoute)}`,
       "  - article:author: Daniel van Dijk",
       `  - article:published_time: ${article.date.toISOString()}`,
       "  - locale: en_US",
