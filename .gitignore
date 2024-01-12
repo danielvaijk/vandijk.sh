@@ -18,6 +18,7 @@ npm-debug.log*
 public/assets/*
 !public/assets/.gitkeep
 
+src/media/articles.json
 src/routes/articles/*/index.mdx
 src/routes/articles/*/meta.json
 
