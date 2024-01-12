@@ -1,5 +1,4 @@
-import path from "path";
-import { mkdir, writeFile } from "fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 
 import prettier from "prettier";
 
@@ -11,7 +10,7 @@ import {
   fetchNotionBlockChildren,
   fetchNotionPage,
 } from "~/helpers/notion";
-import { getRouteFromText } from "~/helpers/url";
+import { joinPathNames, slugify } from "~/utilities/path";
 import {
   convertBlocksToMarkup,
   createMarkupForImage,
@@ -56,7 +55,7 @@ for (let index = 0; index < articlesPageContents.length; index++) {
       title,
       id: childPageBlock.id,
       date: new Date(childPageBlock.last_edited_time),
-      path: getRouteFromText(title),
+      path: slugify(title),
     };
 
     if (isNextIndexBlockOfType(articlesPageContents, index, NotionBlockType.PARAGRAPH)) {
@@ -72,10 +71,10 @@ for (const article of articles) {
   const { results: blocks } = await fetchNotionBlockChildren(article.id);
   const { articleContent, anchorLinks } = await convertBlocksToMarkup(blocks);
 
-  const articleRoute = getRouteFromText(article.title);
-  const articleDirectory = path.join("./src/routes/articles", articleRoute);
-  const articleFilePath = path.join(articleDirectory, "index.mdx");
-  const articleMetadataPath = path.join(articleDirectory, "meta.json");
+  const articleRoute = slugify(article.title);
+  const articleDirectory = joinPathNames("./src/routes/articles", articleRoute);
+  const articleFilePath = joinPathNames(articleDirectory, "index.mdx");
+  const articleMetadataPath = joinPathNames(articleDirectory, "meta.json");
 
   const coverImageContent = getImageContentFromBlock({
     // Convert the cover object into a "fake" block so it can be pass in here.
@@ -91,7 +90,7 @@ for (const article of articles) {
 
   const getOpenGraphMetadataForImage = (metadata: ImageMetadata, publicPath: string) =>
     [
-      `  - image: ${path.join(baseUrl, publicPath)}`,
+      `  - image: ${joinPathNames(baseUrl, publicPath)}`,
       `    image:alt: ${coverImageContent.caption.text}`,
       `    image:type: image/${metadata.format}`,
       `    image:width: ${metadata.width}`,
@@ -140,11 +139,12 @@ for (const article of articles) {
       "---",
       `title: "${article.title}"`,
       `description: "${article.description}"`,
+      "author: Daniel van Dijk",
       "opengraph:",
       "  - title: true",
       "  - description: true",
       "  - type: article",
-      `  - url: ${path.join(baseUrl, "articles", articleRoute)}`,
+      `  - url: ${joinPathNames(baseUrl, "articles", articleRoute)}`,
       "  - article:author: Daniel van Dijk",
       `  - article:published_time: ${article.date.toISOString()}`,
       "  - locale: en_US",

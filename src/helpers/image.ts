@@ -1,8 +1,9 @@
-import path from "path";
-import { createHash } from "crypto";
-import { writeFile } from "fs/promises";
+import { createHash } from "node:crypto";
+import { writeFile } from "node:fs/promises";
 
 import sharp, { type Sharp } from "sharp";
+
+import { joinPathNames } from "~/utilities/path";
 
 enum ImageFormat {
   WEBP = "webp",
@@ -150,7 +151,7 @@ async function saveImage({ metadata, output }: ProcessedImage): Promise<string> 
   const fileName = `${contentHash}-${width}.${format}`;
   const publicPath = `/assets/${fileName}`;
 
-  await writeFile(path.join("./public", publicPath), output);
+  await writeFile(joinPathNames("./public", publicPath), output);
 
   return publicPath;
 }
