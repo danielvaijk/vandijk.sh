@@ -12,8 +12,22 @@ function slugify(text: string): string {
   );
 }
 
-function joinPathNames(...paths: Array<string>): string {
-  return paths.join("/").replaceAll("//", "/");
+function joinPathNames(...segments: Array<string>): string {
+  let result = "";
+
+  for (const segment of segments) {
+    const partToAdd = segment.startsWith("/") ? segment.slice(1) : segment;
+
+    if (result.endsWith("/")) {
+      result += partToAdd;
+    } else if (result.length === 0) {
+      result += partToAdd;
+    } else {
+      result += "/" + partToAdd;
+    }
+  }
+
+  return result;
 }
 
 export { slugify, joinPathNames };
