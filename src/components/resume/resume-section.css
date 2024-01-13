@@ -1,0 +1,23 @@
+.resume-section > h4 {
+  margin: 0;
+}
+
+.resume-section > h4:first-letter {
+  font-size: 160%;
+}
+
+.resume-section > hr {
+  height: 1px;
+  width: 100%;
+  border: none;
+  background-color: black;
+}
+
+.resume-section > ul {
+  padding-left: 0.8rem;
+}
+
+.resume-section-without-bullet-points > ul {
+  padding: 0;
+  list-style: none;
+}

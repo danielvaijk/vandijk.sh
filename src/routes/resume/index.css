@@ -1,0 +1,12 @@
+#resume {
+  width: 100%;
+  padding: 0.8rem;
+  margin-top: 0.6rem;
+}
+
+@media screen and (min-width: 46rem) {
+  #resume {
+    padding: 0.8rem 2rem;
+    margin-top: 2rem;
+  }
+}
