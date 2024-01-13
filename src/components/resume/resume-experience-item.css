@@ -1,0 +1,19 @@
+.resume-experience-item-content {
+  display: flex;
+  flex-direction: column;
+  padding: 0.4rem 0;
+}
+
+.resume-experience-item-content p {
+  margin: 0;
+}
+
+.resume-experience-item-company,
+.resume-experience-item-position {
+  display: flex;
+  justify-content: space-between;
+}
+
+.resume-experience-item-achievements {
+  margin-top: 0.4rem;
+}
