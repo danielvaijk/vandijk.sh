@@ -38,13 +38,12 @@ export default component$(() => {
           position="Front-end Developer"
           duration="Dec. 2019 - Jun. 2021"
           achievements={[
-            "Become a mentor after 6 months.",
-            "Created a developer portal on the website, including plugins in PHP and front-end in jQuery.",
-            "Improved the standards, architecture, static analysis, and CI/CD pipelines of several (~18) front-end projects.",
-            "Was the technical owner and admin of the website (bunq.com), maintaining, redesigning, and building new pages and back-end plugins in PHP for CraftCMS.",
-            "Completed a full redesign and upgrade of the Flarum-based forum website, including making improvements and adding features to the PHP back-end and the Mithril front-end.",
-            "Developed a web app in React for uploading receipts so you could split the bill and send out payment requests.",
-            "Developed an iframe widget with React and a 2D canvas library that allowed users to display a 3D terrain with the amount of trees they've planted.",
+            "Improved the features, best practices, architecture, static analysis, tech stacks, and CI/CD across several (~18) front-end projects. This included working with a diverse range of front-end frameworks, like Backbone.js, Mithril.js, React, and jQuery; and design systems like Semantic UI.",
+            "Created many subsites under the main website (bunq.com) using jQuery and PHP: a Developer Portal where developers working with the bunq API could register a (bare-bones) bank account, log in, and manage their application OAuth credentials; and another where you could see all the donation initiatives created by users, including donation goals, progress, story, and links to donate.",
+            "Carried out admin duties on the website (bunq.com) such as managing user access and permissions, configurations, plugins, page structures, component schemas, and more in CraftCMS. Similar was also done for the forum website in Flarum, though less frequently.",
+            "Made several improvements to the Flarum-based forum (including a WebView used by the banking apps): completed a large Flarum upgrade and UI redesign, added the ability to Google Translate posts, and made other general improvements to the PHP back-end and Mithril.js front-end.",
+            "Built a web app in React where you could upload a photo of a receipt to a proprietary Machine Learning model and it would parse it into individual line items. You could then edit/split the bill and send out payment requests via email, SMS, or in the banking app.",
+            "Built an iframe widget with React and a 2D canvas library that made it possible for users to embed a dynamic 3D terrain that displayed the current amount of trees they've planted so far, similar to the forest terrain displayed inside the banking app.",
           ]}
         />
 
@@ -54,10 +53,11 @@ export default component$(() => {
           position="Self-employed Full-stack Engineer"
           duration="Mar. 2018 - Present"
           achievements={[
-            "Built a duo-app web platform to help event organizers manage their ambassador marketing efforts, and ambassadors to manage their tasks and rewards.",
-            "Created a ORM framework to facilitate managing model data from back-end responses in the front-end for Redux and then a similar one again for MobX.",
-            "Created a Spring-like framework for Node.js for TypeScript Object-oriented Programming.",
-            "Created a security-first logger that prevents the leak of sensitive information though logs, without pattern matching.",
+            "Built four web apps as part of a product that helped event organizers manage their ambassador promotions: a dashboard where they could manage and keep track of their event promotions and ambassadors, one where invitations could be accepted and managers/ambassadors could register, one where ambassadors could keep track of and submit their promotion tasks, and another where ambassadors could manage their rewards (like event guestlists). The entire project was full-stack with TypeScript, Node.js, PostgreSQL, React, and Tailwind CSS. Any frameworks were built custom and from scratch for the project (see below).",
+            "Created an ORM framework for Redux and then a similar one again for MobX. They brought the benefits of Object-Relational Mapping to the front-end.",
+            "Created a robust logging framework that prevents accidental sensitive information leaks — without the uncertainty of pattern matching.",
+            "Created a Spring-like REST API framework for Node.js for OOP TypeScript projects, which acted as a thin wrapper that added basic routing, comprehensive error handling, request processing and response creation features. It allowed me to create incredibly robust REST APIs.",
+            "Created an incredibly comprehensive linting and formatting configuration and tool belt to apply strict guidelines and best practices. It was packaged in a way that made it easy to use in all my projects to maintain consistent quality control.",
           ]}
         />
 
@@ -67,9 +67,11 @@ export default component$(() => {
           position="IT & Software Engineering"
           duration="May 2016 - Nov. 2019"
           achievements={[
-            "Helped the IT department troubleshoot and solve a broad range of technical issues and challenges, including helping with operations from time to time.",
-            "Wrote a PowerShell script to automate setting up new HP ZBook laptops for used by operators out in the field, which included installing software, configuring the Windows registry, and uninstalling bloatware.",
-            "Developed a Windows program in C++ to generate Excel reports from interpreted ultrasonic scan files from TD-Scan, for daily use by operators in pipeline projects. The Graphical User Interface was written by hand using the Windows SDK.",
+            "Wrote small GUI programs in C# to help with repetitive tasks, such as calculating Snell's law.",
+            "Helped the IT department troubleshoot and solve a broad range of technical issues and challenges. Occasionally filled in for day-to-day operations.",
+            "Traveled internationally to visit on-site projects in Thailand and Turkey, help with IT operations in Spain, and meet with vendors in England.",
+            "Wrote an all-in-one laptop setup PowerShell script to automate getting new or formatted HP ZBook laptops ready for use out in the field, which included installing software, setting up various configurations, and uninstalling bloatware that came pre-installed on the laptop (which sometimes caused technical issues).",
+            "Developed a Windows program in C++ to generate Excel reports from interpreted ultrasonic scan files saved from TD-Scan, for daily use by operators in pipeline projects. The Graphical User Interface (GUI) was written by hand using the Windows SDK.",
           ]}
         />
 
@@ -79,12 +81,9 @@ export default component$(() => {
           position="3D Game Developer"
           duration="Apr. 2012 - May 2017"
           achievements={[
-            "Created a Tetris-inspired game in C# with the Unity Engine for conjugating Portuguese verbs for a school project.",
-            "Created a Unity Engine asset in C# that provided a fully-featured game inventory system, including a Graphical User Interface.",
-            "Created a Unity Engine asset in C# that provided example implementations with different networking systems and frameworks.",
-            "Created a Unity Engine asset in C# that provided a multiplayer chat system, including a Graphical User Interface.",
-            "Created a First Person Shooter inspired by Call of Duty's zombie mode in C# with the Unity Engine and sold it as an asset.",
-            "Created a C# Windows program using Visual Studio to control a Lego Mindstorms automated guided vehicle (AGV) via bluetooth.",
+            "Created a Tetris-inspired game in C# with the Unity Engine, where you had letters falling down and had to correctly build conjugated verbs in Portuguese.",
+            "Created several Unity Engine assets developed in C# for sale: a fully-featured inventory system with a GUI, example implementations of different networking systems and frameworks, a multiplayer GUI chat system, and a multiplayer wave survival FPS inspired by Call of Duty's zombie mode.",
+            "Created a C# Windows program in Visual Studio to control a Lego Mindstorms automated guided vehicle (AGV) via bluetooth.",
           ]}
         />
       </ResumeSection>
@@ -113,17 +112,17 @@ export default component$(() => {
         />
         <ResumeSkillItem
           type="Frameworks"
-          examples={["jQuery", "React", "Express.js", "Next.js", "Jest", "Spring Boot", "Qwik"]}
+          examples={["jQuery", "React", "Express.js", "Next.js", "Spring Boot", "Qwik"]}
         />
+        <ResumeSkillItem type="Design Systems" examples={["Semantic UI", "Tailwind CSS"]} />
+        <ResumeSkillItem type="Testing" examples={["Jest", "Cypress", "Playwright"]} />
         <ResumeSkillItem type="Data Modeling" examples={["Mongoose", "Redux", "MobX"]} />
         <ResumeSkillItem
           type="Tools"
-          examples={["Git", "npm", "Yarn", "Docker", "Kubernetes", "Maven", "Webpack", "Turbo"]}
+          examples={["Git", "npm", "Yarn", "ESLint", "Prettier", "Maven", "Webpack", "Turbo"]}
         />
-        <ResumeSkillItem
-          type="Other"
-          examples={["Unity Engine", "Cloudflare", "CraftCMS", "Flarum", "AWS"]}
-        />
+        <ResumeSkillItem type="Cloud" examples={["Cloudflare", "Docker", "Kubernetes", "AWS"]} />
+        <ResumeSkillItem type="Other" examples={["Unity Engine", "CraftCMS", "Flarum"]} />
       </ResumeSection>
     </div>
   );
