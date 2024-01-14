@@ -22,15 +22,32 @@ interface NotionPageResponse {
 }
 
 async function createNotionRequest<ResponseBody>(endpoint: string): Promise<ResponseBody> {
-  const url = joinPathNames("https://api.notion.com/v1", endpoint);
+  const url = new URL(joinPathNames("https://api.notion.com/v1", endpoint));
   const headers = {
     "Content-Type": "application/json",
     "Authorization": NOTION_API_TOKEN,
     "Notion-Version": NOTION_API_VERSION,
   };
 
-  const request = await fetch(url, { headers });
-  const response = await request.json();
+  let response;
+
+  do {
+    if (response?.has_more) {
+      url.searchParams.set("start_cursor", response.next_cursor);
+    }
+
+    const currentRequest = await fetch(url, { headers });
+    const currentResponse = await currentRequest.json();
+
+    if (response) {
+      response = {
+        ...currentResponse,
+        results: [...response.results, ...currentResponse.results],
+      };
+    } else {
+      response = currentResponse;
+    }
+  } while (response.has_more);
 
   return response;
 }
