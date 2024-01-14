@@ -3,6 +3,7 @@ import { useLocation, type DocumentHead } from "@builder.io/qwik-city";
 
 import stylesForLayout from "./layout.css?inline";
 import stylesForCodeHighlights from "../../styles/prism.css?inline";
+import { createPageMetaTags } from "~/helpers/meta";
 
 export default component$(() => {
   useStyles$(stylesForLayout);
@@ -22,11 +23,21 @@ export default component$(() => {
 });
 
 export const head: DocumentHead = ({ head }) => {
+  const isArticle = Boolean(head.title);
+
   // For article pages the title is set in the MDX frontmatter, but we override it
   // to include a base title. The original title (without the base) is still used
   // for the Open Graph title, so it's not completely useless.
   const titleBase = "Daniel van Dijk's Blog";
-  const title = head.title ? `${titleBase} - ${head.title}` : titleBase;
+  const title = isArticle ? `${titleBase} - ${head.title}` : titleBase;
 
-  return { title };
+  if (isArticle) {
+    return { title };
+  }
+
+  const description =
+    "I explore and write about a wide range of engineering topics and challenges.";
+  const meta = createPageMetaTags({ title, description });
+
+  return { title, meta };
 };
