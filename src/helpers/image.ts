@@ -48,6 +48,8 @@ async function fetchAndProcessImage(
     throw new Error("Only images from Notion's S3 bucket can be loaded.");
   }
 
+  console.debug(`Sending GET request to ${url}`);
+
   const response = await fetch(url);
   const blob = await response.blob();
   const image = sharp(await blob.arrayBuffer());
@@ -125,6 +127,10 @@ async function createImageVariants(
     // to call resize with the original width again at one point.
     const targetWidth = resizeWidth < width ? resizeWidth : width;
     const resizedImage = image.resize(targetWidth);
+
+    console.debug(
+      `Resizing image from format ${metadata.format} to ${format} with width ${targetWidth}...`
+    );
 
     const { data, info } = await resizedImage.toBuffer({
       resolveWithObject: true,
