@@ -36,6 +36,8 @@ async function createNotionRequest<ResponseBody>(endpoint: string): Promise<Resp
       url.searchParams.set("start_cursor", response.next_cursor);
     }
 
+    console.debug(`Sending GET request to ${url.toString()}`);
+
     const currentRequest = await fetch(url, { headers });
     const currentResponse = await currentRequest.json();
 
