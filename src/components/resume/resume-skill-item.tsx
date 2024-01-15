@@ -1,4 +1,6 @@
-import { component$ } from "@builder.io/qwik";
+import { component$, useStylesScoped$ } from "@builder.io/qwik";
+
+import styles from "./resume-skill-item.css?inline";
 
 interface ResumeSkillItemProps {
   type: string;
@@ -6,8 +8,10 @@ interface ResumeSkillItemProps {
 }
 
 export const ResumeSkillItem = component$<ResumeSkillItemProps>(({ type, examples }) => {
+  useStylesScoped$(styles);
+
   return (
-    <li>
+    <li class="resume-skill-item">
       <strong>{type}: </strong>
       {examples.join(", ")}
     </li>
