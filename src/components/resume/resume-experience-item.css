@@ -1,7 +1,7 @@
 .resume-experience-item-content {
   display: flex;
   flex-direction: column;
-  padding: 0.4rem 0;
+  padding: 0.8rem 0;
 }
 
 .resume-experience-item-content p {
@@ -14,6 +14,20 @@
   justify-content: space-between;
 }
 
-.resume-experience-item-achievements {
+.resume-experience-item-position i {
+  width: 50%;
+}
+
+.resume-experience-item-position i:last-child {
+  text-align: right;
+}
+
+.resume-experience-item-achievements li {
   margin-top: 0.4rem;
+}
+
+@media screen and (min-width: 46rem) {
+  .resume-experience-item-content {
+    padding: 0.4rem 0;
+  }
 }
