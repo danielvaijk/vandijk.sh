@@ -1,0 +1,9 @@
+.resume-skill-item:not(:last-child) {
+  margin-bottom: 0.4rem;
+}
+
+@media screen and (min-width: 46rem) {
+  .resume-skill-item:not(:last-child) {
+    margin-bottom: 0;
+  }
+}
