@@ -1,8 +1,8 @@
 import type { NotionBlock } from "~/definition/notion";
 import { joinPathNames } from "~/utilities/url";
 
-const NOTION_API_VERSION = "2022-06-28";
-const NOTION_API_TOKEN = `Bearer ${process.env.NOTION_TOKEN}`;
+const { NOTION_TOKEN } = process.env;
+const NOTION_VERSION = "2022-06-28";
 const NOTION_ARTICLES_PAGE_ID = "c15b7465-243e-4966-bfea-63789f645b04";
 
 interface NotionBlockChildrenResponse {
@@ -21,12 +21,16 @@ interface NotionPageResponse {
   };
 }
 
+if (!NOTION_TOKEN) {
+  throw new Error("Notion API token is missing.");
+}
+
 async function createNotionRequest<ResponseBody>(endpoint: string): Promise<ResponseBody> {
   const url = new URL(joinPathNames("https://api.notion.com/v1", endpoint));
   const headers = {
     "Content-Type": "application/json",
-    "Authorization": NOTION_API_TOKEN,
-    "Notion-Version": NOTION_API_VERSION,
+    "Authorization": `Bearer ${NOTION_TOKEN}`,
+    "Notion-Version": NOTION_VERSION,
   };
 
   let response;
