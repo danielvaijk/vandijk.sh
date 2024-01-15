@@ -170,11 +170,24 @@ async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
     return ["```", "", "```"].join("\n");
   }
 
-  const { language } = content;
-  const formatConfig = { ...PRETTIER_CONFIG, printWidth: 80, parser: language };
-  const formattedCode = await prettier.format(code, formatConfig);
+  const prettierSupportInfo = await prettier.getSupportInfo();
 
-  return ["```", language, "\n", formattedCode, "```"].join("");
+  const { language = "" } = content;
+  const supportedLanguages = prettierSupportInfo.languages.map(({ name }) => name);
+
+  let codeOutput;
+
+  if (supportedLanguages.includes(language)) {
+    codeOutput = await prettier.format(code, {
+      ...PRETTIER_CONFIG,
+      printWidth: 80,
+      parser: language,
+    });
+  } else {
+    codeOutput = code + "\n";
+  }
+
+  return ["```", language, "\n", codeOutput, "```"].join("");
 }
 
 interface ConvertedMarkup {
