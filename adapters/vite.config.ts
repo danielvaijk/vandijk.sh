@@ -3,6 +3,7 @@ import { staticAdapter } from "@builder.io/qwik-city/adapters/static/vite";
 import { extendConfig } from "@builder.io/qwik-city/vite";
 
 import baseConfig from "../vite.config";
+import { determineOriginUrl } from "../src/utilities/url";
 
 export default extendConfig(baseConfig, () => {
   return {
@@ -12,6 +13,6 @@ export default extendConfig(baseConfig, () => {
         input: ["src/entry.cloudflare-pages.tsx", "@qwik-city-plan"],
       },
     },
-    plugins: [staticAdapter({ origin: "https://daniel.vandijk.sh" }), cloudflarePagesAdapter()],
+    plugins: [cloudflarePagesAdapter(), staticAdapter({ origin: determineOriginUrl() })],
   };
 });
