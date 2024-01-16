@@ -37,6 +37,8 @@ interface ImageSourceSet {
   size: string;
 }
 
+const IS_CF_BUILD = Boolean(process.env.CF_PAGES);
+
 async function fetchAndProcessImage(
   url: string,
   purpose = ImagePurpose.OTHER
@@ -99,7 +101,7 @@ async function createImageVariants(
   switch (format) {
     case ImageFormat.WEBP:
       image = image.webp({
-        effort: 6,
+        effort: IS_CF_BUILD ? 6 : 0,
         quality: 80,
         alphaQuality: 100,
         smartSubsample: true,
@@ -109,7 +111,7 @@ async function createImageVariants(
 
     case ImageFormat.AVIF:
       image = image.avif({
-        effort: 9,
+        effort: IS_CF_BUILD ? 9 : 0,
         quality: 80,
         lossless: false,
       });
