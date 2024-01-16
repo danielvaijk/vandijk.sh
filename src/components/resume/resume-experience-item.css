@@ -1,7 +1,10 @@
+.resume-experience-item:not(:first-of-type) {
+  margin-top: 1.8rem;
+}
+
 .resume-experience-item-content {
   display: flex;
   flex-direction: column;
-  padding: 0.8rem 0;
 }
 
 .resume-experience-item-content p {
@@ -22,12 +25,17 @@
   text-align: right;
 }
 
-.resume-experience-item-achievements li {
-  margin-top: 0.4rem;
+.resume-experience-item-achievements {
+  margin-top: 0.8rem;
+  text-align: justify;
+}
+
+.resume-experience-item-achievements li:not(:last-child) {
+  margin-bottom: 0.8rem;
 }
 
 @media screen and (min-width: 46rem) {
-  .resume-experience-item-content {
-    padding: 0.4rem 0;
+  .resume-experience-item:not(:first-of-type) {
+    margin-top: 1.4rem;
   }
 }
