@@ -21,11 +21,11 @@ export default component$(() => {
           projects
         </Link>
         ,{" "}
-        <Link href="/articles" prefetch>
+        <Link href="/articles/" prefetch>
           articles
         </Link>
         ,{" "}
-        <Link href="/resume" prefetch>
+        <Link href="/resume/" prefetch>
           resume
         </Link>
         , or{" "}

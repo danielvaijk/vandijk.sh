@@ -71,12 +71,12 @@ export const NavigationHeaderLinks = component$(() => {
           </Link>
         </li>
         <li>
-          <Link href="/articles" prefetch>
+          <Link href="/articles/" prefetch>
             Articles
           </Link>
         </li>
         <li>
-          <Link href="/resume" prefetch>
+          <Link href="/resume/" prefetch>
             Resume
           </Link>
         </li>
