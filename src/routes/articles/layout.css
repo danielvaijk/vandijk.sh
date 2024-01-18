@@ -70,7 +70,7 @@ article p {
 
 article > pre {
   width: 100%;
-  overflow-x: hidden;
+  overflow-x: scroll;
   padding: 0.8rem;
   margin: 0;
   margin-block-start: 1em;
