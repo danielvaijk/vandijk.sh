@@ -8,12 +8,12 @@ export const NavigationHeaderLinks = component$(() => {
 
   useOnDocument(
     "click",
-    $((clickEvent) => {
+    $((clickEvent: MouseEvent) => {
       if (!listRef.value || !hamburgerRef.value) {
         return;
       }
 
-      const { x, y } = clickEvent as MouseEvent;
+      const { x, y } = clickEvent;
       const listRect = listRef.value.getBoundingClientRect();
       const hamburgerRect = hamburgerRef.value.getBoundingClientRect();
 
@@ -66,17 +66,32 @@ export const NavigationHeaderLinks = component$(() => {
             target="_blank"
             rel="noopener noreferrer"
             href="https://github.com/danielvaijk?tab=repositories"
+            onClick$={() => {
+              isOpen.value = !isOpen.value;
+            }}
           >
             Projects
           </Link>
         </li>
         <li>
-          <Link href="/articles/" prefetch>
+          <Link
+            href="/articles/"
+            onClick$={() => {
+              isOpen.value = !isOpen.value;
+            }}
+            prefetch
+          >
             Articles
           </Link>
         </li>
         <li>
-          <Link href="/resume/" prefetch>
+          <Link
+            href="/resume/"
+            onClick$={() => {
+              isOpen.value = !isOpen.value;
+            }}
+            prefetch
+          >
             Resume
           </Link>
         </li>
@@ -85,6 +100,9 @@ export const NavigationHeaderLinks = component$(() => {
             target="_blank"
             rel="noopener noreferrer"
             href="https://www.linkedin.com/in/daniel-vandijk-sh/"
+            onClick$={() => {
+              isOpen.value = !isOpen.value;
+            }}
           >
             Connect
           </Link>
