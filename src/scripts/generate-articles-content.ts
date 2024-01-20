@@ -9,14 +9,14 @@ import {
   NOTION_ARTICLES_PAGE_ID,
   fetchNotionBlockChildren,
   fetchNotionPage,
+  isNextIndexBlockOfType,
 } from "~/helpers/notion";
 import { joinPathNames, slugify, determineOriginUrl } from "~/utilities/url";
 import {
   convertBlocksToMarkup,
   createMarkupForImage,
   getImageContentFromBlock,
-  getTextContentFromBlock,
-  isNextIndexBlockOfType,
+  getRichTextContentFromBlock,
 } from "~/helpers/markup";
 import {
   ImageFormat,
@@ -62,7 +62,7 @@ for (let index = 0; index < articlesPageContents.length; index++) {
     };
 
     if (isNextIndexBlockOfType(articlesPageContents, index, NotionBlockType.PARAGRAPH)) {
-      article.description = getTextContentFromBlock(articlesPageContents[index + 1]);
+      article.description = getRichTextContentFromBlock(articlesPageContents[index + 1]);
     }
 
     articles.push(article);
