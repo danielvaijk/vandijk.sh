@@ -1,9 +1,5 @@
-import type { NotionBlock } from "~/definition/notion";
+import type { NotionBlock, NotionBlockType } from "~/definition/notion";
 import { joinPathNames } from "~/utilities/url";
-
-const { NOTION_TOKEN } = process.env;
-const NOTION_VERSION = "2022-06-28";
-const NOTION_ARTICLES_PAGE_ID = "c15b7465-243e-4966-bfea-63789f645b04";
 
 interface NotionBlockChildrenResponse {
   object: string;
@@ -20,6 +16,10 @@ interface NotionPageResponse {
     };
   };
 }
+
+const { NOTION_TOKEN } = process.env;
+const NOTION_VERSION = "2022-06-28";
+const NOTION_ARTICLES_PAGE_ID = "c15b7465-243e-4966-bfea-63789f645b04";
 
 if (!NOTION_TOKEN) {
   throw new Error("Notion API token is missing.");
@@ -66,4 +66,13 @@ async function fetchNotionBlockChildren(blockId: string): Promise<NotionBlockChi
   return createNotionRequest(`/blocks/${blockId}/children`);
 }
 
-export { fetchNotionPage, fetchNotionBlockChildren, NOTION_ARTICLES_PAGE_ID };
+function isNextIndexBlockOfType(array: Array<NotionBlock>, index: number, type: NotionBlockType) {
+  return index < array.length - 1 && array[index + 1].type === type;
+}
+
+export {
+  fetchNotionPage,
+  fetchNotionBlockChildren,
+  isNextIndexBlockOfType,
+  NOTION_ARTICLES_PAGE_ID,
+};

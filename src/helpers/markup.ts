@@ -17,6 +17,7 @@ import {
   createSourceSetsFromImageVariants,
   saveImage,
 } from "./image";
+import { isNextIndexBlockOfType } from "./notion";
 import { slugify } from "../utilities/url";
 
 interface ImageCaption {
@@ -29,11 +30,18 @@ interface ImageContent {
   caption: ImageCaption;
 }
 
-function isNextIndexBlockOfType(array: Array<NotionBlock>, index: number, type: NotionBlockType) {
-  return index < array.length - 1 && array[index + 1].type === type;
+interface ConvertedMarkup {
+  anchorLinks: string;
+  articleContent: string;
 }
 
-function getContentFromRichText(richTexts: Array<NotionRichText>) {
+function getRichTextContentFromBlock(block: NotionBlock) {
+  const { rich_text: richTexts } = block[block.type] as NotionBlockContents;
+
+  if (!richTexts) {
+    return "";
+  }
+
   return richTexts.reduce((result: string, richText: NotionRichText): string => {
     const { annotations = {} } = richText;
     const { content = "", link } = richText.text ?? {};
@@ -63,16 +71,6 @@ function getContentFromRichText(richTexts: Array<NotionRichText>) {
 
     return result + text;
   }, "");
-}
-
-function getTextContentFromBlock(block: NotionBlock): string {
-  const { rich_text: richText } = block[block.type] as NotionBlockContents;
-
-  if (!richText) {
-    return "";
-  }
-
-  return getContentFromRichText(richText);
 }
 
 function getImageContentFromBlock({
@@ -191,11 +189,6 @@ async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
   return ["```", language, "\n", codeOutput, "```"].join("");
 }
 
-interface ConvertedMarkup {
-  anchorLinks: string;
-  articleContent: string;
-}
-
 async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<ConvertedMarkup> {
   let articleContent = "";
   let anchorLinks = "";
@@ -209,32 +202,33 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
 
     switch (block.type) {
       case NotionBlockType.PARAGRAPH:
-        content = getTextContentFromBlock(block);
+        content = getRichTextContentFromBlock(block);
         break;
 
       case NotionBlockType.BULLETED_LIST_ITEM:
         prefix = "-";
-        content = getTextContentFromBlock(block);
-        spacer = isNextIndexBlockOfType(blocks, index, NotionBlockType.BULLETED_LIST_ITEM)
-          ? "\n"
-          : spacer;
+        content = getRichTextContentFromBlock(block);
+
+        if (isNextIndexBlockOfType(blocks, index, NotionBlockType.BULLETED_LIST_ITEM)) {
+          spacer = "\n";
+        }
         break;
 
       case NotionBlockType.HEADING_ONE:
         prefix = "#";
-        content = getTextContentFromBlock(block);
+        content = getRichTextContentFromBlock(block);
         break;
 
       case NotionBlockType.HEADING_TWO:
         prefix = "##";
-        content = getTextContentFromBlock(block);
+        content = getRichTextContentFromBlock(block);
         content = `[${content}](#${slugify(content)})`;
         anchorLinks += `- ${content}\n`;
         break;
 
       case NotionBlockType.HEADING_THREE:
         prefix = "###";
-        content = getTextContentFromBlock(block);
+        content = getRichTextContentFromBlock(block);
         content = `[${content}](#${slugify(content)})`;
         anchorLinks += `  - ${content}\n`;
         break;
@@ -296,9 +290,8 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
 }
 
 export {
-  isNextIndexBlockOfType,
   getImageContentFromBlock,
   convertBlocksToMarkup,
   createMarkupForImage,
-  getTextContentFromBlock,
+  getRichTextContentFromBlock,
 };
