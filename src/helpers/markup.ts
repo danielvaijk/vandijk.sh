@@ -7,6 +7,7 @@ import {
   type NotionRichText,
 } from "~/definition/notion";
 import { PRETTIER_CONFIG } from "~/definition/prettier";
+
 import {
   ImageFormat,
   createImageVariants,

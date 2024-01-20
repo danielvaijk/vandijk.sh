@@ -1,6 +1,9 @@
-import { readFile } from "node:fs/promises";
+import type { Options } from "prettier";
 
-const prettierConfigContents = await readFile(".prettierrc", { encoding: "utf-8" });
-const prettierConfigJson = JSON.parse(prettierConfigContents);
+import prettierConfig from "../../.prettierrc.json";
 
-export const PRETTIER_CONFIG = prettierConfigJson;
+// The only reason we need to do this rather than import the JSON file directly
+// everywhere is because there's a mismatch between what's expected by the format
+// function options parameter and the JSON contents (the enum definition for the
+// "trailingComma" property, basically).
+export const PRETTIER_CONFIG = prettierConfig as Options;
