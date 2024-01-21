@@ -27,6 +27,12 @@ interface NotionRichText {
   };
 }
 
+interface NotionMultiSelect {
+  id: string;
+  name: string;
+  color: string;
+}
+
 interface NotionBlockContents {
   type?: "file" | "external";
   language?: string;
@@ -50,4 +56,10 @@ interface NotionChildPageBlock extends NotionBlock {
 }
 
 export { NotionBlockType };
-export type { NotionBlock, NotionRichText, NotionBlockContents, NotionChildPageBlock };
+export type {
+  NotionBlock,
+  NotionRichText,
+  NotionMultiSelect,
+  NotionBlockContents,
+  NotionChildPageBlock,
+};

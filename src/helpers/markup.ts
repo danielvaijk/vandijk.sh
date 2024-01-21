@@ -7,6 +7,7 @@ import {
   type NotionRichText,
 } from "~/definition/notion";
 import { PRETTIER_CONFIG } from "~/definition/prettier";
+import { getWordCount } from "~/utilities/text";
 
 import {
   ImageFormat,
@@ -33,6 +34,7 @@ interface ImageContent {
 interface ConvertedMarkup {
   anchorLinks: string;
   articleContent: string;
+  wordCount: number;
 }
 
 function getRichTextContentFromBlock(block: NotionBlock) {
@@ -192,6 +194,7 @@ async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
 async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<ConvertedMarkup> {
   let articleContent = "";
   let anchorLinks = "";
+  let wordCount = 0;
 
   for (let index = 0; index < blocks.length; index++) {
     const block = blocks[index];
@@ -203,11 +206,13 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
     switch (block.type) {
       case NotionBlockType.PARAGRAPH:
         content = getRichTextContentFromBlock(block);
+        wordCount += getWordCount(content);
         break;
 
       case NotionBlockType.BULLETED_LIST_ITEM:
         prefix = "-";
         content = getRichTextContentFromBlock(block);
+        wordCount += getWordCount(content);
 
         if (isNextIndexBlockOfType(blocks, index, NotionBlockType.BULLETED_LIST_ITEM)) {
           spacer = "\n";
@@ -217,11 +222,14 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
       case NotionBlockType.HEADING_ONE:
         prefix = "#";
         content = getRichTextContentFromBlock(block);
+        wordCount += getWordCount(content);
         break;
 
       case NotionBlockType.HEADING_TWO:
         prefix = "##";
         content = getRichTextContentFromBlock(block);
+        wordCount += getWordCount(content);
+
         content = `[${content}](#${slugify(content)})`;
         anchorLinks += `- ${content}\n`;
         break;
@@ -229,6 +237,8 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
       case NotionBlockType.HEADING_THREE:
         prefix = "###";
         content = getRichTextContentFromBlock(block);
+        wordCount += getWordCount(content);
+
         content = `[${content}](#${slugify(content)})`;
         anchorLinks += `  - ${content}\n`;
         break;
@@ -286,6 +296,7 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
   return {
     articleContent,
     anchorLinks,
+    wordCount,
   };
 }
 

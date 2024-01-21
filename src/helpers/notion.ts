@@ -1,4 +1,9 @@
-import type { NotionBlock, NotionBlockType } from "~/definition/notion";
+import type {
+  NotionBlock,
+  NotionBlockType,
+  NotionMultiSelect,
+  NotionRichText,
+} from "~/definition/notion";
 import { joinPathNames } from "~/utilities/url";
 
 interface NotionBlockChildrenResponse {
@@ -9,6 +14,17 @@ interface NotionBlockChildrenResponse {
 }
 
 interface NotionPageResponse {
+  properties: {
+    snippet: {
+      rich_text: Array<NotionRichText>;
+    };
+    cover_alt: {
+      rich_text: Array<NotionRichText>;
+    };
+    tags: {
+      multi_select: Array<NotionMultiSelect>;
+    };
+  };
   cover: {
     type: string;
     external: {

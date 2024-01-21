@@ -28,8 +28,6 @@ article h2 {
 
 article h2 + p:first-letter {
   font-size: 160%;
-  line-height: 1;
-  margin-right: 0.1rem;
 }
 
 article h3 {
@@ -49,18 +47,33 @@ article h3 > a {
   color: inherit;
 }
 
-article div[role="doc-subtitle"] {
+article time[role="doc-subtitle"] p {
   margin: 1rem auto 4rem auto;
   max-width: 32rem;
   line-height: 1.1;
   text-align: center;
   font-size: 1.25rem;
-  font-weight: 400;
   font-style: italic;
 }
 
-/* the heading anchor list */
-article div[role="doc-subtitle"] + ul a {
+article h2#contents {
+  cursor: unset;
+}
+
+article h2#contents + p {
+  text-align: center;
+  margin: 0.4rem 0 0 0;
+}
+
+article h2#contents + p:first-letter {
+  font-size: unset;
+}
+
+article h2#contents + p + ul {
+  margin: 2rem auto 4rem auto;
+}
+
+article h2#contents + p + ul a {
   color: inherit;
 }
 
