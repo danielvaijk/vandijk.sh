@@ -8,20 +8,29 @@ export interface ArticleSummaryProps {
   title: string;
   date: string;
   path: string;
+  topic: string;
   description: string;
+  readTimeInMinutes: number;
 }
 
 export const ArticleSummaryItem = component$<ArticleSummaryProps>(
-  ({ title, date, path, description }) => {
+  ({ title, date, path, description, topic, readTimeInMinutes }) => {
     const { scopeId } = useStylesScoped$(styles);
-    const dateFormatted = formatDateAsString(new Date(date));
+
+    const dateParsed = new Date(date);
+    const dateFormatted = formatDateAsString(dateParsed);
 
     return (
       <li class="article-summary">
         <Link class={scopeId} href={`/articles/${path}/`} prefetch>
-          <time>{dateFormatted}</time>
+          <time dateTime={dateParsed.toISOString()}>{dateFormatted}</time>
           <h4>{title}</h4>
           <p>{description}</p>
+
+          <div class="article-summary-read-info">
+            <p>Talks about {topic}</p>
+            <p>~{readTimeInMinutes} min read</p>
+          </div>
         </Link>
       </li>
     );
