@@ -57,12 +57,13 @@ article time[role="doc-subtitle"] p {
 }
 
 article h2#contents {
+  margin-top: 4rem;
   cursor: unset;
 }
 
 article h2#contents + p {
   text-align: center;
-  margin: 0.4rem 0 0 0;
+  margin: 0.2rem 0 0 0;
 }
 
 article h2#contents + p:first-letter {
