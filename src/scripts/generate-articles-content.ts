@@ -9,14 +9,12 @@ import {
   NOTION_ARTICLES_PAGE_ID,
   fetchNotionBlockChildren,
   fetchNotionPage,
-  isNextIndexBlockOfType,
 } from "~/helpers/notion";
 import { joinPathNames, slugify, determineOriginUrl } from "~/utilities/url";
 import {
   convertBlocksToMarkup,
   createMarkupForImage,
   getImageContentFromBlock,
-  getRichTextContentFromBlock,
 } from "~/helpers/markup";
 import {
   ImageFormat,
@@ -61,28 +59,37 @@ for (let index = 0; index < articlesPageContents.length; index++) {
       path: slugify(title),
     };
 
-    if (isNextIndexBlockOfType(articlesPageContents, index, NotionBlockType.PARAGRAPH)) {
-      article.description = getRichTextContentFromBlock(articlesPageContents[index + 1]);
-    }
-
     articles.push(article);
   }
 }
 
-for (const article of articles) {
-  const page = await fetchNotionPage(article.id);
-  const { results: blocks } = await fetchNotionBlockChildren(article.id);
-  const { articleContent, anchorLinks } = await convertBlocksToMarkup(blocks);
+for (const { id: articleId, ...articleData } of articles) {
+  const page = await fetchNotionPage(articleId);
+  const { results: blocks } = await fetchNotionBlockChildren(articleId);
+  const { articleContent, anchorLinks, wordCount } = await convertBlocksToMarkup(blocks);
 
-  const articleRoute = slugify(article.title);
+  const averageWordsPerMinute = 200;
+  const readTimeInMinutes = Math.ceil(wordCount / averageWordsPerMinute);
+
+  const articleRoute = slugify(articleData.title);
   const articleDirectory = joinPathNames("./src/routes/articles", articleRoute);
   const articleFilePath = joinPathNames(articleDirectory, "index.mdx");
   const articleMetadataPath = joinPathNames(articleDirectory, "meta.json");
 
+  const { cover, properties } = page;
+  const { date, title } = articleData;
+
+  const topic = properties.tags.multi_select[0].name;
+  const description = properties.snippet.rich_text[0].plain_text;
+  const coverCaption = properties.cover_alt.rich_text[0].plain_text;
+
+  const publishDateIso = date.toISOString();
+  const publishDateFormatted = formatDateAsString(date);
+
   const coverImageContent = getImageContentFromBlock({
     // Convert the cover object into a "fake" block so it can be pass in here.
-    block: { id: "", type: NotionBlockType.COVER, [NotionBlockType.COVER]: page.cover },
-    captionOverride: "(HIDDEN) Article cover image.",
+    block: { id: "", type: NotionBlockType.COVER, [NotionBlockType.COVER]: cover },
+    captionOverride: coverCaption,
   });
 
   const coverImageData = await fetchAndProcessImage(
@@ -134,8 +141,8 @@ for (const article of articles) {
   const mdxContents = await prettier.format(
     [
       "---",
-      `title: "${article.title}"`,
-      `description: "${article.description}"`,
+      `title: "${title}"`,
+      `description: "${description}"`,
       "author: Daniel van Dijk",
       "opengraph:",
       "  - title: true",
@@ -143,7 +150,8 @@ for (const article of articles) {
       "  - type: article",
       `  - url: ${joinPathNames(originUrl, "articles", articleRoute)}`,
       "  - article:author: Daniel van Dijk",
-      `  - article:published_time: ${article.date.toISOString()}`,
+      `  - article:published_time: ${publishDateIso}`,
+      `  - tag: ${topic}`,
       "  - locale: en_US",
       "  - site_name: Daniel van Dijk",
       coverImageOpenGraphMetadata,
@@ -155,9 +163,12 @@ for (const article of articles) {
       "",
       coverImageMarkup,
       "",
-      `# ${article.title}`,
+      `# ${title}`,
       "",
-      `<div role="doc-subtitle">${formatDateAsString(article.date)}</div>`,
+      `<time dateTime="${publishDateIso}" role="doc-subtitle">${publishDateFormatted}</time>`,
+      "",
+      "## Contents",
+      `A ~${readTimeInMinutes} min read on ${topic}.`,
       "",
       anchorLinks,
       "",
@@ -168,10 +179,18 @@ for (const article of articles) {
     }
   );
 
-  const metaContents = await prettier.format(JSON.stringify(article), {
-    parser: "json",
-    ...PRETTIER_CONFIG,
-  });
+  const metaContents = await prettier.format(
+    JSON.stringify({
+      ...articleData,
+      topic,
+      description,
+      readTimeInMinutes,
+    }),
+    {
+      parser: "json",
+      ...PRETTIER_CONFIG,
+    }
+  );
 
   await mkdir(articleDirectory, { recursive: true });
   await writeFile(articleFilePath, mdxContents);

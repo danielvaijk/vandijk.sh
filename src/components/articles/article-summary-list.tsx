@@ -15,14 +15,8 @@ export const ArticleSummaryList = component$<ArticleSummaryListProps>(({ article
 
   return (
     <ul class="article-summary-list">
-      {articles.map(({ title, date, path, description }) => (
-        <ArticleSummaryItem
-          key={title}
-          title={title}
-          date={date}
-          path={path}
-          description={description}
-        />
+      {articles.map(({ path, ...rest }) => (
+        <ArticleSummaryItem key={path} path={path} {...rest} />
       ))}
     </ul>
   );

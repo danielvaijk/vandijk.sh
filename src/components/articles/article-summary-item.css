@@ -19,3 +19,9 @@
 .article-summary a > p {
   text-align: justify;
 }
+
+.article-summary-read-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
