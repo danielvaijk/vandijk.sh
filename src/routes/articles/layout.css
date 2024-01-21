@@ -28,6 +28,8 @@ article h2 {
 
 article h2 + p:first-letter {
   font-size: 160%;
+  line-height: 1;
+  margin-right: 0.1rem;
 }
 
 article h3 {
@@ -64,10 +66,14 @@ article h2#contents {
 article h2#contents + p {
   text-align: center;
   margin: 0.2rem 0 0 0;
+  font-weight: bolder;
+  font-style: italic;
 }
 
 article h2#contents + p:first-letter {
   font-size: unset;
+  line-height: unset;
+  margin-right: unset;
 }
 
 article h2#contents + p + ul {
