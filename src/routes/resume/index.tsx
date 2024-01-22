@@ -14,7 +14,9 @@ export default component$(() => {
   return (
     <div id="resume">
       <ResumeSection title="education" withoutBulletPoints>
-        <p>Completely self-taught since 2012.</p>
+        <li>
+          <p>Completely self-taught since 2012.</p>
+        </li>
       </ResumeSection>
 
       <ResumeSection title="experience">
