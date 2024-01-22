@@ -26,6 +26,7 @@
 }
 
 .resume-experience-item-achievements {
+  padding-left: 0.9rem;
   margin-top: 0.8rem;
   text-align: justify;
 }
@@ -35,6 +36,10 @@
 }
 
 @media screen and (min-width: 46rem) {
+  .resume-experience-item-achievements {
+    padding-left: 0.8rem;
+  }
+
   .resume-experience-item:not(:first-of-type) {
     margin-top: 1.4rem;
   }

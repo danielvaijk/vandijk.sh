@@ -13,11 +13,16 @@
   background-color: black;
 }
 
-.resume-section > ul {
-  padding-left: 0.8rem;
+.resume-section ul {
+  padding-left: 0.9rem;
 }
 
 .resume-section-without-bullet-points > ul {
-  padding: 0;
   list-style: none;
+}
+
+@media screen and (min-width: 46rem) {
+  .resume-section ul {
+    padding-left: 0.8rem;
+  }
 }
