@@ -178,6 +178,9 @@ for (const { id: articleId, ...articleData } of articles) {
     ].join("\n"),
     {
       parser: "mdx",
+      // Don't wrap anything due to width limits, since MDX will wrap wrapped text
+      // using a paragraph element, which causes unexpected markup inconsistencies.
+      printWidth: Infinity,
     }
   );
 
