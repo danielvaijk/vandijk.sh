@@ -174,7 +174,7 @@ async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
   const prettierSupportInfo = await prettier.getSupportInfo();
 
   const { language = "" } = content;
-  const supportedLanguages = prettierSupportInfo.languages.map(({ name }) => name);
+  const supportedLanguages = prettierSupportInfo.languages.map(({ name }) => name.toLowerCase());
 
   let codeOutput;
 
@@ -188,7 +188,17 @@ async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
     codeOutput = code + "\n";
   }
 
-  return ["```", language, "\n", codeOutput, "```"].join("");
+  return [
+    "{/* prettier-ignore-start */}",
+    "\n",
+    "```",
+    language,
+    "\n",
+    codeOutput,
+    "```",
+    "\n",
+    "{/* prettier-ignore-end */}",
+  ].join("");
 }
 
 async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<ConvertedMarkup> {
