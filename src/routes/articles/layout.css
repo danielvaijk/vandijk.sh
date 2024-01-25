@@ -17,6 +17,7 @@ article figure img {
 }
 
 article figure > figcaption {
+  margin-top: 0.4rem;
   text-align: center;
   font-size: 1rem;
   opacity: 0.6;
@@ -80,6 +81,10 @@ article h2#contents + p + ul {
   margin: 2rem auto 4rem auto;
 }
 
+article h2#contents + p + ul li {
+  text-align: start;
+}
+
 article h2#contents + p + ul a {
   color: inherit;
 }
@@ -110,10 +115,4 @@ article *:not(pre) > code {
 
 article ul li {
   text-align: justify;
-}
-
-@media screen and (min-width: 46rem) {
-  article ul li {
-    text-align: start;
-  }
 }
