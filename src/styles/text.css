@@ -42,6 +42,10 @@ p {
   margin-inline-end: 0px;
 }
 
+ol li::marker {
+  font-weight: bold;
+}
+
 @media screen and (min-width: 46rem) {
   h1 {
     font-size: 2.5rem;
