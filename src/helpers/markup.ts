@@ -8,6 +8,7 @@ import {
 } from "~/definition/notion";
 import { PRETTIER_CONFIG } from "~/definition/prettier";
 import { getWordCount } from "~/utilities/text";
+import { slugify } from "~/utilities/url";
 
 import {
   ImageFormat,
@@ -19,7 +20,6 @@ import {
   saveImage,
 } from "./image";
 import { isNextIndexBlockOfType } from "./notion";
-import { slugify } from "../utilities/url";
 
 interface ImageCaption {
   text: string;
@@ -204,7 +204,9 @@ async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
 async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<ConvertedMarkup> {
   let articleContent = "";
   let anchorLinks = "";
+
   let wordCount = 0;
+  let numberedItemCount = 0;
 
   for (let index = 0; index < blocks.length; index++) {
     const block = blocks[index];
@@ -226,6 +228,18 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
 
         if (isNextIndexBlockOfType(blocks, index, NotionBlockType.BULLETED_LIST_ITEM)) {
           spacer = "\n";
+        }
+        break;
+
+      case NotionBlockType.NUMBERED_LIST_ITEM:
+        prefix = `${++numberedItemCount}.`;
+        content = getRichTextContentFromBlock(block);
+        wordCount += getWordCount(content);
+
+        if (isNextIndexBlockOfType(blocks, index, NotionBlockType.NUMBERED_LIST_ITEM)) {
+          spacer = "\n";
+        } else {
+          numberedItemCount = 0;
         }
         break;
 

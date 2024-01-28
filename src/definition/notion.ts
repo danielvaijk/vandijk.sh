@@ -5,6 +5,7 @@ enum NotionBlockType {
   HEADING_TWO = "heading_2",
   HEADING_THREE = "heading_3",
   BULLETED_LIST_ITEM = "bulleted_list_item",
+  NUMBERED_LIST_ITEM = "numbered_list_item",
   IMAGE = "image",
   CODE = "code",
   COVER = "cover",
