@@ -6,13 +6,6 @@ import type {
 } from "~/definition/notion";
 import { joinPathNames } from "~/utilities/url";
 
-interface NotionBlockChildrenResponse {
-  object: string;
-  has_more: boolean;
-  next_cursor: string;
-  results: Array<NotionBlock>;
-}
-
 interface NotionPageResponse {
   properties: {
     snippet: {
@@ -31,6 +24,13 @@ interface NotionPageResponse {
       url: string;
     };
   };
+}
+
+interface NotionBlockChildrenResponse {
+  object: string;
+  has_more: boolean;
+  next_cursor: string;
+  results: Array<NotionBlock>;
 }
 
 const { NOTION_TOKEN } = process.env;
