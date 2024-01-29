@@ -4,7 +4,7 @@ import { useLocation, type DocumentHead } from "@builder.io/qwik-city";
 import { createPageMetaTags } from "~/helpers/meta";
 
 import stylesForLayout from "./layout.css?inline";
-import stylesForCodeHighlights from "../../styles/prism.css?inline";
+import stylesForCodeHighlights from "../../styles/code.css?inline";
 
 export default component$(() => {
   useStyles$(stylesForLayout);
