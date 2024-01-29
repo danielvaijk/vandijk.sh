@@ -7,7 +7,8 @@
  */
 @import "./styles/normalize.css";
 @import "./styles/document.css";
+@import "./styles/code.css";
 @import "./styles/text.css";
+@import "./styles/image.css";
 @import "./styles/header.css";
 @import "./styles/footer.css";
-@import "./styles/miscellaneous.css";
