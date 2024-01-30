@@ -10,11 +10,11 @@ export interface ArticleSummaryProps {
   path: string;
   topic: string;
   description: string;
-  readTimeInMinutes: number;
+  readTime: number;
 }
 
 export const ArticleSummaryItem = component$<ArticleSummaryProps>(
-  ({ title, date, path, description, topic, readTimeInMinutes }) => {
+  ({ title, date, path, description, topic, readTime }) => {
     const { scopeId } = useStylesScoped$(styles);
 
     const dateParsed = new Date(date);
@@ -29,7 +29,7 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
 
           <div class="article-summary-read-info">
             <p>Talks about {topic}</p>
-            <p>~{readTimeInMinutes} min read</p>
+            <p>~{readTime} min read</p>
           </div>
         </Link>
       </li>

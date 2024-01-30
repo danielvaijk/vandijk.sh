@@ -7,7 +7,7 @@ import {
   type NotionRichText,
 } from "~/definition/notion";
 import { PRETTIER_CONFIG } from "~/definition/prettier";
-import { getWordCount } from "~/utilities/text";
+import { getReadTimeInMinutesFromWordCount, getWordCount } from "~/utilities/text";
 import { slugify } from "~/utilities/url";
 
 import {
@@ -16,10 +16,12 @@ import {
   fetchAndProcessImage,
   type ProcessedImage,
   type ImageSourceSet,
-  createSourceSetsFromImageVariants,
+  createSourceSetFromImageVariants,
   saveImage,
+  serializeSourceSet,
 } from "./image";
 import { isNextIndexBlockOfType } from "./notion";
+import { formatDateAsString } from "~/utilities/time";
 
 interface ImageCaption {
   text: string;
@@ -34,17 +36,14 @@ interface ImageContent {
 interface ConvertedMarkup {
   anchorLinks: string;
   articleContent: string;
-  wordCount: number;
+  readTime: number;
 }
 
 function getRichTextContentFromBlock(block: NotionBlock) {
-  const { rich_text: richTexts } = block[block.type] as NotionBlockContents;
+  const blockContent = block[block.type] as NotionBlockContents;
+  const richTextList = blockContent.rich_text ?? [];
 
-  if (!richTexts) {
-    return "";
-  }
-
-  return richTexts.reduce((result: string, richText: NotionRichText): string => {
+  return richTextList.reduce((result: string, richText: NotionRichText): string => {
     const { annotations = {} } = richText;
     const { content = "", link } = richText.text ?? {};
 
@@ -109,58 +108,91 @@ function getImageContentFromBlock({
   };
 }
 
-function createMarkupForImage({
+function renderImageMarkup({
   image,
   caption,
   publicPath,
   isPriority = false,
-  avifSourceSets = [],
-  webpSourceSets = [],
+  avifSourceSet: avifSources = [],
+  webpSourceSet: webpSources = [],
 }: {
   image: ProcessedImage;
   caption: ImageCaption;
   publicPath: string;
   isPriority?: boolean;
-  avifSourceSets?: Array<ImageSourceSet>;
-  webpSourceSets?: Array<ImageSourceSet>;
+  avifSourceSet?: Array<ImageSourceSet>;
+  webpSourceSet?: Array<ImageSourceSet>;
 }): string {
-  const { width, height } = image.metadata;
-  const isSingleImage = avifSourceSets.length + webpSourceSets.length === 0;
+  const { metadata } = image;
+  const isSingleImage = avifSources.length + webpSources.length === 0;
 
-  const widthAttribute = `width="${width}"`;
-  const heightAttribute = `height="${height}"`;
+  const src = `src="${publicPath}"`;
+  const width = `width="${metadata.width}"`;
+  const height = `height="${metadata.height}"`;
   const decoding = `decoding="${isPriority ? "sync" : "async"}"`;
   const loading = `loading="${isPriority ? "eager" : "lazy"}"`;
   const alt = `alt="${caption.text}"`;
-  const sizes = `sizes="(max-width: 46rem) 90vw, 46rem"`;
+
+  const img = `<img ${src} ${width} ${height} ${alt} ${decoding} ${loading} />`;
+  const figcaption = caption.isHidden ? null : `<figcaption>${caption.text}</figcaption>`;
 
   if (isSingleImage) {
-    return [
-      "<figure>",
-      `<img src="${publicPath}" ${widthAttribute} ${heightAttribute} ${alt} ${decoding} ${loading} />`,
-      !caption.isHidden && `<figcaption>${caption.text}</figcaption>`,
-      "</figure>",
-    ]
-      .filter((value) => value)
-      .join("\n");
+    return ["<figure>", img, figcaption, "</figure>"].filter((value) => value).join("\n");
   }
 
-  const createSourceSetAttribute = (sources: Array<ImageSourceSet>): string => {
-    return `srcset="${sources.map(({ path, size }) => [path, size].join(" ")).join(", ")}"`;
-  };
+  const sizes = `sizes="(max-width: 46rem) 90vw, 46rem"`;
+  const avifSourceSet = `srcset="${serializeSourceSet(avifSources)}"`;
+  const webpSourceSet = `srcset="${serializeSourceSet(webpSources)}"`;
 
   return [
     "<figure>",
     "<picture>",
-    `<source ${sizes} ${createSourceSetAttribute(avifSourceSets)} />`,
-    `<source ${sizes} ${createSourceSetAttribute(webpSourceSets)} />`,
-    `<img src="${publicPath}" ${widthAttribute} ${heightAttribute} ${alt} ${decoding} ${loading} />`,
+    `<source ${sizes} ${avifSourceSet} />`,
+    `<source ${sizes} ${webpSourceSet} />`,
+    img,
     "</picture>",
-    !caption.isHidden && `<figcaption>${caption.text}</figcaption>`,
+    figcaption,
     "</figure>",
   ]
     .filter((value) => value)
     .join("\n");
+}
+
+async function generateImagesWithMarkup({
+  image,
+  caption,
+  publicPath,
+  isPriority = false,
+}: {
+  image: ProcessedImage;
+  caption: ImageCaption;
+  publicPath?: string;
+  isPriority?: boolean;
+}) {
+  if (publicPath) {
+    return renderImageMarkup({
+      image,
+      caption,
+      publicPath,
+      isPriority,
+    });
+  }
+
+  const avifVariants = await createImageVariants(image, ImageFormat.AVIF);
+  const webpVariants = await createImageVariants(image, ImageFormat.WEBP);
+
+  const avifSourceSet = await createSourceSetFromImageVariants(avifVariants);
+  const webpSourceSet = await createSourceSetFromImageVariants(webpVariants);
+
+  return renderImageMarkup({
+    image,
+    caption,
+    isPriority,
+    avifSourceSet,
+    webpSourceSet,
+    // We use the smallest WebP variant as fallback.
+    publicPath: webpSourceSet[0].path,
+  });
 }
 
 async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
@@ -272,29 +304,17 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
           const imageContent = getImageContentFromBlock({ block });
           const imageData = await fetchAndProcessImage(imageContent.url);
 
-          const options = {
-            image: imageData,
-            caption: imageContent.caption,
-          };
+          let publicPath;
 
           if (imageData.willUseOriginal) {
-            content = createMarkupForImage({ ...options, publicPath: await saveImage(imageData) });
-          } else {
-            const avifVariants = await createImageVariants(imageData, ImageFormat.AVIF);
-            const webpVariants = await createImageVariants(imageData, ImageFormat.WEBP);
-
-            const avifSourceSets = await createSourceSetsFromImageVariants(avifVariants);
-            const webpSourceSets = await createSourceSetsFromImageVariants(webpVariants);
-
-            const publicPath = webpSourceSets[0].path;
-
-            content = createMarkupForImage({
-              ...options,
-              publicPath,
-              avifSourceSets,
-              webpSourceSets,
-            });
+            publicPath = await saveImage(imageData);
           }
+
+          content = await generateImagesWithMarkup({
+            publicPath,
+            image: imageData,
+            caption: imageContent.caption,
+          });
         }
         break;
 
@@ -317,16 +337,95 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
     }
   }
 
+  const readTime = getReadTimeInMinutesFromWordCount(wordCount);
+
   return {
     articleContent,
     anchorLinks,
-    wordCount,
+    readTime,
   };
+}
+
+function generateMdxArticlePage({
+  pageUrl,
+  title,
+  description,
+  topic,
+  date,
+  coverImage,
+  readTime,
+  anchorLinks,
+  articleContent,
+}: {
+  pageUrl: string;
+  title: string;
+  description: string;
+  topic: string;
+  date: Date;
+  readTime: number;
+  anchorLinks: string;
+  articleContent: string;
+  coverImage: {
+    url: string;
+    alt: string;
+    type: string;
+    width: number;
+    height: number;
+    markup: string;
+  };
+}) {
+  return `
+---
+title: ${title}
+description: "${description}"
+author: Daniel van Dijk
+opengraph:
+  - title: true
+  - description: true
+  - type: article
+  - url: ${pageUrl}
+  - article:author: Daniel van Dijk
+  - article:published_time: ${date.toISOString()}
+  - tag: ${topic}
+  - locale: en_US
+  - site_name: Daniel van Dijk
+  - image: ${coverImage.url}
+    image:alt: ${coverImage.alt}
+    image:type: ${coverImage.type}
+    image:width: ${coverImage.width}
+    image:height: ${coverImage.height}
+---
+
+export default function Layout({ children: content }) {
+  return <article>{content}</article>;
+}
+
+${coverImage.markup}
+
+# ${title}
+
+<time dateTime="${date.toISOString()}" role="doc-subtitle">
+  ${formatDateAsString(date)}
+</time>
+
+---
+
+## Contents
+
+A ~${readTime} min read on ${topic}.
+
+${anchorLinks}
+
+---
+
+${articleContent}
+  `;
 }
 
 export {
   getImageContentFromBlock,
   convertBlocksToMarkup,
-  createMarkupForImage,
   getRichTextContentFromBlock,
+  generateMdxArticlePage,
+  generateImagesWithMarkup,
 };

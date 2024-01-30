@@ -125,8 +125,6 @@ async function createImageVariants(
   const { width = 0 } = metadata;
 
   for (const resizeWidth of [480, 705, 960, 1410, 1440, 2115]) {
-    // The resize method mutates the image object reference, so we need
-    // to call resize with the original width again at one point.
     const targetWidth = resizeWidth < width ? resizeWidth : width;
     const resizedImage = image.resize(targetWidth);
 
@@ -158,7 +156,7 @@ async function createImageVariants(
   return variants;
 }
 
-async function createSourceSetsFromImageVariants(
+async function createSourceSetFromImageVariants(
   variants: Array<ProcessedImage>
 ): Promise<Array<ImageSourceSet>> {
   const imageSources = [];
@@ -172,6 +170,10 @@ async function createSourceSetsFromImageVariants(
   }
 
   return imageSources;
+}
+
+function serializeSourceSet(sourceSet: Array<ImageSourceSet>): string {
+  return sourceSet.map(({ path, size }) => [path, size].join(" ")).join(", ");
 }
 
 async function saveImage({ metadata, output }: ProcessedImage): Promise<string> {
@@ -191,7 +193,8 @@ export {
   ImagePurpose,
   fetchAndProcessImage,
   createImageVariants,
-  createSourceSetsFromImageVariants,
+  createSourceSetFromImageVariants,
+  serializeSourceSet,
   saveImage,
 };
-export type { ProcessedImage, ImageMetadata, ImageSourceSet };
+export type { ProcessedImage, ImageSourceSet };

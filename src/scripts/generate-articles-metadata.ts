@@ -12,7 +12,7 @@ const entities = await readdir(ARTICLES_DIRECTORY, { withFileTypes: true });
 
 const results = [];
 
-for await (const entity of entities) {
+for (const entity of entities) {
   if (!entity.isDirectory()) {
     continue;
   }
