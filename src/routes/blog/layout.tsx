@@ -11,7 +11,7 @@ export default component$(() => {
   useStyles$(stylesForCodeHighlights);
 
   const location = useLocation();
-  const isAtRoot = location.url.pathname.endsWith("/articles/");
+  const isAtRoot = location.url.pathname.endsWith("/blog/");
   const isDev404 = location.url.pathname.endsWith("/404.html");
   const shouldShowFooter = !isDev404 && !isAtRoot;
 

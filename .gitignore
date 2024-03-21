@@ -21,8 +21,8 @@ public/assets/*
 !public/assets/.gitkeep
 
 src/media/articles.json
-src/routes/articles/*/index.mdx
-src/routes/articles/*/meta.json
+src/routes/blog/*/index.mdx
+src/routes/blog/*/meta.json
 
 # Cloudflare
 functions/**/*.js

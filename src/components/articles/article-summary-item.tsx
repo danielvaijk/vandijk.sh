@@ -22,7 +22,7 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
 
     return (
       <li class="article-summary">
-        <Link class={scopeId} href={`/articles/${path}/`} prefetch>
+        <Link class={scopeId} href={`/blog/${path}/`} prefetch>
           <time dateTime={dateParsed.toISOString()}>{dateFormatted}</time>
           <h4>{title}</h4>
           <p>{description}</p>
