@@ -17,6 +17,18 @@ export default component$(() => {
 
   return (
     <div id="resume">
+      <ResumeSection title="introduction" withoutBulletPoints>
+        <li>
+          <p>
+            My passion for technology started with an affinity for playing video games on computers.
+            From the age of 14 onwards, that passion became the driving force behind intricate,
+            novel & robust software solutions in a wide range of industries, sectors, and domains.
+            Currently located in Amsterdam, I spend most of my time delivering countless key
+            contributions and innovations at both adidas and Stentorian.
+          </p>
+        </li>
+      </ResumeSection>
+
       <ResumeSection title="education" withoutBulletPoints>
         <li>
           <p>Completely self-taught since 2012.</p>
@@ -32,9 +44,10 @@ export default component$(() => {
           achievements={
             isShowingLatest
               ? [
-                  "Drove a huge multi-team, multi-department initiative to replace a vendor worth 2.6M euros per year, which covered crucial use cases such as A/B Testing, Segment-based Data Collection and Personalization, and Social Proof. A fully functioning back-end prototype was built in Java, comprising of 3 REST APIs, a PostgreSQL and a DynamoDB database.",
+                  "Was temporarily lent to another department to help implement a complex analytics segment data collection endpoint in their Spring Boot Java API.",
+                  "Drove a huge multi-team, multi-department initiative to replace a vendor worth 2.6M euros per year, which covered crucial use cases such as A/B Testing, Segment-based Data Collection and Personalization, and Social Proof. A fully functioning back-end prototype was built in Java (with Spring Boot), comprising of 3 REST APIs, a PostgreSQL and a DynamoDB database.",
                   "Designed a page layout engine architecture that resolved longstanding page performance and rendering issues due to personalization, by leveraging distributed edge caching and the server-side rendering of an existing micro front-end architecture.",
-                  "Maintained and improved core frameworks, tools, and CI/CD pipelines used by all other website teams.",
+                  "Maintained and improved core frameworks, tools, and CI/CD pipelines used by all other website teams. Provided technical support in multiple Teams channels, unblocking teams and initiatives.",
                   "Invented, and open-sourced, a unique linter CLI tool called Breakpoint; that statically analyzes npm packages for breaking changes, written in Rust using SWC's ECMA parser.",
                   "Led the development of a core Routing API, built with Go, PostgreSQL, and Kafka. This project further cemented Go as an alternative for Node.js within the .COM Experience department.",
                 ]
@@ -53,6 +66,7 @@ export default component$(() => {
                   "Upgraded a React homepage component that displayed category recommendations to be completely automated instead of manually curated, including a new UI design. It was the first use-case using a new internal personalization architecture.",
                   "Led the development of a Node.js API using Express.js which served product and category recommendations for several key revenue-driving use cases on the website.",
                   "Led the development of React libraries that allowed teams to consume and handle A/B tests and perform data collection on segments for analytics purposes.",
+                  "Presented several tech talks to the adidas engineering community, including personal projects and broader educational topics like security.",
                 ]
               : []
           }
@@ -114,7 +128,7 @@ export default component$(() => {
         />
       </ResumeSection>
 
-      <ResumeSection title="skills" withoutBulletPoints>
+      <ResumeSection title="hard skills" withoutBulletPoints>
         <ResumeSkillItem type="Runtimes" examples={["Node.js"]} />
         <ResumeSkillItem
           type="Languages"
@@ -164,6 +178,27 @@ export default component$(() => {
           examples={["DigitalOcean", "Cloudflare", "Docker", "Kubernetes", "AWS"]}
         />
         <ResumeSkillItem type="Other" examples={["Unity Engine", "CraftCMS", "Flarum"]} />
+      </ResumeSection>
+
+      <ResumeSection title="soft skills" withoutBulletPoints>
+        <ResumeSkillItem
+          type="Languages"
+          examples={["English (Native), Portuguese (Native), Dutch (Basic)"]}
+        />
+        <ResumeSkillItem
+          type="Leadership"
+          examples={[
+            "Project Management",
+            "Delegation",
+            "Expectation Management",
+            "Communication",
+            "Coordination",
+          ]}
+        />
+        <ResumeSkillItem
+          type="Communication"
+          examples={["Presenting Tech Talks", "Technical Writing", "Technical Support"]}
+        />
       </ResumeSection>
     </div>
   );
