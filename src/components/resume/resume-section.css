@@ -14,7 +14,8 @@
 }
 
 .resume-section ul {
-  padding-left: 0.9rem;
+  margin: 0;
+  padding: 1rem 0 1rem 0.9rem;
 }
 
 .resume-section-without-bullet-points > ul {

@@ -19,20 +19,16 @@ export default component$(() => {
     <div id="resume">
       <ResumeSection title="introduction" withoutBulletPoints>
         <li>
-          <p>
-            My passion for technology started with an affinity for playing video games on computers.
-            From the age of 14 onwards, that passion became the driving force behind intricate,
-            novel & robust software solutions in a wide range of industries, sectors, and domains.
-            Currently located in Amsterdam, I spend most of my time delivering countless key
-            contributions and innovations at both adidas and Stentorian.
-          </p>
+          My passion for technology started with an affinity for playing video games on computers.
+          From the age of 14 onwards, that passion became the driving force behind intricate, novel
+          & robust software solutions in a wide range of industries, sectors, and domains. Currently
+          located in Amsterdam, I spend most of my time delivering countless key contributions and
+          innovations at both adidas and Stentorian.
         </li>
       </ResumeSection>
 
       <ResumeSection title="education" withoutBulletPoints>
-        <li>
-          <p>Completely self-taught since 2012.</p>
-        </li>
+        <li>Completely self-taught since 2012.</li>
       </ResumeSection>
 
       <ResumeSection title="experience">
