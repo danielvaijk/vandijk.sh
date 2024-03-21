@@ -1,5 +1,6 @@
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 import type { DocumentHead } from "@builder.io/qwik-city";
+import { useLocation } from "@builder.io/qwik-city";
 
 import { ResumeSection } from "~/components/resume/resume-section";
 import { ResumeExperienceItem } from "~/components/resume/resume-experience-item";
@@ -10,6 +11,9 @@ import { ResumeSkillItem } from "~/components/resume/resume-skill-item";
 
 export default component$(() => {
   useStylesScoped$(styles);
+
+  const { url } = useLocation();
+  const isShowingLatest = url.searchParams.get("latest") == "";
 
   return (
     <div id="resume">
@@ -25,6 +29,17 @@ export default component$(() => {
           location="Amsterdam, Netherlands"
           position="Software Engineer II"
           duration="Oct. 2023 - Present"
+          achievements={
+            isShowingLatest
+              ? [
+                  "Drove a huge multi-team, multi-department initiative to replace a vendor worth 2.6M euros per year, which covered crucial use cases such as A/B Testing, Segment-based Data Collection and Personalization, and Social Proof. A fully functioning back-end prototype was built in Java, comprising of 3 REST APIs, a PostgreSQL and a DynamoDB database.",
+                  "Designed a page layout engine architecture that resolved longstanding page performance and rendering issues due to personalization, by leveraging distributed edge caching and the server-side rendering of an existing micro front-end architecture.",
+                  "Maintained and improved core frameworks, tools, and CI/CD pipelines used by all other website teams.",
+                  "Invented, and open-sourced, a unique linter CLI tool called Breakpoint; that statically analyzes npm packages for breaking changes, written in Rust using SWC's ECMA parser.",
+                  "Led the development of a core Routing API, built with Go, PostgreSQL, and Kafka. This project further cemented Go as an alternative for Node.js within the .COM Experience department.",
+                ]
+              : []
+          }
         />
 
         <ResumeExperienceItem
@@ -32,6 +47,15 @@ export default component$(() => {
           location="Amsterdam, Netherlands"
           position="Software Engineer"
           duration="Jul. 2021 - Sep. 2023"
+          achievements={
+            isShowingLatest
+              ? [
+                  "Upgraded a React homepage component that displayed category recommendations to be completely automated instead of manually curated, including a new UI design. It was the first use-case using a new internal personalization architecture.",
+                  "Led the development of a Node.js API using Express.js which served product and category recommendations for several key revenue-driving use cases on the website.",
+                  "Led the development of React libraries that allowed teams to consume and handle A/B tests and perform data collection on segments for analytics purposes.",
+                ]
+              : []
+          }
         />
 
         <ResumeExperienceItem
@@ -98,14 +122,15 @@ export default component$(() => {
             "C#",
             "C++",
             "HTML",
-            "CSS",
-            "SCSS",
+            "(S)CSS",
             "PHP",
             "SQL",
             "Bash",
             "JavaScript",
             "TypeScript",
             "Java",
+            "Go",
+            "Rust",
           ]}
         />
         <ResumeSkillItem
@@ -114,16 +139,30 @@ export default component$(() => {
         />
         <ResumeSkillItem
           type="Frameworks"
-          examples={["jQuery", "React", "Express.js", "Next.js", "Spring Boot", "Qwik"]}
+          examples={["jQuery", "React.js", "Express.js", "Next.js", "Spring Boot", "Qwik"]}
         />
         <ResumeSkillItem type="Design Systems" examples={["Semantic UI", "Tailwind CSS"]} />
         <ResumeSkillItem type="Testing" examples={["Jest", "Cypress", "Playwright"]} />
         <ResumeSkillItem type="Data Modeling" examples={["Mongoose", "Redux", "MobX"]} />
         <ResumeSkillItem
           type="Tools"
-          examples={["Git", "npm", "Yarn", "ESLint", "Prettier", "Maven", "Webpack", "Turbo"]}
+          examples={[
+            "Git",
+            "npm",
+            "Yarn",
+            "ESLint",
+            "Prettier",
+            "Maven",
+            "Webpack",
+            "Vite",
+            "Rollup",
+            "Turbo",
+          ]}
         />
-        <ResumeSkillItem type="Cloud" examples={["Cloudflare", "Docker", "Kubernetes", "AWS"]} />
+        <ResumeSkillItem
+          type="Cloud"
+          examples={["DigitalOcean", "Cloudflare", "Docker", "Kubernetes", "AWS"]}
+        />
         <ResumeSkillItem type="Other" examples={["Unity Engine", "CraftCMS", "Flarum"]} />
       </ResumeSection>
     </div>
