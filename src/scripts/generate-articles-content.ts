@@ -87,11 +87,11 @@ for (const { id: articleId, ...articleData } of articles) {
   const description = properties.snippet.rich_text[0].plain_text ?? "";
 
   const articleRoute = slugify(title);
-  const articleDirectory = joinPathNames("./src/routes/articles", articleRoute);
+  const articleDirectory = joinPathNames("./src/routes/blog", articleRoute);
   const articleFilePath = joinPathNames(articleDirectory, "index.mdx");
   const articleMetadataPath = joinPathNames(articleDirectory, "meta.json");
 
-  const pageUrl = joinPathNames(originUrl, "articles", articleRoute);
+  const pageUrl = joinPathNames(originUrl, "blog", articleRoute);
 
   const coverImage = {
     url: joinPathNames(originUrl, coverImagePublicPath),

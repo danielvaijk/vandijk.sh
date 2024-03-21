@@ -6,7 +6,7 @@ import { PRETTIER_CONFIG } from "~/definition/prettier";
 import { joinPathNames } from "~/utilities/url";
 
 const ARTICLES_METADATA_FILE_PATH = "./src/media/articles.json";
-const ARTICLES_DIRECTORY = "./src/routes/articles";
+const ARTICLES_DIRECTORY = "./src/routes/blog";
 
 const entities = await readdir(ARTICLES_DIRECTORY, { withFileTypes: true });
 
