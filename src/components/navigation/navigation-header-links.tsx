@@ -75,13 +75,13 @@ export const NavigationHeaderLinks = component$(() => {
         </li>
         <li>
           <Link
-            href="/articles/"
+            href="/blog/"
             onClick$={() => {
               isOpen.value = !isOpen.value;
             }}
             prefetch
           >
-            Articles
+            Blog
           </Link>
         </li>
         <li>

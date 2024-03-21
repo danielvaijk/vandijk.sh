@@ -21,7 +21,7 @@ export default component$(() => {
           projects
         </Link>
         ,{" "}
-        <Link href="/articles/" prefetch>
+        <Link href="/blog/" prefetch>
           articles
         </Link>
         ,{" "}
