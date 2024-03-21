@@ -13,6 +13,8 @@ npm-debug.log*
 
 # Misc
 .DS_Store
+.idea
+.vscode
 
 # Generated
 public/assets/*
