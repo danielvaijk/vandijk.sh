@@ -4,6 +4,12 @@
   margin-top: 0.6rem;
 }
 
+@media print {
+  #resume {
+    margin-top: 0;
+  }
+}
+
 @media screen and (min-width: 46rem) {
   #resume {
     padding: 0.8rem 2rem;
