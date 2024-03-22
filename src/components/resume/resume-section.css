@@ -22,8 +22,16 @@
   list-style: none;
 }
 
+.resume-section-split-columns > ul {
+  column-count: 3;
+}
+
 @media screen and (min-width: 46rem) {
   .resume-section ul {
     padding-left: 0.8rem;
+  }
+
+  .resume-section-split-columns > ul {
+    column-count: 4;
   }
 }
