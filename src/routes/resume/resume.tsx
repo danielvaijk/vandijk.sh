@@ -35,15 +35,14 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
 
       <ResumeSection title="Areas of Expertise" withSplitColumns>
         <li>Full-stack Development</li>
-        <li>Front-end Development</li>
+        <li>Software Development</li>
         <li>Back-end Development</li>
         <li>Performance Optimization</li>
         <li>Project Management</li>
-        <li>DevOps & CI/CD</li>
-        <li>Research & Development</li>
-        <li>Writing</li>
-        <li>Presentations</li>
-        <li>Analytics</li>
+        <li>Continuous Integration (CI)</li>
+        <li>Continuous Deployment (CD)</li>
+        <li>Technical Writing</li>
+        <li>Technical Presentations</li>
         <li>A/B Testing</li>
         <li>Personalization</li>
         <li>Framework Design</li>
@@ -51,6 +50,9 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
         <li>Solution Architecture</li>
         <li>Automated Testing</li>
         <li>Design Systems</li>
+        <li>Databases (Relational & NoSQL)</li>
+        <li>UI & UX</li>
+        <li>R&D</li>
       </ResumeSection>
 
       <ResumeSection title="Professional Experience">
