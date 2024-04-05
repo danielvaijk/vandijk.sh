@@ -31,6 +31,7 @@ body {
 
 @media print {
   body {
+    font-family: Calibri, serif;
     background-image: none;
   }
 }

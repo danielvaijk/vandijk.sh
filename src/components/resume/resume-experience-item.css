@@ -2,6 +2,10 @@
   margin-top: 1.8rem;
 }
 
+.resume-experience-item-achievements-only {
+  list-style: none;
+}
+
 .resume-experience-item-content {
   display: flex;
   flex-direction: column;
@@ -11,10 +15,15 @@
   margin: 0;
 }
 
-.resume-experience-item-company,
+.resume-experience-item-name,
 .resume-experience-item-position {
   display: flex;
   justify-content: space-between;
+}
+
+.resume-experience-item-name a {
+  color: inherit;
+  text-decoration: underline;
 }
 
 .resume-experience-item-position i {
