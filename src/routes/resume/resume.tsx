@@ -15,14 +15,6 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
 
   return (
     <div id="resume">
-      {showFull && (
-        <ResumeSection title="Contact" withoutBulletPoints>
-          <ResumeSkillItem type="Email" examples={["<redacted email address>"]} />
-          <ResumeSkillItem type="Phone" examples={["<redacted phone number>"]} />
-          <ResumeSkillItem type="Location" examples={["Amsterdam, The Netherlands"]} />
-        </ResumeSection>
-      )}
-
       <ResumeSection title="Summary" withoutBulletPoints>
         <li>
           Dynamic and multidisciplinary <strong>Senior Full-stack Software Engineer</strong> with
