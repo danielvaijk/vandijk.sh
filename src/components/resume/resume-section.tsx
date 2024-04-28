@@ -1,16 +1,16 @@
-import { Slot, component$, useStylesScoped$ } from "@builder.io/qwik";
+import { Slot, component$, useStyles$ } from "@builder.io/qwik";
 
 import styles from "./resume-section.css?inline";
 
 interface ResumeSectionProps {
-  title: string;
+  title?: string;
   withoutBulletPoints?: boolean;
   withSplitColumns?: boolean;
 }
 
 export const ResumeSection = component$<ResumeSectionProps>(
   ({ title, withoutBulletPoints = false, withSplitColumns = false }) => {
-    useStylesScoped$(styles);
+    useStyles$(styles);
 
     return (
       <div
@@ -22,8 +22,8 @@ export const ResumeSection = component$<ResumeSectionProps>(
           },
         ]}
       >
-        <h4>{title.toUpperCase()}</h4>
-        <hr />
+        {title && <h4>{title.toUpperCase()}</h4>}
+        {title && <hr />}
         <ul>
           <Slot />
         </ul>

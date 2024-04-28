@@ -21,11 +21,6 @@
   justify-content: space-between;
 }
 
-.resume-experience-item-name a {
-  color: inherit;
-  text-decoration: underline;
-}
-
 .resume-experience-item-position i {
   width: 50%;
 }

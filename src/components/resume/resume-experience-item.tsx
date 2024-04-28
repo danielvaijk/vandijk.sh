@@ -4,27 +4,20 @@ import styles from "./resume-experience-item.css?inline";
 
 interface ResumeExperienceItemProps {
   name?: string;
-  link?: string;
   location?: string;
   position?: string;
   duration?: string;
+  description: string;
   achievements?: Array<string>;
 }
 
 export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
-  ({ name, link, location, position, duration, achievements = [] }) => {
+  ({ name, location, position, duration, description, achievements = [] }) => {
     useStylesScoped$(styles);
 
     const isAchievementsOnly = !name;
     const locationOrDuration = location ?? duration;
-
-    const title = link ? (
-      <a target="_blank" rel="noopener noreferrer" href={link}>
-        {name}
-      </a>
-    ) : (
-      name
-    );
+    const hasAchievements = achievements.length > 0;
 
     return (
       <li
@@ -35,18 +28,24 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
       >
         <div class="resume-experience-item-content">
           <div class="resume-experience-item-name">
-            <strong>{title}</strong>
+            <strong>{name}</strong>
             <p>{locationOrDuration}</p>
           </div>
 
           {position && (
             <div class="resume-experience-item-position">
-              <i>{position}</i>
-              <i>{duration}</i>
+              <strong>{position}</strong>
+              <strong>{duration}</strong>
             </div>
           )}
 
-          {achievements.length > 0 && (
+          {description && <br />}
+          {description && <p>{description}</p>}
+
+          {hasAchievements && <br />}
+          {hasAchievements && <i>Key Contributions:</i>}
+
+          {hasAchievements && (
             <ul class="resume-experience-item-achievements">
               {achievements.map((achievement, index) => {
                 return <li key={index}>{achievement}</li>;
