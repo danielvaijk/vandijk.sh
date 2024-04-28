@@ -4,7 +4,6 @@ import { ResumeSection } from "~/components/resume/resume-section";
 import { ResumeExperienceItem } from "~/components/resume/resume-experience-item";
 
 import styles from "./index.css?inline";
-import { ResumeSkillItem } from "~/components/resume/resume-skill-item";
 
 interface ResumeProps {
   showFull?: boolean;
@@ -15,269 +14,221 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
 
   return (
     <div id="resume">
-      <ResumeSection title="Summary" withoutBulletPoints>
+      <ResumeSection withoutBulletPoints>
         <li>
-          Dynamic and multidisciplinary <strong>Senior Full-stack Software Engineer</strong> with
-          over a decade of hands-on experience across various stacks, domains, and sectors. Known
-          for leading high-impact projects, driving technological advancements, and contributing to
-          the open source community.
+          <p>
+            <strong>
+              Accomplished Software Engineer with extensive experience across a spectrum of
+              programming languages, frameworks, and technologies in dynamic environments such as
+              adidas and bunq.
+            </strong>
+          </p>
+        </li>
+        <li>
+          <p>
+            Demonstrates a proven track record of developing, deploying, and enhancing software
+            applications that improve business operations, user experience, and technological
+            innovation. Proficient in leading cross-functional teams to deliver high-value projects
+            with optimized performance and scalability. Skilled in transforming theoretical models
+            into practical, robust tech solutions that directly contribute to corporate objectives.
+            Expert in navigating complex project requirements, ensuring seamless integration and
+            deployment of advanced solutions within prescribed timelines. Notable success in
+            pioneering new software tools and frameworks that lead to significant improvements in
+            system functionality and efficiency.
+          </p>
         </li>
       </ResumeSection>
-
       <ResumeSection title="Areas of Expertise" withSplitColumns>
-        <li>Software Development</li>
-        <li>Project Management</li>
-        <li>Solution Architecture</li>
-        <li>Performance Optimization</li>
-        <li>Distributed Systems</li>
-        <li>Automated Testing</li>
-        <li>Web Applications</li>
-        <li>Design Systems</li>
-        <li>Object-Oriented Programming</li>
-        <li>Relational/NoSQL Databases</li>
-        <li>Application Framework Design</li>
-        <li>Graphical User Interfaces</li>
-        <li>RESTful APIs</li>
-        <li>DevOps & CI/CD</li>
+        <li>Software Architecture Design</li>
+        <li>API Development & Management</li>
+        <li>DevOps Practices</li>
+        <li>Technical Project Leadership</li>
+        <li>Performance Engineering</li>
+        <li>Software Development Lifecycle</li>
         <li>Data Structures & Algorithms</li>
-        <li>Dynamic/Static Analysis</li>
-        <li>Research & Development</li>
-        <li>Technical Writing</li>
-        <li>Technical Presentations</li>
-        <li>Personalization</li>
-        <li>A/B Testing</li>
+        <li>Full-Stack Development</li>
+        <li>Testing & Quality Assurance</li>
+        <li>Innovative Solutions Development</li>
+        <li>Cloud Computing</li>
+        <li>Database Management</li>
+        <li>System Optimization</li>
+        <li>Agile Methodologies</li>
+        <li>Team Development</li>
       </ResumeSection>
-
-      <ResumeSection title="Technical Skills" withoutBulletPoints>
-        <ResumeSkillItem type="Runtimes" examples={["Node.js"]} />
-        <ResumeSkillItem
-          type="Languages"
-          examples={["JavaScript", "TypeScript", "Java", "Rust", "Go", "SQL", "PHP", "C#", "C++"]}
-        />
-        <ResumeSkillItem
-          type="Frameworks"
-          examples={["React.js", "Express.js", "Next.js", "Spring", "Qwik", "jQuery"]}
-        />
-        <ResumeSkillItem
-          type="Databases"
-          examples={["PostgreSQL", "DynamoDB", "MongoDB", "MySQL"]}
-        />
-        <ResumeSkillItem
-          type="Cloud"
-          examples={["Docker", "Kubernetes", "AWS", "Apache Kafka", "Cloudflare"]}
-        />
-        <ResumeSkillItem type="Testing" examples={["Jest", "Vitest", "Cypress", "Playwright"]} />
-        <ResumeSkillItem type="Networking" examples={["HTTP", "DNS", "TCP/UDP", "WebSockets"]} />
-        <ResumeSkillItem type="Tools" examples={["Git", "Unity Engine"]} />
+      <ResumeSection title="Technical Proficiencies" withoutBulletPoints>
+        <li>
+          <strong>Runtimes:</strong> Node.js | <strong>Languages:</strong> JavaScript, TypeScript,
+          Java, Rust, Go, SQL, PHP, C#, C++ | <strong>Frameworks:</strong> React.js, Express.js,
+          Next.js, Spring, Qwik, jQuery | <strong>Databases:</strong> PostgreSQL, DynamoDB, MongoDB,
+          MySQL | <strong>Cloud:</strong> Docker, Kubernetes, Apache Kafka, Cloudflare, AWS |{" "}
+          <strong>Testing:</strong> Jest, Vitest, Cypress, Playwright | <strong>Tools:</strong> Git,
+          Unity Engine
+        </li>
       </ResumeSection>
-
-      <ResumeSection title="Work Experience">
+      <ResumeSection title="Key Projects">
+        <li>
+          <strong>
+            <a href="https://github.com/danielvaijk/breakpoint">Breakpoint (2024)</a>:
+          </strong>{" "}
+          Created a linting tool that flags breaking changes through static analysis, written in{" "}
+          <strong>Rust</strong>.
+        </li>
+        <li>
+          <strong>
+            <a href="https://github.com/danielvaijk/synctivity">Synctivity (2024)</a>:
+          </strong>{" "}
+          Created a tool that syncs contribution activity between Git developer platforms, written
+          in <strong>Rust</strong>.
+        </li>
+        <li>
+          <strong>
+            <a href="https://github.com/danielvaijk/vandijk.sh">vandijk.sh (2023)</a>:
+          </strong>{" "}
+          Built an engineering portfolio and blog using <strong>TypeScript</strong>,{" "}
+          <strong>Node.js</strong>, <strong>Qwik</strong>, and the <strong>Notion API</strong>. It
+          features a static Notion-to-MDX article generator and a static image optimizer, deployed
+          on <strong>Cloudflare</strong>.
+        </li>
+        <li>
+          <strong>Photography Portfolio (2022):</strong> Launched a photography portfolio website to
+          exhibit photography work, employing <strong>TypeScript</strong>, <strong>Node.js</strong>,{" "}
+          <strong>Next.js</strong>, and various other modern web technologies, managed and deployed
+          via <strong>Cloudflare</strong>.
+        </li>
+        <li>
+          <strong>Offstage (2018 - 2021)</strong> Developed a multi-app event promotion management
+          platform for event organizers to automate and manage online and offline promotion efforts
+          and ambassadors. Initially built with JavaScript, Node.js, Express.js, MongoDB, Mongoose,
+          jQuery, Semantic UI, and Pug.js and later rebuilt with TypeScript, Node.js, React.js,
+          MobX, Tailwind CSS, and custom frameworks.
+        </li>
+        <li>
+          <strong>
+            <a href="https://github.com/danielvaijk/ev3-controller">
+              EV3 Mindstorm Controller (2017)
+            </a>
+            :
+          </strong>{" "}
+          Created a GUI application in C# for remote control of an EV3 Mindstorm AGV, featuring
+          manual and automatic navigation modes via bluetooth connectivity.
+        </li>
+        <li>
+          <strong>
+            <a href="https://github.com/danielvaijk/wave-survival">
+              Wave Survival Multiplayer (2014 - 2016)
+            </a>
+            :
+          </strong>{" "}
+          Developed a fully-featured multiplayer first-person shooter game as a commercial template
+          project on the <strong>Unity Engine</strong> using <strong>C#</strong>, enabling other
+          developers to quickly learn by example or kickstart game ideas.
+        </li>
+        <li>
+          <strong>
+            <a href="https://github.com/danielvaijk/verb-tetris">Verb Tetris (2013)</a>:
+          </strong>{" "}
+          Designed a Tetris-like 2D game for a High School assignment, created using{" "}
+          <strong>C#</strong> and the <strong>Unity Engine</strong>, promoting educational
+          engagement through gameplay.
+        </li>
+      </ResumeSection>
+      <ResumeSection title="Professional Experience">
         <ResumeExperienceItem
           name="adidas"
-          location="Amsterdam, Netherlands"
+          location="Amsterdam, Netherlands (Hybrid)"
           position="Software Engineer II, Web Frameworks & Tooling"
-          duration="Jul. 2021 - Present"
+          duration="2023 - Present"
+          description="Responsible for developing libraries and frameworks to streamline developer productivity across 20 engineering teams, building core systems and APIs that provide a foundation to other crucial services, and improving Jenkins CI/CD pipelines and DevOps processes."
           achievements={
             showFull
               ? [
-                  "Built a Go REST API with PostgreSQL and Apache Kafka to manage traffic routing, serving millions of daily website visits and requests.",
-                  "Designed a page layout engine that made 1:1 website experiences possible, solving longstanding page rendering and performance blockers related to personalization.",
+                  "Spearheaded the buy-in of Go as a viable alternative to TypeScript and Node.js for REST APIs.",
+                  "Enhanced traffic handling for millions of daily visitor requests by building a Go REST API with PostgreSQL and Apache Kafka.",
+                  "Designed a rendering engine that made 1:1 personalized pages scalable, solving longstanding UX issues and unblocking initiatives.",
                 ]
               : []
           }
         />
 
-        {showFull && (
-          <ResumeExperienceItem
-            position="Software Engineer, 3rd Party Tools"
-            achievements={[
-              "Orchestrated a multi-department effort to replace a vendor, resulting in back-end prototype built with Java, Spring, PostgreSQL, and DynamoDB worth €2.6M annually.",
-              "Engineered React frameworks to handle A/B Testing and Data Collection, increasing development productivity across 20 engineering teams.",
-              "Pioneered a Node.js REST gateway API to serve product and category recommendations, resulting in a marked increase in CTR ratios and conversion rates.",
-            ]}
-          />
-        )}
+        <ResumeExperienceItem
+          name="adidas"
+          location="Amsterdam, Netherlands (Hybrid)"
+          position="Software Engineer, 3rd Party Tools"
+          duration="2022 - 2023"
+          description="Responsible for several vendor integrations on the website spanning a wide array of features such as Search, A/B Testing, Personalization, Recommendations, Reviews, Analytics, and Data Collection;  including the development of full-stack integrations and reusable libraries."
+          achievements={
+            showFull
+              ? [
+                  "Secured annual savings of €2.6M by orchestrating a multi-department vendor replacement effort that led to the creation of a back-end prototype with Java, Spring, PostgreSQL, and DynamoDB.",
+                  "Boosted development productivity across 20 engineering teams by engineering React frameworks for A/B Testing and Data Collection.",
+                  "Increased CTR ratios and conversion rates by pioneering a Node.js REST gateway API for product and category recommendations.",
+                ]
+              : []
+          }
+        />
 
-        {showFull && (
-          <ResumeExperienceItem
-            position="Software Engineer, Landing Pages"
-            achievements={[
-              "Presented various in-person and online tech talks to hundreds of engineers in the community on personal projects and educational topics like application security.",
-              "Transformed homepage category recommendations with a new automated system & design, completely eliminating operational overhead while boosting relevancy and UX.",
-            ]}
-          />
-        )}
+        <ResumeExperienceItem
+          name="adidas"
+          location="Amsterdam, Netherlands (Hybrid)"
+          position="Software Engineer, Campaign & Storytelling"
+          duration="2021 - 2022"
+          description="Responsible for mantaining key landing pages like the homepage, including improvements to page rendering, personalization, and overall page design and UX. Worked with content publishers to automate and streamline content creation and curation."
+          achievements={
+            showFull
+              ? [
+                  "Released a POC that paved the way to replace a vendor with a new, internal recommendations architecture created by Data Science.",
+                  "Eliminated operational overhead and enhanced user experience by transforming homepage category recommendations with a new automated system and component design.",
+                ]
+              : []
+          }
+        />
 
         <ResumeExperienceItem
           name="bunq"
-          location="Amsterdam, Netherlands"
+          location="Amsterdam, Netherlands (On-Site)"
           position="Front-end Developer"
-          duration="Dec. 2019 - Jun. 2021"
+          duration="2019 - 2021"
+          description="Responsible for maintaining several front-end projects with a diverse stack including jQuery, Backbone.js, Mithril.js, React, Semantic UI, and more; developing greenfield projects, being the admin for the website and forum and maintainer of their MySQL/PHP back-ends."
           achievements={[
-            "Built a React iframe widget that rendered a dynamic canvas-drawn 3D terrain with the planted tree counts, allowing users and businesses to visualize and promote their CO2 offset contributions on various websites.",
-            "Built a React app that allowed you to upload receipt images, which were automatically itemized by a Machine Learning model, allowing users to easily split bills and send out payment requests to friends and family.",
-            "Led and coordinated complete redesigns and upgrades of the CraftCMS website (and its various sub-sites) and the Flarum forum website, uplifting DX and UX.",
-            "Standardized & improved tooling and CI/CD across 18+ front-end projects built with varying frameworks like jQuery, Mithril.js, Backbone.js, and React.js, resulting in less mistakes making it past review and hours spent weekly on review reiterations.",
-            "Created a developer portal with a PHP back-end and jQuery front-end, allowing developers to create bank accounts and manage their app integrations with ease.",
+            "Facilitated environmental transparency and engagement by building a dynamic 3D forest visualization widget.",
+            "Simplified bill splitting and payment requests by building a receipt splitting web app with AI-powered itemization.",
+            "Led comprehensive website overhauls, markedly enhancing both user and developer experience across multiple platforms.",
+            "Reduced PR review time by introducing Continuous Integration (CI) across a diverse variety of 18 front-end projects.",
+            "Created a website/portal with PHP and jQuery for integration developers, drastically improving DX for integration creation.",
           ]}
         />
 
         <ResumeExperienceItem
           name="JES Pipelines PTE Ltd."
-          location="Rotterdam, Netherlands"
-          position="Software Engineer"
-          duration="May 2016 - Nov. 2019"
+          location="Rotterdam, Netherlands (Hybrid)"
+          position="Software Engineer | IT Technician"
+          duration="2016 - 2019"
+          description="Responsible for developing PowerShell scripts and C#/C++ GUI applications to streamline and automate daily field operations and providing IT support when necessary. Undertook field assignments in Turkey, Thailand, England, and Spain; providing global mobility & versatility."
           achievements={[
-            "Flew out to pipeline projects in Turkey and Thailand to gather information daily operations, and to England to collaborate with equipment vendors on software projects.",
-            "Developed a GUI Windows C++ application to generate Excel weld inspection reports from ultrasonic scan data, cutting report delivery times from hours down to minutes.",
-            "Designed a Windows PowerShell automation script to expedite laptop configurations, cutting field operation setup times by 90%.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          position="IT Technician"
-          achievements={[
-            "Assisted with candidate interviews and performed IT support in Spain during transition periods, keeping IT running smoothly.",
-            "Solved various technical issues for the IT department, helping unblock initiatives and field operations.",
+            "Streamlined operations and report generation by developing a custom GUI application, reducing process time from hours to minutes.",
+            "Enhanced field operation setup efficiency with a custom PowerShell script, reducing setup times by 90%.",
+            "Ensured seamless IT operations during critical transition periods through effective support and problem resolution.",
+            "Contributed to team readiness and operational efficiency by aiding in recruitment and technical assessments.",
           ]}
         />
       </ResumeSection>
-
-      <ResumeSection title="Projects">
-        <ResumeExperienceItem
-          name="Breakpoint"
-          link="https://github.com/danielvaijk/breakpoint"
-          duration="2024"
-          achievements={[
-            "A linter that flags breaking changes in npm packages through static analysis, written in Rust.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          name="Synctivity"
-          link="https://github.com/danielvaijk/synctivity"
-          duration="2024"
-          achievements={[
-            "A tool to sync contribution activity between Git developer platforms, written in Rust.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          name="Engineering Portfolio Website & Blog"
-          link="https://github.com/danielvaijk/vandijk.sh"
-          duration="2023"
-          achievements={[
-            "Built with TypeScript, Node.js, Qwik, and the Notion API. Deployed on Cloudflare.",
-            "Includes a script that statically generates MDX articles, pulling content from the Notion API.",
-            "Includes a script that statically generates optimized AVIF and WebP image variants, including optimal image HTML.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          name="Photography Portfolio Website (closed source)"
-          duration="2022"
-          achievements={[
-            "A basic portfolio website to showcase photos and information about my photography.",
-            "Built with TypeScript, Node.js, Next.js, React, MDX, ImageKit, Formspree, and (initially) DatoCMS.",
-            "Domain registration, DNS management, and deployments are done on Cloudflare.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          name="Node.js Framework (closed source for now)"
-          duration="2021"
-          achievements={[
-            "A Spring-like TypeScript framework for Node.js, allowing developers to quickly create robust REST APIs.",
-            "Includes a built-in logging library that makes it impossible to accidentally leak sensitive information.",
-            "Includes an intuitive and performant decorator-based (micro) HTTP router.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          name="Hades"
-          link="https://github.com/stentorian-io/hades"
-          duration="2020 - 2021"
-          achievements={[
-            "Create a framework that brings the developer experience of ORMs to front-end state management.",
-            "Initially built with JavaScript and Flow for Redux, later rebuilt with TypeScript for MobX.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          name="Offstage (closed source)"
-          duration="2018 - 2021"
-          achievements={[
-            "A web-based event promotion management platform.",
-            "Initially built with JavaScript, Node.js, Express.js, MongoDB, Mongoose, jQuery, Semantic UI, and Pug.",
-            "Later rebuilt with TypeScript, Node.js, React, MobX, Tailwind CSS, and custom frameworks and libraries.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          name="EV3 Mindstorm Controller"
-          link="https://github.com/danielvaijk/ev3-controller"
-          duration="2017"
-          achievements={[
-            "A Windows GUI application that remotely controlled an EV3 Mindstorm AGV via bluetooth.",
-            "The AGV could be controlled manually, or automatically, where it'd follow a colored path using a light sensor.",
-            "Built with C# and Visual Studio's UI XAML designer.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          name="Wave Survival Multiplayer"
-          link="https://github.com/danielvaijk/wave-survival"
-          duration="2014 - 2016"
-          achievements={[
-            "A richly-featured multiplayer first-person shooter (FPS) game sold as a template project.",
-            "Built with C# on the Unity Engine.",
-          ]}
-        />
-
-        <ResumeExperienceItem
-          name="Verb Tetris"
-          link="https://github.com/danielvaijk/verb-tetris"
-          duration="2013"
-          achievements={[
-            "A Tetris-inspired 2D game created for a Portuguese grammar assignment in High School.",
-            "Built with C# on the Unity Engine.",
-          ]}
-        />
+      <ResumeSection title="Volunteer Experience" withoutBulletPoints>
+        <li>
+          <strong>Vice Treasurer</strong> | Interact Club, Rotary International, Santa Terezinha de
+          Itaipu, Brazil
+        </li>
+        <li>
+          <strong>Club Member</strong> | Interact Club, Rotary International, Santa Terezinha de
+          Itaipu, Brazil
+        </li>
       </ResumeSection>
-
-      <ResumeSection title="Volunteering" withoutBulletPoints>
-        <ResumeExperienceItem
-          name="Interact Club, Rotary International"
-          location="Santa Terezinha de Itaipu, Brazil"
-          position="Vice Treasurer"
-          duration="Aug. 2014 - Mar. 2016"
-          achievements={
-            showFull
-              ? [
-                  "Managed club funds by collecting and submitting dues and reporting on financial statuses.",
-                  "Became elected as Vice Treasurer alongside the club's newly elected administration board.",
-                ]
-              : []
-          }
-        />
-
-        <ResumeExperienceItem
-          position="Club Member"
-          achievements={[
-            "Helped organize and run a large multi-day event, bringing hundreds of members from clubs within the state of Paraná.",
-            "Participated in various social activities and projects, helping local communities and those in need.",
-          ]}
-        />
-      </ResumeSection>
-
-      <ResumeSection title="Languages" withoutBulletPoints>
-        <ResumeSkillItem type="English" examples={["Native"]} />
-        <ResumeSkillItem type="Portuguese" examples={["Native"]} />
-        <ResumeSkillItem type="Dutch" examples={["Basic"]} />
-      </ResumeSection>
-
-      <ResumeSection title="Education" withoutBulletPoints>
-        <li>Self-educated in alignment with the latest industry standards since 2012.</li>
+      <ResumeSection title="Education & Credentials" withoutBulletPoints>
+        <li>
+          <strong>Self-educated</strong> in alignment with the latest industry standards since 2012.
+        </li>
+        <li>
+          <strong>Languages:</strong> English, Native | Portuguese, Native | Dutch, Basic
+        </li>
       </ResumeSection>
     </div>
   );
