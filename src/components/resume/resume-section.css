@@ -1,5 +1,5 @@
 .resume-section {
-  margin: 0.6rem 0;
+  margin: 1.2rem 0;
 }
 
 .resume-section > h4 {
@@ -22,17 +22,12 @@
 }
 
 .resume-section ul {
-  margin: 0;
+  margin: 0.8rem 0 0 0;
   padding-left: 0.9rem;
 }
 
 .resume-section ul li:not(:last-child) {
   margin-bottom: 0.2rem;
-}
-
-.resume-section ul li a {
-  color: inherit;
-  text-decoration: underline;
 }
 
 .resume-section-without-bullet-points > ul {

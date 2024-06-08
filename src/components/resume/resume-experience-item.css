@@ -11,14 +11,23 @@
   flex-direction: column;
 }
 
-.resume-experience-item-content p {
-  margin: 0;
-}
-
 .resume-experience-item-name,
 .resume-experience-item-position {
   display: flex;
   justify-content: space-between;
+}
+
+.resume-experience-item-name p {
+  margin: 0;
+}
+
+.resume-experience-item-description,
+.resume-experience-item-achievements {
+  margin: 0.6rem 0 0 0;
+}
+
+.resume-experience-item-key-contributions {
+  margin: 1.2rem 0 0 0;
 }
 
 .resume-experience-item-position i {
@@ -31,7 +40,6 @@
 
 .resume-experience-item-achievements {
   padding-left: 0.9rem;
-  margin-top: 0.8rem;
   text-align: justify;
 }
 
