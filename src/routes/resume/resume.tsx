@@ -17,24 +17,10 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
       <ResumeSection withoutBulletPoints>
         <li>
           <p>
-            <strong>
-              Accomplished Software Engineer with extensive experience across a spectrum of
-              programming languages, frameworks, and technologies in dynamic environments such as
-              adidas and bunq.
-            </strong>
-          </p>
-        </li>
-        <li>
-          <p>
-            Demonstrates a proven track record of developing, deploying, and enhancing software
-            applications that improve business operations, user experience, and technological
-            innovation. Proficient in leading cross-functional teams to deliver high-value projects
-            with optimized performance and scalability. Skilled in transforming theoretical models
-            into practical, robust tech solutions that directly contribute to corporate objectives.
-            Expert in navigating complex project requirements, ensuring seamless integration and
-            deployment of advanced solutions within prescribed timelines. Notable success in
-            pioneering new software tools and frameworks that lead to significant improvements in
-            system functionality and efficiency.
+            Dynamic and multidisciplinary <strong>Software Engineer</strong> with over a decade of
+            hands-on experience across various stacks, domains, and sectors. Known for leading
+            high-impact projects, driving technological advancements, and contributing to the
+            open-source community.
           </p>
         </li>
       </ResumeSection>
@@ -96,11 +82,14 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
           via <strong>Cloudflare</strong>.
         </li>
         <li>
-          <strong>Offstage (2018 - 2021)</strong> Developed a multi-app event promotion management
+          <strong>Offstage (2018 - 2021):</strong> Developed a multi-app event promotion management
           platform for event organizers to automate and manage online and offline promotion efforts
-          and ambassadors. Initially built with JavaScript, Node.js, Express.js, MongoDB, Mongoose,
-          jQuery, Semantic UI, and Pug.js and later rebuilt with TypeScript, Node.js, React.js,
-          MobX, Tailwind CSS, and custom frameworks.
+          and ambassadors. Initially built with <strong>JavaScript</strong>,{" "}
+          <strong>Node.js</strong>, <strong>Express.js</strong>, <strong>MongoDB</strong>,{" "}
+          <strong>Mongoose</strong>, <strong>jQuery</strong>, <strong>Semantic UI</strong>, and{" "}
+          <strong>Pug.js</strong> and later rebuilt with <strong>TypeScript</strong>,{" "}
+          <strong>Node.js</strong>, <strong>React.js</strong>, <strong>MobX</strong>,{" "}
+          <strong>Tailwind CSS</strong>, and custom frameworks.
         </li>
         <li>
           <strong>
@@ -109,8 +98,8 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
             </a>
             :
           </strong>{" "}
-          Created a GUI application in C# for remote control of an EV3 Mindstorm AGV, featuring
-          manual and automatic navigation modes via bluetooth connectivity.
+          Created a GUI application in <strong>C#</strong> for remote control of an EV3 Mindstorm
+          AGV, featuring manual and automatic navigation modes via bluetooth connectivity.
         </li>
         <li>
           <strong>
@@ -132,9 +121,10 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
           engagement through gameplay.
         </li>
       </ResumeSection>
+
       <ResumeSection title="Professional Experience">
         <ResumeExperienceItem
-          name="adidas"
+          name="Adidas"
           location="Amsterdam, Netherlands (Hybrid)"
           position="Software Engineer II, Web Frameworks & Tooling"
           duration="2023 - Present"
@@ -151,7 +141,7 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
         />
 
         <ResumeExperienceItem
-          name="adidas"
+          name="Adidas"
           location="Amsterdam, Netherlands (Hybrid)"
           position="Software Engineer, 3rd Party Tools"
           duration="2022 - 2023"
@@ -168,27 +158,27 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
         />
 
         <ResumeExperienceItem
-          name="adidas"
+          name="Adidas"
           location="Amsterdam, Netherlands (Hybrid)"
           position="Software Engineer, Campaign & Storytelling"
           duration="2021 - 2022"
-          description="Responsible for mantaining key landing pages like the homepage, including improvements to page rendering, personalization, and overall page design and UX. Worked with content publishers to automate and streamline content creation and curation."
+          description="Responsible for mantaining key landing pages like the homepage, including delivering improvements to page rendering performance, personalization, and overall design and UX. Worked with in-house content publishers to automate and streamline content creation, curation, and presentation."
           achievements={
             showFull
               ? [
-                  "Released a POC that paved the way to replace a vendor with a new, internal recommendations architecture created by Data Science.",
-                  "Eliminated operational overhead and enhanced user experience by transforming homepage category recommendations with a new automated system and component design.",
+                  "Released a first-ever POC on the homepage that validated further rollouts of a new internal personalization architecture created by the Data Science team.",
+                  "Completely eliminated the manual curation of category recommendations, reducing operational overhead by 100% and increasing content relevancy for users.",
                 ]
               : []
           }
         />
 
         <ResumeExperienceItem
-          name="bunq"
+          name="Bunq"
           location="Amsterdam, Netherlands (On-Site)"
           position="Front-end Developer"
           duration="2019 - 2021"
-          description="Responsible for maintaining several front-end projects with a diverse stack including jQuery, Backbone.js, Mithril.js, React, Semantic UI, and more; developing greenfield projects, being the admin for the website and forum and maintainer of their MySQL/PHP back-ends."
+          description="Responsible for maintaining several projects in a diverse front-end stack (jQuery, Backbone.js, Mithril.js, React.js, Semantic UI, etc), developing greenfield projects, carrying out admin duties for bunq.com (main website), together.bunq.com (forum), and maintaining their respective PHP/MySQL back-ends."
           achievements={[
             "Facilitated environmental transparency and engagement by building a dynamic 3D forest visualization widget.",
             "Simplified bill splitting and payment requests by building a receipt splitting web app with AI-powered itemization.",
@@ -203,7 +193,7 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
           location="Rotterdam, Netherlands (Hybrid)"
           position="Software Engineer | IT Technician"
           duration="2016 - 2019"
-          description="Responsible for developing PowerShell scripts and C#/C++ GUI applications to streamline and automate daily field operations and providing IT support when necessary. Undertook field assignments in Turkey, Thailand, England, and Spain; providing global mobility & versatility."
+          description="Responsible for developing PowerShell scripts and C#/C++ GUI applications for Windows to streamline and automate daily field operations and providing IT support when necessary. Provided global versatility by travelling for multiple on-field assignments in the Netherlands, Turkey, Thailand, England, and Spain."
           achievements={[
             "Streamlined operations and report generation by developing a custom GUI application, reducing process time from hours to minutes.",
             "Enhanced field operation setup efficiency with a custom PowerShell script, reducing setup times by 90%.",
