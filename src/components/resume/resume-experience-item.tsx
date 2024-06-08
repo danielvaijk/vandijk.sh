@@ -39,11 +39,11 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
             </div>
           )}
 
-          {description && <br />}
-          {description && <p>{description}</p>}
+          {description && <p class="resume-experience-item-description">{description}</p>}
 
-          {hasAchievements && <br />}
-          {hasAchievements && <i>Key Contributions:</i>}
+          {hasAchievements && (
+            <i class="resume-experience-item-key-contributions">Key Contributions:</i>
+          )}
 
           {hasAchievements && (
             <ul class="resume-experience-item-achievements">

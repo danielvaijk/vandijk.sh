@@ -30,6 +30,10 @@ body {
 }
 
 @media print {
+  html {
+    font-size: 12px;
+  }
+
   body {
     font-family: "Times New Roman", serif;
     background-image: none;
