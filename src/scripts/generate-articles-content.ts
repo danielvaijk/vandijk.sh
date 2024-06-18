@@ -48,7 +48,7 @@ for (let index = 0; index < articlesPageContents.length; index++) {
   articles.push({
     title,
     id: childPageBlock.id,
-    date: new Date(childPageBlock.last_edited_time),
+    date: new Date(childPageBlock.created_time),
     path: slugify(title),
   });
 }

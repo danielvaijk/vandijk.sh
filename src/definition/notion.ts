@@ -50,7 +50,7 @@ interface NotionBlockContents {
 }
 
 interface NotionChildPageBlock extends NotionBlock {
-  last_edited_time: string;
+  created_time: string;
   child_page: {
     title: string;
   };
