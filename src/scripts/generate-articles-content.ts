@@ -125,6 +125,7 @@ for (const { id: articleId, ...articleData } of articles) {
   const articleMetadata = await prettier.format(
     JSON.stringify({
       ...articleData,
+      coverImageMarkup,
       topic,
       description,
       readTime,
