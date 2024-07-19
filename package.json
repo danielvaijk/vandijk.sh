@@ -43,5 +43,8 @@
     "vite": "^4.4.11",
     "vite-tsconfig-paths": "^4.2.1",
     "wrangler": "^3.0.0"
+  },
+  "dependencies": {
+    "typeit": "^8.8.3"
   }
 }
