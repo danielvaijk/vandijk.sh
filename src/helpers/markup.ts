@@ -5,11 +5,8 @@ import {
   type NotionBlock,
   type NotionBlockContents,
   type NotionRichText,
-} from "~/definition/notion";
-import { PRETTIER_CONFIG } from "~/definition/prettier";
-import { getReadTimeInMinutesFromWordCount, getWordCount } from "~/utilities/text";
-import { slugify } from "~/utilities/url";
-
+} from "src/definition/notion";
+import { PRETTIER_CONFIG } from "src/definition/prettier";
 import {
   ImageFormat,
   createImageVariants,
@@ -19,18 +16,20 @@ import {
   createSourceSetFromImageVariants,
   saveImage,
   serializeSourceSet,
-} from "./image";
-import { isNextIndexBlockOfType } from "./notion";
-import { formatDateAsString } from "~/utilities/time";
+} from "src/helpers/image";
+import { isNextIndexBlockOfType } from "src/helpers/notion";
+import { getReadTimeInMinutesFromWordCount, getWordCount } from "src/utilities/text";
+import { formatDateAsString } from "src/utilities/time";
+import { slugify } from "src/utilities/url";
 
 interface ImageCaption {
-  text: string;
   isHidden: boolean;
+  text: string;
 }
 
 interface ImageContent {
-  url: string;
   caption: ImageCaption;
+  url: string;
 }
 
 interface ConvertedMarkup {
@@ -39,7 +38,7 @@ interface ConvertedMarkup {
   readTime: number;
 }
 
-function getRichTextContentFromBlock(block: NotionBlock) {
+function getRichTextContentFromBlock(block: NotionBlock): string {
   const blockContent = block[block.type] as NotionBlockContents;
   const richTextList = blockContent.rich_text ?? [];
 
@@ -49,11 +48,11 @@ function getRichTextContentFromBlock(block: NotionBlock) {
 
     let text = content;
 
-    if (!text) {
+    if (typeof text === "undefined" || text.length === 0) {
       return result;
     }
 
-    if (link) {
+    if (typeof link !== "undefined" && link !== null) {
       text = `[${text}](${link.url})`;
     }
 
@@ -90,9 +89,9 @@ function getImageContentFromBlock({
   const { url } = content[content.type] ?? {};
   const caption = captionOverride ?? content.caption?.[0]?.plain_text;
 
-  if (!url) {
+  if (typeof url === "undefined" || url.length === 0) {
     throw new Error("Image content is missing a URL.");
-  } else if (!caption) {
+  } else if (typeof caption === "undefined" || caption.length === 0) {
     throw new Error("Image content is missing a caption.");
   }
 
@@ -100,27 +99,27 @@ function getImageContentFromBlock({
   const captionWithoutTag = isCaptionHidden ? caption.slice("(HIDDEN)".length).trim() : caption;
 
   return {
-    url,
     caption: {
       isHidden: isCaptionHidden,
       text: captionWithoutTag,
     },
+    url,
   };
 }
 
 function renderImageMarkup({
-  image,
-  caption,
-  publicPath,
-  isPriority = false,
   avifSourceSet: avifSources = [],
+  caption,
+  image,
+  isPriority = false,
+  publicPath,
   webpSourceSet: webpSources = [],
 }: {
-  image: ProcessedImage;
-  caption: ImageCaption;
-  publicPath: string;
-  isPriority?: boolean;
   avifSourceSet?: Array<ImageSourceSet>;
+  caption: ImageCaption;
+  image: ProcessedImage;
+  isPriority?: boolean;
+  publicPath: string;
   webpSourceSet?: Array<ImageSourceSet>;
 }): string {
   const { metadata } = image;
@@ -137,7 +136,9 @@ function renderImageMarkup({
   const figcaption = caption.isHidden ? null : `<figcaption>${caption.text}</figcaption>`;
 
   if (isSingleImage) {
-    return ["<figure>", img, figcaption, "</figure>"].filter((value) => value).join("\n");
+    return ["<figure>", img, figcaption, "</figure>"]
+      .filter((value): boolean => value !== null)
+      .join("\n");
   }
 
   const sizes = `sizes="(max-width: 46rem) 90vw, 46rem"`;
@@ -154,27 +155,29 @@ function renderImageMarkup({
     figcaption,
     "</figure>",
   ]
-    .filter((value) => value)
+    .filter((value): boolean => value !== null)
     .join("\n");
 }
 
-async function generateImagesWithMarkup({
-  image,
-  caption,
-  publicPath,
-  isPriority = false,
-}: {
-  image: ProcessedImage;
+interface GenerateImagesWithMarkupOptions {
   caption: ImageCaption;
-  publicPath?: string;
+  image: ProcessedImage;
   isPriority?: boolean;
-}) {
-  if (publicPath) {
+  publicPath?: string;
+}
+
+async function generateImagesWithMarkup({
+  caption,
+  image,
+  isPriority = false,
+  publicPath,
+}: GenerateImagesWithMarkupOptions): Promise<string> {
+  if (typeof publicPath === "string" && publicPath.length > 0) {
     return renderImageMarkup({
-      image,
       caption,
-      publicPath,
+      image,
       isPriority,
+      publicPath,
     });
   }
 
@@ -185,13 +188,13 @@ async function generateImagesWithMarkup({
   const webpSourceSet = await createSourceSetFromImageVariants(webpVariants);
 
   return renderImageMarkup({
-    image,
-    caption,
-    isPriority,
     avifSourceSet,
-    webpSourceSet,
-    // We use the smallest WebP variant as fallback.
+    caption,
+    image,
+    isPriority,
     publicPath: webpSourceSet[0].path,
+    // We use the smallest WebP variant as fallback.
+    webpSourceSet,
   });
 }
 
@@ -199,25 +202,25 @@ async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
   const content = block[block.type] as NotionBlockContents;
   const code = content.rich_text?.[0]?.plain_text;
 
-  if (!code) {
+  if (typeof code === "undefined" || code.length === 0) {
     return ["```", "", "```"].join("\n");
   }
 
   const prettierSupportInfo = await prettier.getSupportInfo();
 
   const { language = "" } = content;
-  const supportedLanguages = prettierSupportInfo.languages.map(({ name }) => name.toLowerCase());
+  const supportedLanguages = prettierSupportInfo.languages.map(({ name: languageName }): string =>
+    languageName.toLowerCase()
+  );
 
-  let codeOutput;
+  let codeOutput = `${code}\n`;
 
   if (supportedLanguages.includes(language)) {
     codeOutput = await prettier.format(code, {
       ...PRETTIER_CONFIG,
-      printWidth: 80,
       parser: language,
+      printWidth: 80,
     });
-  } else {
-    codeOutput = code + "\n";
   }
 
   return [
@@ -264,7 +267,8 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
         break;
 
       case NotionBlockType.NUMBERED_LIST_ITEM:
-        prefix = `${++numberedItemCount}.`;
+        numberedItemCount += 1;
+        prefix = `${numberedItemCount}.`;
         content = getRichTextContentFromBlock(block);
         wordCount += getWordCount(content);
 
@@ -304,17 +308,16 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
           const imageContent = getImageContentFromBlock({ block });
           const imageData = await fetchAndProcessImage(imageContent.url);
 
-          let publicPath;
+          const generateOptions: GenerateImagesWithMarkupOptions = {
+            caption: imageContent.caption,
+            image: imageData,
+          };
 
           if (imageData.willUseOriginal) {
-            publicPath = await saveImage(imageData);
+            generateOptions.publicPath = await saveImage(imageData);
           }
 
-          content = await generateImagesWithMarkup({
-            publicPath,
-            image: imageData,
-            caption: imageContent.caption,
-          });
+          content = await generateImagesWithMarkup(generateOptions);
         }
         break;
 
@@ -326,12 +329,12 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
         throw new Error(`Block type "${block.type}" is not supported.`);
     }
 
-    if (!content.length) {
+    if (content.length === 0) {
       continue;
     }
 
-    if (prefix) {
-      articleContent += prefix + " " + content + spacer;
+    if (prefix.length > 0) {
+      articleContent += `${prefix} ${content}${spacer}`;
     } else {
       articleContent += content + spacer;
     }
@@ -340,40 +343,40 @@ async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<Conver
   const readTime = getReadTimeInMinutesFromWordCount(wordCount);
 
   return {
-    articleContent,
     anchorLinks,
+    articleContent,
     readTime,
   };
 }
 
 function generateMdxArticlePage({
-  pageUrl,
-  title,
-  description,
-  topic,
-  date,
-  coverImage,
-  readTime,
   anchorLinks,
   articleContent,
+  coverImage,
+  date,
+  description,
+  pageUrl,
+  readTime,
+  title,
+  topic,
 }: {
-  pageUrl: string;
-  title: string;
-  description: string;
-  topic: string;
-  date: Date;
-  readTime: number;
   anchorLinks: string;
   articleContent: string;
   coverImage: {
-    url: string;
     alt: string;
-    type: string;
-    width: number;
     height: number;
     markup: string;
+    type: string;
+    url: string;
+    width: number;
   };
-}) {
+  date: Date;
+  description: string;
+  pageUrl: string;
+  readTime: number;
+  title: string;
+  topic: string;
+}): string {
   return `
 ---
 title: ${title}

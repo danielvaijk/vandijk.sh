@@ -4,11 +4,11 @@ function slugify(text: string): string {
       .trim()
       .toLowerCase()
       // Replace all spaces with a dash.
-      .replace(/\s+/g, "-")
+      .replace(/\s+/gu, "-")
       // Replace all non-word characters.
-      .replace(/[^\w\\-]+/g, "")
+      .replace(/[^\w\\-]+/gu, "")
       // Collapse repeated dashes.
-      .replace(/\\-\\-+/g, "-")
+      .replace(/\\-\\-+/gu, "-")
   );
 }
 
@@ -23,7 +23,7 @@ function joinPathNames(...segments: Array<string>): string {
     } else if (result.length === 0) {
       result += partToAdd;
     } else {
-      result += "/" + partToAdd;
+      result += `/${partToAdd}`;
     }
   }
 
@@ -35,9 +35,9 @@ function determineOriginUrl(): string {
 
   if (CF_PAGES_BRANCH === "main") {
     return "https://daniel.vandijk.sh";
-  } else if (CF_PAGES_URL) {
+  } else if (typeof CF_PAGES_URL !== "undefined") {
     return CF_PAGES_URL;
-  } else if (PREVIEW_BUILD) {
+  } else if (typeof PREVIEW_BUILD !== "undefined") {
     return "http://localhost:4173";
   } else {
     return "http://localhost:5173";

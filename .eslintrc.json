@@ -1,0 +1,20 @@
+{
+  "root": true,
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "parserOptions": {
+    "ecmaFeatures": {
+      "jsx": true
+    }
+  },
+  "extends": [
+    "@danielvaijk/eslint-config/standard",
+    "@danielvaijk/eslint-config/typescript",
+    "@danielvaijk/eslint-config/qwik"
+  ],
+  "rules": {
+    "no-console": "off"
+  }
+}

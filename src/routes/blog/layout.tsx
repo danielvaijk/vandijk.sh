@@ -1,18 +1,19 @@
+import type { QwikJSX } from "@builder.io/qwik";
 import { component$, Slot, useStyles$ } from "@builder.io/qwik";
+import type { DocumentHeadProps, DocumentHeadValue } from "@builder.io/qwik-city";
 import { useLocation, type DocumentHead } from "@builder.io/qwik-city";
 
-import { createPageMetaTags } from "~/helpers/meta";
+import { createPageMetaTags } from "src/helpers/meta";
+import stylesForLayout from "src/routes/blog/layout.css?inline";
+import stylesForCodeHighlights from "src/styles/code.css?inline";
 
-import stylesForLayout from "./layout.css?inline";
-import stylesForCodeHighlights from "../../styles/code.css?inline";
-
-export default component$(() => {
+export default component$((): QwikJSX.Element => {
   useStyles$(stylesForLayout);
   useStyles$(stylesForCodeHighlights);
 
-  const location = useLocation();
-  const isAtRoot = location.url.pathname.endsWith("/blog/");
-  const isDev404 = location.url.pathname.endsWith("/404.html");
+  const { url } = useLocation();
+  const isAtRoot = url.pathname.endsWith("/blog/");
+  const isDev404 = url.pathname.endsWith("/404.html");
   const shouldShowFooter = !isDev404 && !isAtRoot;
 
   return (
@@ -23,14 +24,14 @@ export default component$(() => {
   );
 });
 
-export const head: DocumentHead = ({ head }) => {
-  const isArticle = Boolean(head.title);
+export const head: DocumentHead = (props: DocumentHeadProps): DocumentHeadValue => {
+  const isArticle = Boolean(props.head.title);
 
   // For article pages the title is set in the MDX frontmatter, but we override it
   // to include a base title. The original title (without the base) is still used
   // for the Open Graph title, so it's not completely useless.
   const titleBase = "Daniel van Dijk's Blog";
-  const title = isArticle ? `${titleBase} - ${head.title}` : titleBase;
+  const title = isArticle ? `${titleBase} - ${props.head.title}` : titleBase;
 
   if (isArticle) {
     return { title };
@@ -38,7 +39,8 @@ export const head: DocumentHead = ({ head }) => {
 
   const description =
     "I explore and write about a wide range of engineering topics and challenges.";
-  const meta = createPageMetaTags({ title, description });
 
-  return { title, meta };
+  const meta = createPageMetaTags({ description, title });
+
+  return { meta, title };
 };

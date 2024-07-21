@@ -7,6 +7,5 @@ lib
 lib-types
 node_modules
 temp
-vite.config.ts
 package-lock.json
 server

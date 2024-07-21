@@ -1,21 +1,22 @@
+import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
-import styles from "./article-summary-item.css?inline";
-import { formatDateAsString } from "~/utilities/time";
+import styles from "src/components/articles/article-summary-item.css?inline";
+import { formatDateAsString } from "src/utilities/time";
 
 export interface ArticleSummaryProps {
-  title: string;
-  date: string;
-  path: string;
-  topic: string;
-  description: string;
-  readTime: number;
   coverImageMarkup: string;
+  date: string;
+  description: string;
+  path: string;
+  readTime: number;
+  title: string;
+  topic: string;
 }
 
 export const ArticleSummaryItem = component$<ArticleSummaryProps>(
-  ({ title, date, path, description, topic, readTime, coverImageMarkup }) => {
+  ({ coverImageMarkup, date, description, path, readTime, title, topic }): QwikJSX.Element => {
     const { scopeId } = useStylesScoped$(styles);
 
     const dateParsed = new Date(date);
@@ -25,8 +26,8 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
     // so as a workaround we manually insert it as a class name to any
     // figure, picture, and img HTML elements in the markup string.
     const coverImageWithScopeId = coverImageMarkup.replace(
-      /<(figure|picture|img)([^>]*)>/g,
-      (_, tag, attributes) => `<${tag}${attributes} class="${scopeId}">`
+      /<(?<tag>figure|picture|img)(?<attributes>[^>]*)>/gu,
+      (_, tag: string, attributes: string): string => `<${tag}${attributes} class="${scopeId}">`
     );
 
     return (

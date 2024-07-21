@@ -1,27 +1,17 @@
-/**
- * WHAT IS THIS FILE?
- *
- * SSR entry point, in all cases the application is rendered outside the browser, this
- * entry point will be the common one.
- *
- * - Server (express, cloudflare...)
- * - npm run start
- * - npm run preview
- * - npm run build
- *
- */
+import type { RenderToStreamResult } from "@builder.io/qwik/server";
 import { renderToStream, type RenderToStreamOptions } from "@builder.io/qwik/server";
+// eslint-disable-next-line import/no-unresolved -- Doesn't work well with declared modules.
 import { manifest } from "@qwik-client-manifest";
 
-import Root from "./root";
+import Root from "src/root";
 
-export default function (opts: RenderToStreamOptions) {
+export default async function serve(opts: RenderToStreamOptions): Promise<RenderToStreamResult> {
   return renderToStream(<Root />, {
     manifest,
     ...opts,
     containerAttributes: {
       lang: "en-us",
-      prefix: "og: http://ogp.me/ns#",
+      prefix: "og: https://ogp.me/ns#",
       ...opts.containerAttributes,
     },
   });

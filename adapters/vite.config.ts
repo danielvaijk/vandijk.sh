@@ -1,16 +1,17 @@
 import { staticAdapter } from "@builder.io/qwik-city/adapters/static/vite";
 import { extendConfig } from "@builder.io/qwik-city/vite";
+import type { UserConfig } from "vite";
 
-import baseConfig from "../vite.config";
-import { determineOriginUrl } from "../src/utilities/url";
+import { determineOriginUrl } from "src/utilities/url";
+import baseConfig from "vite.config";
 
-export default extendConfig(baseConfig, () => {
+export default extendConfig(baseConfig, (): UserConfig => {
   return {
     build: {
-      ssr: true,
       rollupOptions: {
         input: "@qwik-city-plan",
       },
+      ssr: true,
     },
     plugins: [
       staticAdapter({
