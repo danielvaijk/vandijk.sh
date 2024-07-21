@@ -3,65 +3,78 @@ import type {
   NotionBlockType,
   NotionMultiSelect,
   NotionRichText,
-} from "~/definition/notion";
-import { joinPathNames } from "~/utilities/url";
+} from "src/definition/notion";
+import { joinPathNames } from "src/utilities/url";
 
-interface NotionPageResponse {
+interface NotionResponse {
+  has_more: boolean;
+  next_cursor: string;
+  // Object: string;
+  results: Array<unknown>;
+}
+
+interface NotionPageResponse extends NotionResponse {
+  cover: {
+    external: {
+      url: string;
+    };
+    type: string;
+  };
   properties: {
-    snippet: {
+    cover_alt: {
       rich_text: Array<NotionRichText>;
     };
-    cover_alt: {
+    snippet: {
       rich_text: Array<NotionRichText>;
     };
     tags: {
       multi_select: Array<NotionMultiSelect>;
     };
   };
-  cover: {
-    type: string;
-    external: {
-      url: string;
-    };
-  };
 }
 
-interface NotionBlockChildrenResponse {
+interface NotionBlockChildrenResponse extends NotionResponse {
   object: string;
-  has_more: boolean;
-  next_cursor: string;
   results: Array<NotionBlock>;
 }
 
-const { NOTION_TOKEN } = process.env;
 const NOTION_VERSION = "2022-06-28";
 const NOTION_ARTICLES_PAGE_ID = "c15b7465-243e-4966-bfea-63789f645b04";
 
-if (!NOTION_TOKEN) {
-  throw new Error("Notion API token is missing.");
+function getNotionToken(): string {
+  const { NOTION_TOKEN } = process.env;
+
+  if (typeof NOTION_TOKEN === "undefined") {
+    throw new Error("Notion API token is missing.");
+  } else {
+    return NOTION_TOKEN;
+  }
 }
 
-async function createNotionRequest<ResponseBody>(endpoint: string): Promise<ResponseBody> {
+async function createNotionRequest<ResponseBody extends NotionResponse>(
+  endpoint: string
+): Promise<ResponseBody> {
   const url = new URL(joinPathNames("https://api.notion.com/v1", endpoint));
   const headers = {
+    "Authorization": `Bearer ${getNotionToken()}`,
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${NOTION_TOKEN}`,
     "Notion-Version": NOTION_VERSION,
   };
 
+  // eslint-disable-next-line @typescript-eslint/init-declarations -- Intentionally undefined.
   let response;
 
   do {
-    if (response?.has_more) {
+    if (response?.has_more === true) {
       url.searchParams.set("start_cursor", response.next_cursor);
     }
 
     console.debug(`Sending GET request to ${url.toString()}`);
 
     const currentRequest = await fetch(url, { headers });
-    const currentResponse = await currentRequest.json();
+    const currentResponse = (await currentRequest.json()) as ResponseBody;
 
-    if (response) {
+    if (typeof response !== "undefined") {
       response = {
         ...currentResponse,
         results: [...response.results, ...currentResponse.results],
@@ -82,7 +95,11 @@ async function fetchNotionBlockChildren(blockId: string): Promise<NotionBlockChi
   return createNotionRequest(`/blocks/${blockId}/children`);
 }
 
-function isNextIndexBlockOfType(array: Array<NotionBlock>, index: number, type: NotionBlockType) {
+function isNextIndexBlockOfType(
+  array: Array<NotionBlock>,
+  index: number,
+  type: NotionBlockType
+): boolean {
   return index < array.length - 1 && array[index + 1].type === type;
 }
 

@@ -1,19 +1,19 @@
 import type { DocumentMeta } from "@builder.io/qwik-city";
 
 function createPageMetaTags({
-  title,
   description,
+  title,
 }: {
-  title: string;
   description: string;
+  title: string;
 }): Array<DocumentMeta> {
   return [
-    { name: "description", content: description },
-    { property: "og:title", content: title },
-    { property: "og:description", content: description },
-    { property: "og:type", content: "website" },
-    { property: "og:locale", content: "en_US" },
-    { property: "og:site_name", content: "Daniel van Dijk" },
+    { content: description, name: "description" },
+    { content: title, property: "og:title" },
+    { content: description, property: "og:description" },
+    { content: "website", property: "og:type" },
+    { content: "en_US", property: "og:locale" },
+    { content: "Daniel van Dijk", property: "og:site_name" },
   ];
 }
 

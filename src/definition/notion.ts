@@ -1,59 +1,59 @@
 enum NotionBlockType {
-  PARAGRAPH = "paragraph",
-  CHILD_PAGE = "child_page",
-  HEADING_ONE = "heading_1",
-  HEADING_TWO = "heading_2",
-  HEADING_THREE = "heading_3",
   BULLETED_LIST_ITEM = "bulleted_list_item",
-  NUMBERED_LIST_ITEM = "numbered_list_item",
-  IMAGE = "image",
+  CHILD_PAGE = "child_page",
   CODE = "code",
   COVER = "cover",
+  HEADING_ONE = "heading_1",
+  HEADING_THREE = "heading_3",
+  HEADING_TWO = "heading_2",
+  IMAGE = "image",
+  NUMBERED_LIST_ITEM = "numbered_list_item",
+  PARAGRAPH = "paragraph",
 }
 
 interface NotionBlock {
+  [index: string]: unknown;
   id: string;
   type: NotionBlockType;
-  [index: string]: unknown;
 }
 
 interface NotionRichText {
-  annotations?: Record<string, boolean>;
+  annotations?: { [key: string]: boolean };
   plain_text?: string;
   text?: {
     content: string;
-    link?: {
+    link: {
       url: string;
-    };
+    } | null;
   };
 }
 
 interface NotionMultiSelect {
+  color: string;
   id: string;
   name: string;
-  color: string;
 }
 
 interface NotionBlockContents {
-  type?: "file" | "external";
-  language?: string;
-  file?: {
-    url: string;
-  };
-  external?: {
-    url: string;
-  };
   caption?: Array<{
     plain_text?: string;
   }>;
+  external?: {
+    url: string;
+  };
+  file?: {
+    url: string;
+  };
+  language?: string;
   rich_text?: Array<NotionRichText>;
+  type?: "file" | "external";
 }
 
 interface NotionChildPageBlock extends NotionBlock {
-  created_time: string;
   child_page: {
     title: string;
   };
+  created_time: string;
 }
 
 export { NotionBlockType };

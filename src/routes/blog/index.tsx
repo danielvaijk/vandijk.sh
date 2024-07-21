@@ -1,12 +1,12 @@
+import type { QwikJSX } from "@builder.io/qwik";
 import { component$ } from "@builder.io/qwik";
 
-import { ArticleSummaryList } from "~/components/articles/article-summary-list";
-import { CenteredTitle } from "~/components/centered-title";
+import { ArticleSummaryList } from "src/components/articles/article-summary-list";
+import { CenteredTitle } from "src/components/centered-title";
+import articles from "src/media/articles.json";
 
-import articles from "../../media/articles.json";
-
-export default component$(() => {
-  if (!articles.length) {
+export default component$((): QwikJSX.Element => {
+  if (articles.length === 0) {
     return <CenteredTitle title="Oh!" subtitle="There's nothing here yet." />;
   }
 

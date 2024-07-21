@@ -1,15 +1,15 @@
+import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 
-import { ResumeSection } from "~/components/resume/resume-section";
-import { ResumeExperienceItem } from "~/components/resume/resume-experience-item";
-
-import styles from "./index.css?inline";
+import { ResumeExperienceItem } from "src/components/resume/resume-experience-item";
+import { ResumeSection } from "src/components/resume/resume-section";
+import styles from "src/routes/resume/index.css?inline";
 
 interface ResumeProps {
   showFull?: boolean;
 }
 
-export const Resume = component$<ResumeProps>(({ showFull = false }) => {
+export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.Element => {
   useStylesScoped$(styles);
 
   return (
@@ -98,7 +98,7 @@ export const Resume = component$<ResumeProps>(({ showFull = false }) => {
         <li>
           <strong>Arma Key Stealer (2012):</strong> Serial key stealer malware disguised as an
           online cheat for Arma 2: Operation Arrowhead, developed with <strong>WinForms</strong> and{" "}
-          <strong>Visual Basic</strong>, to counteract and discourage wannabe cheaters.
+          <strong>Visual Basic</strong>, to counteract and discourage wannabe cheaters on mpgh.net.
         </li>
       </ResumeSection>
 

@@ -1,19 +1,22 @@
+import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 
-import styles from "./centered-title.css?inline";
+import styles from "src/components/centered-title.css?inline";
 
 interface CenteredTitleProps {
-  title: string;
   subtitle: string;
+  title: string;
 }
 
-export const CenteredTitle = component$<CenteredTitleProps>(({ title, subtitle }) => {
-  useStylesScoped$(styles);
+export const CenteredTitle = component$<CenteredTitleProps>(
+  ({ subtitle, title }): QwikJSX.Element => {
+    useStylesScoped$(styles);
 
-  return (
-    <div class="centered-title">
-      <h2>{title}</h2>
-      <p>{subtitle}</p>
-    </div>
-  );
-});
+    return (
+      <div class="centered-title">
+        <h2>{title}</h2>
+        <p>{subtitle}</p>
+      </div>
+    );
+  }
+);
