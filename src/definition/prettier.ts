@@ -1,6 +1,6 @@
 import type { Options } from "prettier";
 
-import prettierConfig from "../../.prettierrc.json";
+import prettierConfig from ".prettierrc.json";
 
 // The only reason we need to do this rather than import the JSON file directly
 // everywhere is because there's a mismatch between what's expected by the format

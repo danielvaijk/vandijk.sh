@@ -1,15 +1,20 @@
+import type { QwikJSX } from "@builder.io/qwik";
 import { $, component$, useOnDocument, useOnWindow, useSignal } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
-export const NavigationHeaderLinks = component$(() => {
+export const NavigationHeaderLinks = component$((): QwikJSX.Element => {
   const isOpen = useSignal(false);
   const listRef = useSignal<HTMLElement>();
   const hamburgerRef = useSignal<HTMLElement>();
 
   useOnDocument(
     "click",
-    $((clickEvent: MouseEvent) => {
-      if (!listRef.value || !hamburgerRef.value) {
+    $((clickEvent: MouseEvent): void => {
+      if (typeof listRef.value === "undefined") {
+        return;
+      }
+
+      if (typeof hamburgerRef.value === "undefined") {
         return;
       }
 
@@ -17,16 +22,16 @@ export const NavigationHeaderLinks = component$(() => {
       const listRect = listRef.value.getBoundingClientRect();
       const hamburgerRect = hamburgerRef.value.getBoundingClientRect();
 
-      const isClickOutsideRect = (rect: DOMRect) => {
-        const { left, right, top, bottom } = rect;
-
-        if (x < left || x > right) {
+      const isClickOutsideRect = (rect: DOMRect): boolean => {
+        if (x < rect.left || x > rect.right) {
           return true;
-        } else if (y < top || y > bottom) {
-          return true;
-        } else {
-          return false;
         }
+
+        if (y < rect.top || y > rect.bottom) {
+          return true;
+        }
+
+        return false;
       };
 
       if (!isClickOutsideRect(hamburgerRect)) {
@@ -41,7 +46,7 @@ export const NavigationHeaderLinks = component$(() => {
 
   useOnWindow(
     "resize",
-    $(() => {
+    $((): void => {
       isOpen.value = false;
     })
   );
@@ -51,7 +56,7 @@ export const NavigationHeaderLinks = component$(() => {
       <div
         ref={hamburgerRef}
         class="hamburger clickable"
-        onClick$={() => {
+        onClick$={(): void => {
           isOpen.value = !isOpen.value;
         }}
       >
@@ -60,13 +65,13 @@ export const NavigationHeaderLinks = component$(() => {
         <div></div>
       </div>
 
-      <ul ref={listRef} class={isOpen.value ? "is-open" : undefined}>
+      <ul ref={listRef} class={isOpen.value ? "is-open" : null}>
         <li>
           <Link
             target="_blank"
             rel="noopener noreferrer"
             href="https://github.com/danielvaijk?tab=repositories"
-            onClick$={() => {
+            onClick$={(): void => {
               isOpen.value = !isOpen.value;
             }}
           >
@@ -76,7 +81,7 @@ export const NavigationHeaderLinks = component$(() => {
         <li>
           <Link
             href="/blog/"
-            onClick$={() => {
+            onClick$={(): void => {
               isOpen.value = !isOpen.value;
             }}
             prefetch
@@ -87,7 +92,7 @@ export const NavigationHeaderLinks = component$(() => {
         <li>
           <Link
             href="/resume/"
-            onClick$={() => {
+            onClick$={(): void => {
               isOpen.value = !isOpen.value;
             }}
             prefetch
@@ -100,7 +105,7 @@ export const NavigationHeaderLinks = component$(() => {
             target="_blank"
             rel="noopener noreferrer"
             href="https://www.linkedin.com/in/daniel-vandijk-sh/"
-            onClick$={() => {
+            onClick$={(): void => {
               isOpen.value = !isOpen.value;
             }}
           >

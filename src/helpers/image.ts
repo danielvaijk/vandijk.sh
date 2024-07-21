@@ -3,15 +3,15 @@ import { writeFile } from "node:fs/promises";
 
 import sharp, { type Sharp } from "sharp";
 
-import { joinPathNames } from "~/utilities/url";
+import { joinPathNames } from "src/utilities/url";
 
 enum ImageFormat {
-  WEBP = "webp",
   AVIF = "avif",
   GIF = "gif",
-  SVG = "svg",
-  PNG = "png",
   JPEG = "jpeg",
+  PNG = "png",
+  SVG = "svg",
+  WEBP = "webp",
 }
 
 enum ImagePurpose {
@@ -21,15 +21,15 @@ enum ImagePurpose {
 
 interface ImageMetadata {
   format: string;
-  width: number;
   height: number;
+  width: number;
 }
 
 interface ProcessedImage {
   image: Sharp;
   metadata: ImageMetadata;
-  willUseOriginal?: boolean;
   output: string | Buffer;
+  willUseOriginal: boolean;
 }
 
 interface ImageSourceSet {
@@ -38,6 +38,12 @@ interface ImageSourceSet {
 }
 
 const IS_CF_BUILD = Boolean(process.env.CF_PAGES);
+
+const MIN_EFFORT_WEBP = 0;
+const MAX_EFFORT_WEBP = 6;
+
+const MIN_EFFORT_AVIF = 0;
+const MAX_EFFORT_AVIF = 9;
 
 async function fetchAndProcessImage(
   url: string,
@@ -55,8 +61,8 @@ async function fetchAndProcessImage(
   const response = await fetch(url);
   const blob = await response.blob();
   const image = sharp(await blob.arrayBuffer());
-  const { format = "unknown", width = 0, height = 0 } = await image.metadata();
-  const metadata = { format, width, height };
+  const { format = "unknown", height = 0, width = 0 } = await image.metadata();
+  const metadata = { format, height, width };
 
   if (ImagePurpose.ARTICLE_COVER === purpose) {
     switch (format) {
@@ -69,8 +75,8 @@ async function fetchAndProcessImage(
     }
   }
 
-  let output;
-  let willUseOriginal;
+  let output = null;
+  let willUseOriginal = false;
 
   switch (format) {
     case ImageFormat.SVG:
@@ -101,19 +107,19 @@ async function createImageVariants(
   switch (format) {
     case ImageFormat.WEBP:
       image = image.webp({
-        effort: IS_CF_BUILD ? 6 : 0,
-        quality: 80,
         alphaQuality: 100,
-        smartSubsample: true,
+        effort: IS_CF_BUILD ? MAX_EFFORT_WEBP : MIN_EFFORT_WEBP,
         nearLossless: true,
+        quality: 80,
+        smartSubsample: true,
       });
       break;
 
     case ImageFormat.AVIF:
       image = image.avif({
-        effort: IS_CF_BUILD ? 9 : 0,
-        quality: 80,
+        effort: IS_CF_BUILD ? MAX_EFFORT_AVIF : MIN_EFFORT_AVIF,
         lossless: false,
+        quality: 80,
       });
       break;
 
@@ -124,6 +130,7 @@ async function createImageVariants(
   const variants: Array<ProcessedImage> = [];
   const { width = 0 } = metadata;
 
+  // eslint-disable-next-line @typescript-eslint/no-magic-numbers -- Defined inline.
   for (const resizeWidth of [480, 705, 960, 1410, 1440, 2115]) {
     const targetWidth = resizeWidth < width ? resizeWidth : width;
     const resizedImage = image.resize(targetWidth);
@@ -138,14 +145,15 @@ async function createImageVariants(
 
     const newMetadata = {
       format,
-      width: info.width,
       height: info.height,
+      width: info.width,
     };
 
     variants.push({
       image,
       metadata: newMetadata,
       output: data,
+      willUseOriginal: false,
     });
 
     if (targetWidth === width) {
@@ -154,26 +162,6 @@ async function createImageVariants(
   }
 
   return variants;
-}
-
-async function createSourceSetFromImageVariants(
-  variants: Array<ProcessedImage>
-): Promise<Array<ImageSourceSet>> {
-  const imageSources = [];
-
-  for (let index = 0; index < variants.length; index++) {
-    const variant = variants[index];
-    const variantSize = `${variant.metadata.width}w`;
-    const variantPath = await saveImage(variant);
-
-    imageSources.push({ size: variantSize, path: variantPath });
-  }
-
-  return imageSources;
-}
-
-function serializeSourceSet(sourceSet: Array<ImageSourceSet>): string {
-  return sourceSet.map(({ path, size }) => [path, size].join(" ")).join(", ");
 }
 
 async function saveImage({ metadata, output }: ProcessedImage): Promise<string> {
@@ -186,6 +174,25 @@ async function saveImage({ metadata, output }: ProcessedImage): Promise<string> 
   await writeFile(joinPathNames("./public", publicPath), output);
 
   return publicPath;
+}
+
+async function createSourceSetFromImageVariants(
+  variants: Array<ProcessedImage>
+): Promise<Array<ImageSourceSet>> {
+  const imageSources = [];
+
+  for (const variant of variants) {
+    const variantSize = `${variant.metadata.width}w`;
+    const variantPath = await saveImage(variant);
+
+    imageSources.push({ path: variantPath, size: variantSize });
+  }
+
+  return imageSources;
+}
+
+function serializeSourceSet(sourceSet: Array<ImageSourceSet>): string {
+  return sourceSet.map(({ path, size }): string => [path, size].join(" ")).join(", ");
 }
 
 export {

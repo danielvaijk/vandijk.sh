@@ -1,23 +1,68 @@
+import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 
-import styles from "./resume-experience-item.css?inline";
+import styles from "src/components/resume/resume-experience-item.css?inline";
 
 interface ResumeExperienceItemProps {
-  name?: string;
-  location?: string;
-  position?: string;
-  duration?: string;
-  description: string;
   achievements?: Array<string>;
+  description: string;
+  duration?: string;
+  location?: string;
+  name?: string;
+  position?: string;
 }
 
 export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
-  ({ name, location, position, duration, description, achievements = [] }) => {
+  ({
+    achievements = [],
+    description,
+    duration,
+    location: experienceLocation,
+    name: experienceName,
+    position,
+  }): QwikJSX.Element => {
     useStylesScoped$(styles);
 
-    const isAchievementsOnly = !name;
-    const locationOrDuration = location ?? duration;
-    const hasAchievements = achievements.length > 0;
+    const isAchievementsOnly = typeof name === "undefined";
+    const locationOrDuration = experienceLocation ?? duration;
+
+    const renderPositionOrNull = (): QwikJSX.Element | null => {
+      if (typeof position === "string" && position.length > 0) {
+        return (
+          <div class="resume-experience-item-position">
+            <strong>{position}</strong>
+            <strong>{duration}</strong>
+          </div>
+        );
+      } else {
+        return null;
+      }
+    };
+
+    const renderDescriptionOrNull = (): QwikJSX.Element | null => {
+      if (typeof description === "string" && description.length > 0) {
+        return <p class="resume-experience-item-description">{description}</p>;
+      } else {
+        return null;
+      }
+    };
+
+    const renderAchievementsOrNull = (): QwikJSX.Element | null => {
+      if (achievements.length > 0) {
+        return (
+          <>
+            <i class="resume-experience-item-key-contributions">Key Contributions:</i>
+            <ul class="resume-experience-item-achievements">
+              {achievements.map((achievement, index): QwikJSX.Element => {
+                return <li key={index}>{achievement}</li>;
+              })}
+            </ul>
+          </>
+        );
+      } else {
+        return null;
+      }
+    };
 
     return (
       <li
@@ -28,30 +73,13 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
       >
         <div class="resume-experience-item-content">
           <div class="resume-experience-item-name">
-            <strong>{name}</strong>
+            <strong>{experienceName}</strong>
             <p>{locationOrDuration}</p>
           </div>
 
-          {position && (
-            <div class="resume-experience-item-position">
-              <strong>{position}</strong>
-              <strong>{duration}</strong>
-            </div>
-          )}
-
-          {description && <p class="resume-experience-item-description">{description}</p>}
-
-          {hasAchievements && (
-            <i class="resume-experience-item-key-contributions">Key Contributions:</i>
-          )}
-
-          {hasAchievements && (
-            <ul class="resume-experience-item-achievements">
-              {achievements.map((achievement, index) => {
-                return <li key={index}>{achievement}</li>;
-              })}
-            </ul>
-          )}
+          {renderPositionOrNull()}
+          {renderDescriptionOrNull()}
+          {renderAchievementsOrNull()}
         </div>
       </li>
     );

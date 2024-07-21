@@ -2,8 +2,13 @@ import { readFile, readdir, writeFile } from "node:fs/promises";
 
 import prettier from "prettier";
 
-import { PRETTIER_CONFIG } from "~/definition/prettier";
-import { joinPathNames } from "~/utilities/url";
+import { PRETTIER_CONFIG } from "src/definition/prettier";
+import { joinPathNames } from "src/utilities/url";
+
+interface ArticleMetadata {
+  [index: string]: unknown;
+  date: string;
+}
 
 const ARTICLES_METADATA_FILE_PATH = "./src/media/articles.json";
 const ARTICLES_DIRECTORY = "./src/routes/blog";
@@ -23,7 +28,7 @@ for (const entity of entities) {
   results.push(JSON.parse(metadataContents));
 }
 
-const sortedResults = results.sort((a, b) => {
+const sortedResults = results.sort((a: ArticleMetadata, b: ArticleMetadata): number => {
   const dateA = new Date(a.date);
   const dateB = new Date(b.date);
 

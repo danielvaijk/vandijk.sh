@@ -1,14 +1,16 @@
+import type { QwikJSX } from "@builder.io/qwik";
 import { component$ } from "@builder.io/qwik";
 import { QwikCityProvider } from "@builder.io/qwik-city";
-import { DocumentHead } from "./components/document/document-head";
-import { DocumentBody } from "./components/document/document-body";
+
+import { DocumentBody } from "src/components/document/document-body";
+import { DocumentHead } from "src/components/document/document-head";
 
 // Qwik will try to inline this file in production mode if the amount
 // of CSS is less than 10KB. If the file is larger than 10KB, it will
 // be loaded as a separate file.
-import "./global.css";
+import "src/global.css";
 
-export default component$(() => {
+export default component$((): QwikJSX.Element => {
   return (
     <QwikCityProvider>
       <DocumentHead />

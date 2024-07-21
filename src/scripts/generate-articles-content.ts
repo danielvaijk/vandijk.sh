@@ -2,27 +2,27 @@ import { mkdir, writeFile } from "node:fs/promises";
 
 import prettier from "prettier";
 
-import { PRETTIER_CONFIG } from "~/definition/prettier";
-import { NotionBlockType, type NotionChildPageBlock } from "~/definition/notion";
-import {
-  NOTION_ARTICLES_PAGE_ID,
-  fetchNotionBlockChildren,
-  fetchNotionPage,
-} from "~/helpers/notion";
-import { joinPathNames, slugify, determineOriginUrl } from "~/utilities/url";
+import { NotionBlockType, type NotionChildPageBlock } from "src/definition/notion";
+import { PRETTIER_CONFIG } from "src/definition/prettier";
+import { fetchAndProcessImage, saveImage, ImagePurpose } from "src/helpers/image";
 import {
   convertBlocksToMarkup,
   generateMdxArticlePage,
   getImageContentFromBlock,
   generateImagesWithMarkup,
-} from "~/helpers/markup";
-import { fetchAndProcessImage, saveImage, ImagePurpose } from "~/helpers/image";
+} from "src/helpers/markup";
+import {
+  NOTION_ARTICLES_PAGE_ID,
+  fetchNotionBlockChildren,
+  fetchNotionPage,
+} from "src/helpers/notion";
+import { joinPathNames, slugify, determineOriginUrl } from "src/utilities/url";
 
 interface Article {
-  id: string;
-  title: string;
   date: Date;
+  id: string;
   path: string;
+  title: string;
 }
 
 const articlesPageResponse = await fetchNotionBlockChildren(NOTION_ARTICLES_PAGE_ID);
@@ -30,9 +30,7 @@ const articlesPageContents = articlesPageResponse.results;
 
 const articles: Array<Article> = [];
 
-for (let index = 0; index < articlesPageContents.length; index++) {
-  const block = articlesPageContents[index];
-
+for (const block of articlesPageContents) {
   if (block.type !== NotionBlockType.CHILD_PAGE) {
     continue;
   }
@@ -46,10 +44,10 @@ for (let index = 0; index < articlesPageContents.length; index++) {
   }
 
   articles.push({
-    title,
-    id: childPageBlock.id,
     date: new Date(childPageBlock.created_time),
+    id: childPageBlock.id,
     path: slugify(title),
+    title,
   });
 }
 
@@ -58,7 +56,7 @@ const originUrl = determineOriginUrl();
 for (const { id: articleId, ...articleData } of articles) {
   const page = await fetchNotionPage(articleId);
   const { results: blocks } = await fetchNotionBlockChildren(articleId);
-  const { articleContent, anchorLinks, readTime } = await convertBlocksToMarkup(blocks);
+  const { anchorLinks, articleContent, readTime } = await convertBlocksToMarkup(blocks);
 
   const { cover, properties } = page;
   const coverCaption = properties.cover_alt.rich_text[0].plain_text;
@@ -77,12 +75,12 @@ for (const { id: articleId, ...articleData } of articles) {
   const coverImagePublicPath = await saveImage(coverImageData);
 
   const coverImageMarkup = await generateImagesWithMarkup({
-    isPriority: true,
-    image: coverImageData,
     caption: coverImageContent.caption,
+    image: coverImageData,
+    isPriority: true,
   });
 
-  const { title, date } = articleData;
+  const { date, title } = articleData;
   const topic = properties.tags.multi_select[0].name;
   const description = properties.snippet.rich_text[0].plain_text ?? "";
 
@@ -94,25 +92,25 @@ for (const { id: articleId, ...articleData } of articles) {
   const pageUrl = joinPathNames(originUrl, "blog", articleRoute);
 
   const coverImage = {
+    alt: coverImageContent.caption.text,
+    height: coverImageData.metadata.height,
+    markup: coverImageMarkup,
+    type: `image/${coverImageData.metadata.format}`,
     url: joinPathNames(originUrl, coverImagePublicPath),
     width: coverImageData.metadata.width,
-    height: coverImageData.metadata.height,
-    type: `image/${coverImageData.metadata.format}`,
-    alt: coverImageContent.caption.text,
-    markup: coverImageMarkup,
   };
 
   const articleMarkup = await prettier.format(
     generateMdxArticlePage({
-      title,
-      topic,
+      anchorLinks,
+      articleContent,
+      coverImage,
       date,
       description,
       pageUrl,
       readTime,
-      coverImage,
-      anchorLinks,
-      articleContent,
+      title,
+      topic,
     }),
     {
       parser: "mdx",
@@ -126,9 +124,9 @@ for (const { id: articleId, ...articleData } of articles) {
     JSON.stringify({
       ...articleData,
       coverImageMarkup,
-      topic,
       description,
       readTime,
+      topic,
     }),
     {
       parser: "json",

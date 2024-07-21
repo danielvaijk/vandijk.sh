@@ -1,15 +1,15 @@
+import type { QwikJSX } from "@builder.io/qwik";
 import { component$, Slot, useStylesScoped$ } from "@builder.io/qwik";
 import { useLocation } from "@builder.io/qwik-city";
 
-import { NavigationHeader } from "~/components/navigation/navigation-header";
+import { NavigationHeader } from "src/components/navigation/navigation-header";
+import styles from "src/routes/layout.css?inline";
 
-import styles from "./layout.css?inline";
-
-export default component$(() => {
+export default component$((): QwikJSX.Element => {
   useStylesScoped$(styles);
 
-  const location = useLocation();
-  const isHomepage = location.url.pathname === "/";
+  const { url } = useLocation();
+  const isHomepage = url.pathname === "/";
 
   return (
     <>
