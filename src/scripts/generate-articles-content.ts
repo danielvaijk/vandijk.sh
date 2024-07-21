@@ -1,9 +1,9 @@
 import { mkdir, writeFile } from "node:fs/promises";
 
+import prettierConfig from "@danielvaijk/prettier-config";
 import prettier from "prettier";
 
 import { NotionBlockType, type NotionChildPageBlock } from "src/definition/notion";
-import { PRETTIER_CONFIG } from "src/definition/prettier";
 import { fetchAndProcessImage, saveImage, ImagePurpose } from "src/helpers/image";
 import {
   convertBlocksToMarkup,
@@ -130,7 +130,7 @@ for (const { id: articleId, ...articleData } of articles) {
     }),
     {
       parser: "json",
-      ...PRETTIER_CONFIG,
+      ...prettierConfig,
     }
   );
 
