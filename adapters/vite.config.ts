@@ -2,8 +2,10 @@ import { staticAdapter } from "@builder.io/qwik-city/adapters/static/vite";
 import { extendConfig } from "@builder.io/qwik-city/vite";
 import type { UserConfig } from "vite";
 
-import { determineOriginUrl } from "src/utilities/url";
-import baseConfig from "vite.config";
+// eslint-disable-next-line no-relative-import-paths/no-relative-import-paths -- Vite needs relative paths.
+import { determineOriginUrl } from "../src/utilities/url";
+// eslint-disable-next-line no-relative-import-paths/no-relative-import-paths -- Vite needs relative paths.
+import baseConfig from "../vite.config";
 
 export default extendConfig(baseConfig, (): UserConfig => {
   return {
