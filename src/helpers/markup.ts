@@ -1,3 +1,4 @@
+import prettierConfig from "@danielvaijk/prettier-config";
 import prettier from "prettier";
 
 import {
@@ -6,7 +7,6 @@ import {
   type NotionBlockContents,
   type NotionRichText,
 } from "src/definition/notion";
-import { PRETTIER_CONFIG } from "src/definition/prettier";
 import {
   ImageFormat,
   createImageVariants,
@@ -217,7 +217,7 @@ async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
 
   if (supportedLanguages.includes(language)) {
     codeOutput = await prettier.format(code, {
-      ...PRETTIER_CONFIG,
+      ...prettierConfig,
       parser: language,
       printWidth: 80,
     });

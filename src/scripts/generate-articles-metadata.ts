@@ -1,8 +1,8 @@
 import { readFile, readdir, writeFile } from "node:fs/promises";
 
+import prettierConfig from "@danielvaijk/prettier-config";
 import prettier from "prettier";
 
-import { PRETTIER_CONFIG } from "src/definition/prettier";
 import { joinPathNames } from "src/utilities/url";
 
 interface ArticleMetadata {
@@ -38,7 +38,7 @@ const sortedResults = results.sort((a: ArticleMetadata, b: ArticleMetadata): num
 const serializedResults = JSON.stringify(sortedResults);
 const formattedResults = await prettier.format(serializedResults, {
   parser: "json",
-  ...PRETTIER_CONFIG,
+  ...prettierConfig,
 });
 
 await writeFile(ARTICLES_METADATA_FILE_PATH, formattedResults);
