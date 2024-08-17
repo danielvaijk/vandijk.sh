@@ -33,19 +33,21 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
     return (
       <li class="article-summary">
         <Link class={scopeId} href={`/blog/${path}/`} prefetch>
-          <time dateTime={dateParsed.toISOString()}>{dateFormatted}</time>
-          <h4>{title}</h4>
-
           <div
             class="article-summary-cover-image"
             dangerouslySetInnerHTML={coverImageWithScopeId}
           ></div>
 
-          <p>{description}</p>
+          <div class="article-summary-content">
+            <time dateTime={dateParsed.toISOString()}>{dateFormatted}</time>
+            <h4>{title}</h4>
 
-          <div class="article-summary-read-info">
-            <p>Talks about {topic}</p>
-            <p>~{readTime} min read</p>
+            <p>{description}</p>
+
+            <div class="article-summary-content-read-info">
+              <p>Talks about {topic}</p>
+              <p>~{readTime} min read</p>
+            </div>
           </div>
         </Link>
       </li>
