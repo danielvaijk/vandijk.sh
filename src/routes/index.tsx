@@ -10,6 +10,7 @@ import styles from "src/routes/index.css?inline";
 export default component$((): QwikJSX.Element => {
   useStylesScoped$(styles);
 
+  // eslint-disable-next-line qwik/no-use-visible-task -- It's ok for this to block the main thread.
   useVisibleTask$((): void => {
     /* eslint-disable @typescript-eslint/no-magic-numbers -- Not magic. */
     new TypeIt("#homepage-title", { loop: true, loopDelay: 10000 })
