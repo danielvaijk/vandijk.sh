@@ -1,5 +1,6 @@
 header {
   width: 100%;
+  max-width: 80rem;
   display: flex;
   justify-content: space-between;
   align-items: flex-end;
@@ -77,10 +78,6 @@ header > nav > ul > li a {
 }
 
 @media screen and (min-width: 46rem) {
-  header {
-    padding: 0.8rem 2rem;
-  }
-
   #header-name img {
     width: 60px;
   }

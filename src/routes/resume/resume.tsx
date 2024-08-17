@@ -1,19 +1,16 @@
 import type { QwikJSX } from "@builder.io/qwik";
-import { component$, useStylesScoped$ } from "@builder.io/qwik";
+import { component$ } from "@builder.io/qwik";
 
 import { ResumeExperienceItem } from "src/components/resume/resume-experience-item";
 import { ResumeSection } from "src/components/resume/resume-section";
-import styles from "src/routes/resume/index.css?inline";
 
 interface ResumeProps {
   showFull?: boolean;
 }
 
 export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.Element => {
-  useStylesScoped$(styles);
-
   return (
-    <div id="resume">
+    <div>
       <ResumeSection withoutBulletPoints>
         <li>
           <p>
