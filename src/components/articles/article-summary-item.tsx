@@ -2,7 +2,7 @@ import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
-import styles from "src/components/articles/article-summary-item.css?inline";
+import styles from "src/components/articles/article-summary-item.scss?inline";
 import { formatDateAsString } from "src/utilities/time";
 
 export interface ArticleSummaryProps {

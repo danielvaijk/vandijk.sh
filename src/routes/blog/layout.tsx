@@ -4,8 +4,8 @@ import type { DocumentHeadProps, DocumentHeadValue } from "@builder.io/qwik-city
 import { useLocation, type DocumentHead } from "@builder.io/qwik-city";
 
 import { createPageMetaTags } from "src/helpers/meta";
-import stylesForLayout from "src/routes/blog/layout.css?inline";
-import stylesForCodeHighlights from "src/styles/code.css?inline";
+import stylesForLayout from "src/routes/blog/layout.scss?inline";
+import stylesForCodeHighlights from "src/styles/code.scss?inline";
 
 export default component$((): QwikJSX.Element => {
   useStyles$(stylesForLayout);

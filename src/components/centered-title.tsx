@@ -1,7 +1,7 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 
-import styles from "src/components/centered-title.css?inline";
+import styles from "src/components/centered-title.scss?inline";
 
 interface CenteredTitleProps {
   subtitle: string;
