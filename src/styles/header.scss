@@ -1,3 +1,5 @@
+@import "utilities";
+
 header {
   width: 100%;
   max-width: 80rem;
@@ -6,128 +8,99 @@ header {
   align-items: flex-end;
   padding: 0.8rem;
   user-select: none;
-}
 
-#header-name {
-  display: flex;
-  align-items: center;
-  color: inherit;
-}
-
-#header-name img {
-  margin-right: 0.4rem;
-  width: 40px;
-  height: auto;
-}
-
-#header-name h2 {
-  margin: 0;
-  font-size: 1.6rem;
-}
-
-header > nav {
-  position: relative;
-  margin: 0 0 6px 0;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-header > nav > ul {
-  list-style: none;
-  text-align: center;
-  display: none;
-  margin: 0;
-  padding: 0.8rem;
-  flex-direction: column;
-  position: absolute;
-  top: 2rem;
-  background-color: white;
-  box-shadow: 4px 4px 0 0 rgba(0, 0, 0, 0.15);
-  border: 1px solid black;
-}
-
-header > nav > ul.is-open {
-  display: flex;
-}
-
-header > nav > ul > li:not(:last-child) {
-  margin-bottom: 0.8rem;
-}
-
-header > nav > ul > li a {
-  color: inherit;
-  font-size: 1.2rem;
-  font-weight: bold;
-}
-
-.hamburger {
-  display: flex;
-  padding: 0.6rem;
-}
-
-.hamburger > div {
-  width: 0.4rem;
-  height: 0.4rem;
-  border-radius: 100%;
-  background-color: #212121;
-}
-
-.hamburger > div:not(:last-child) {
-  margin-right: 0.4rem;
-}
-
-@media screen and (min-width: 46rem) {
-  #header-name img {
-    width: 60px;
-  }
-
-  #header-name h2 {
-    margin: 0;
-    font-size: 2rem;
-  }
-
-  header > nav {
-    margin: 0 0 14px 0;
-  }
-
-  header > nav > .hamburger {
-    display: none;
-  }
-
-  header > nav > ul {
-    position: unset;
-    top: unset;
-    padding: unset;
-    display: flex;
-    flex-direction: row;
-    background-color: unset;
-    text-align: right;
-    box-shadow: unset;
-    border: unset;
-  }
-
-  header > nav > ul > li:not(:last-child) {
-    margin-bottom: unset;
-    margin-right: 0.8rem;
-  }
-}
-
-@media print {
-  header {
+  @media print {
     justify-content: center;
   }
 
-  header > nav,
-  #header-name img {
-    display: none;
+  > #header-name {
+    display: flex;
+    align-items: center;
+    color: inherit;
+
+    > img {
+      margin-right: 0.4rem;
+      @include responsive(width, 40px, 60px);
+      height: auto;
+
+      @media print {
+        display: none;
+      }
+    }
+
+    > h2 {
+      margin: 0;
+      @include responsive(font-size, 1.6rem, 2rem);
+
+      @media print {
+        font-size: 2.4rem;
+
+        &::before {
+          content: "D";
+        }
+      }
+    }
   }
 
-  #header-name h2::before {
-    content: "D";
-  }
+  > nav {
+    position: relative;
+    margin: 0 0 6px 0;
+    @include responsive(margin, 0 0 6px 0, 0 0 14px 0);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
 
-  #header-name h2 {
-    font-size: 2.4rem;
+    @media print {
+      display: none;
+    }
+
+    > ul {
+      list-style: none;
+      margin: 0;
+
+      @include responsive(text-align, center, right);
+      @include responsive(display, none, flex);
+      @include responsive(flex-direction, column, row);
+
+      @include mobile-only(padding, 0.8rem);
+      @include mobile-only(position, absolute);
+      @include mobile-only(top, 2rem);
+      @include mobile-only(background-color, white);
+      @include mobile-only(box-shadow, 4px 4px 0 0 rgba(0, 0, 0, 0.15));
+      @include mobile-only(border, 1px solid black);
+
+      &.is-open {
+        display: flex;
+      }
+
+      > li {
+        &:not(:last-child) {
+          @include mobile-only(margin-bottom, 0.8rem);
+          @include desktop-only(margin-right, 0.8rem);
+        }
+
+        a {
+          color: inherit;
+          font-size: 1.2rem;
+          font-weight: bold;
+        }
+      }
+    }
+
+    > .hamburger {
+      @include responsive(display, flex, none);
+      padding: 0.6rem;
+
+      > div {
+        width: 0.4rem;
+        height: 0.4rem;
+        border-radius: 100%;
+        background-color: #212121;
+
+        &:not(:last-child) {
+          margin-right: 0.4rem;
+        }
+      }
+    }
   }
 }

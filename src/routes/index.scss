@@ -5,12 +5,12 @@
   flex-direction: column;
   justify-content: center;
   text-align: center;
-}
 
-#homepage > h2 {
-  margin: 0 0 0.8rem 0;
-}
+  > h2 {
+    margin: 0 0 0.8rem 0;
+  }
 
-#homepage > p {
-  margin: 0;
+  > p {
+    margin: 0;
+  }
 }

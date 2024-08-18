@@ -4,115 +4,120 @@ article {
   font-size: 1.125rem;
   line-height: 1.7777778;
   padding: 2.2rem 0 1.2rem;
-}
 
-article figure {
-  margin-inline: 0;
-}
+  figure {
+    margin-inline: 0;
 
-article figure img {
-  width: 100%;
-  height: auto; /* Let the browser calculate the height to maintain aspect ratio */
-  display: block; /* Removes any extra white space below the image */
-}
+    img {
+      width: 100%;
+      height: auto; // Let the browser calculate the height to maintain aspect ratio.
+      display: block; // Removes any extra white space below the image.
+    }
 
-article figure > figcaption {
-  margin-top: 0.4rem;
-  text-align: center;
-  font-size: 1rem;
-  opacity: 0.6;
-}
+    > figcaption {
+      margin-top: 0.4rem;
+      text-align: center;
+      font-size: 1rem;
+      opacity: 0.6;
+    }
+  }
 
-article h2 {
-  margin: 4rem auto 0 auto;
-}
+  h2 {
+    margin: 4rem auto 0 auto;
 
-article h2 + p:first-letter {
-  font-size: 160%;
-  line-height: 1;
-  margin-right: 0.1rem;
-}
+    + p:first-letter {
+      font-size: 160%;
+      line-height: 1;
+      margin-right: 0.1rem;
+    }
 
-article h3 {
-  margin: 2rem auto 1rem 0;
-  text-align: left;
-}
+    &#contents {
+      margin-top: 4rem;
+      cursor: unset;
 
-article h2,
-article h3 {
-  cursor: pointer;
-  width: max-content;
-  max-width: 100%;
-}
+      + p {
+        text-align: center;
+        margin: 0.2rem 0 0 0;
+        font-weight: bolder;
+        font-style: italic;
 
-article h2 > a,
-article h3 > a {
-  color: inherit;
-}
+        &:first-letter {
+          font-size: unset;
+          line-height: unset;
+          margin-right: unset;
+        }
 
-article time[role="doc-subtitle"] p {
-  margin: 1rem auto 4rem auto;
-  max-width: 32rem;
-  line-height: 1.1;
-  text-align: center;
-  font-size: 1.25rem;
-  font-style: italic;
-}
+        + ul {
+          margin: 2rem auto 4rem auto;
 
-article h2#contents {
-  margin-top: 4rem;
-  cursor: unset;
-}
+          li {
+            text-align: start;
+          }
 
-article h2#contents + p {
-  text-align: center;
-  margin: 0.2rem 0 0 0;
-  font-weight: bolder;
-  font-style: italic;
-}
+          a {
+            color: inherit;
+          }
+        }
+      }
+    }
+  }
 
-article h2#contents + p:first-letter {
-  font-size: unset;
-  line-height: unset;
-  margin-right: unset;
-}
+  h3 {
+    margin: 2rem auto 1rem 0;
+    text-align: left;
+  }
 
-article h2#contents + p + ul {
-  margin: 2rem auto 4rem auto;
-}
+  h2,
+  h3 {
+    cursor: pointer;
+    width: max-content;
+    max-width: 100%;
 
-article h2#contents + p + ul li {
-  text-align: start;
-}
+    > a {
+      color: inherit;
+    }
+  }
 
-article h2#contents + p + ul a {
-  color: inherit;
-}
+  time[role="doc-subtitle"] {
+    p {
+      margin: 1rem auto 4rem auto;
+      max-width: 32rem;
+      line-height: 1.1;
+      text-align: center;
+      font-size: 1.25rem;
+      font-style: italic;
+    }
+  }
 
-article p {
-  text-align: justify;
-}
+  p {
+    text-align: justify;
+  }
 
-article > pre {
-  width: 100%;
-  overflow-x: scroll;
-  padding: 0.8rem;
-  margin: 0;
-  margin-block-start: 1em;
-  margin-block-end: 1em;
-  margin-inline-start: 0px;
-  margin-inline-end: 0px;
-  background-color: #212121;
-}
+  > pre {
+    width: 100%;
+    overflow-x: scroll;
+    padding: 0.8rem;
+    margin: 0;
+    margin-block-start: 1em;
+    margin-block-end: 1em;
+    margin-inline-start: 0;
+    margin-inline-end: 0;
+    background-color: #212121;
+  }
 
-article *:not(pre) > code {
-  padding: 0.125rem;
-  color: #a92323;
-  font-weight: 600;
-  border: 1px solid #e0e0e0;
-  background-color: white;
-}
+  *:not(pre) {
+    > code {
+      padding: 0.125rem;
+      color: #a92323;
+      font-weight: 600;
+      border: 1px solid #e0e0e0;
+      background-color: white;
+    }
+  }
 
-article ul li {
-  text-align: justify;
+  ul {
+    li {
+      text-align: justify;
+    }
+  }
 }
