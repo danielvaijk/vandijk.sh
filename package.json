@@ -45,6 +45,7 @@
     "wrangler": "3.65.1"
   },
   "dependencies": {
+    "modern-normalize": "3.0.0",
     "typeit": "8.8.3"
   }
 }
