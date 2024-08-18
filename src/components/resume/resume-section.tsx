@@ -1,7 +1,7 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { Slot, component$, useStyles$ } from "@builder.io/qwik";
 
-import styles from "src/components/resume/resume-section.css?inline";
+import styles from "src/components/resume/resume-section.scss?inline";
 
 interface ResumeSectionProps {
   title?: string;

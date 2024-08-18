@@ -1,7 +1,7 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 
-import styles from "src/components/resume/resume-experience-item.css?inline";
+import styles from "src/components/resume/resume-experience-item.scss?inline";
 
 interface ResumeExperienceItemProps {
   achievements?: Array<string>;

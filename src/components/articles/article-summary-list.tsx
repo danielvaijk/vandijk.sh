@@ -5,7 +5,7 @@ import {
   ArticleSummaryItem,
   type ArticleSummaryProps,
 } from "src/components/articles/article-summary-item";
-import styles from "src/components/articles/article-summary-list.css?inline";
+import styles from "src/components/articles/article-summary-list.scss?inline";
 
 interface ArticleSummaryListProps {
   articles: Array<ArticleSummaryProps>;

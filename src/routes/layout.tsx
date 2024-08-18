@@ -3,7 +3,7 @@ import { component$, Slot, useStylesScoped$ } from "@builder.io/qwik";
 import { useLocation } from "@builder.io/qwik-city";
 
 import { NavigationHeader } from "src/components/navigation/navigation-header";
-import styles from "src/routes/layout.css?inline";
+import styles from "src/routes/layout.scss?inline";
 
 export default component$((): QwikJSX.Element => {
   useStylesScoped$(styles);

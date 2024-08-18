@@ -5,7 +5,7 @@ import { Link, type DocumentHead } from "@builder.io/qwik-city";
 import TypeIt from "typeit";
 
 import { createPageMetaTags } from "src/helpers/meta";
-import styles from "src/routes/index.css?inline";
+import styles from "src/routes/index.scss?inline";
 
 export default component$((): QwikJSX.Element => {
   useStylesScoped$(styles);
