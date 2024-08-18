@@ -1,49 +1,45 @@
+@import "../../styles/utilities";
+
 .resume-section {
   margin: 1.2rem 0;
-}
 
-.resume-section > h4 {
-  margin: 0;
-}
+  > h4 {
+    margin: 0;
 
-.resume-section > h4:first-letter {
-  font-size: 160%;
-}
-
-.resume-section > hr {
-  height: 1px;
-  width: 100%;
-  border: none;
-  background-color: black;
-}
-
-.resume-section p {
-  text-align: justify;
-}
-
-.resume-section ul {
-  margin: 0.8rem 0 0 0;
-  padding-left: 0.9rem;
-}
-
-.resume-section ul li:not(:last-child) {
-  margin-bottom: 0.2rem;
-}
-
-.resume-section-without-bullet-points > ul {
-  list-style: none;
-}
-
-.resume-section-split-columns > ul {
-  column-count: 3;
-}
-
-@media screen and (min-width: 46rem) {
-  .resume-section ul {
-    padding-left: 0.8rem;
+    &:first-letter {
+      font-size: 160%;
+    }
   }
 
-  .resume-section-split-columns > ul {
-    column-count: 4;
+  > hr {
+    height: 1px;
+    width: 100%;
+    border: none;
+    background-color: black;
+  }
+
+  p {
+    text-align: justify;
+  }
+
+  ul {
+    margin: 0.8rem 0 0 0;
+    @include responsive(padding-left, 0.9rem, 0.8rem);
+
+    li:not(:last-child) {
+      margin-bottom: 0.2rem;
+    }
+  }
+}
+
+.resume-section-without-bullet-points {
+  > ul {
+    list-style: none;
+  }
+}
+
+.resume-section-split-columns {
+  > ul {
+    @include responsive(column-count, 3, 4);
   }
 }
