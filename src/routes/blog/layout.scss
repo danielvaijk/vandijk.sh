@@ -102,16 +102,16 @@ article {
     margin-block-end: 1em;
     margin-inline-start: 0;
     margin-inline-end: 0;
-    background-color: #212121;
+    background-color: var(--code-background-color);
   }
 
   *:not(pre) {
     > code {
       padding: 0.125rem;
-      color: #a92323;
+      color: var(--inline-code-text-color);
       font-weight: 600;
-      border: 1px solid #e0e0e0;
-      background-color: white;
+      border: 1px solid var(--inline-code-border-color);
+      background-color: var(--inline-code-background-color);
     }
   }
 
