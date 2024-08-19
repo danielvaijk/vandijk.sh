@@ -1,7 +1,11 @@
-@import "modern-normalize";
-@import "styles/document";
-@import "styles/code";
-@import "styles/text";
-@import "styles/image";
-@import "styles/header";
-@import "styles/footer";
+@import "src/styles/base/reset";
+@import "src/styles/base/typography";
+@import "src/styles/base/code";
+@import "src/styles/base/image";
+
+@import "src/styles/layout/document";
+@import "src/styles/layout/header";
+@import "src/styles/layout/footer";
+
+@import "src/styles/themes/dark";
+@import "src/styles/themes/light";
