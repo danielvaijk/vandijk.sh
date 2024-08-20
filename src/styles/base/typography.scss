@@ -14,13 +14,16 @@ a,
 }
 
 h1 {
-  display: block;
   @include responsive(font-size, 2.2rem, 2.5rem);
-  margin: 0 auto;
-  max-width: 32rem;
-  line-height: 1.1;
-  text-align: center;
-  font-weight: 200;
+
+  & {
+    display: block;
+    margin: 0 auto;
+    max-width: 32rem;
+    line-height: 1.1;
+    text-align: center;
+    font-weight: 200;
+  }
 }
 
 h2 {
