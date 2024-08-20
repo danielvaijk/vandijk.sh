@@ -33,6 +33,24 @@ export const DocumentHead = component$((): QwikJSX.Element => {
           <style key={key} {...props} dangerouslySetInnerHTML={style} />
         )
       )}
+
+      <script
+        dangerouslySetInnerHTML={`
+        (function() {
+          var theme = localStorage.getItem("theme");
+
+          if (theme) {
+            document.documentElement.className = theme;
+          } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
+            document.documentElement.className = "dark";
+            localStorage.setItem("theme", "dark");
+          } else {
+            document.documentElement.className = "light";
+            localStorage.setItem("theme", "light");
+          }
+        })();
+      `}
+      ></script>
     </head>
   );
 });
