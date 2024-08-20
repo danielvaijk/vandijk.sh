@@ -1,11 +1,31 @@
+@mixin light-theme-variables {
+  --text-color: #212121;
+  --link-color: #0d47a1;
+  --inline-code-text-color: #a92323;
+  --inline-code-border-color: #e0e0e0;
+  --inline-code-background-color: #ffffff;
+  --code-background-color: #212121;
+  --background-color: #ffffff;
+}
+
 @media (prefers-color-scheme: light) {
-  :root {
-    --text-color: #212121;
-    --link-color: #0d47a1;
-    --inline-code-text-color: #a92323;
-    --inline-code-border-color: #e0e0e0;
-    --inline-code-background-color: #ffffff;
-    --code-background-color: #212121;
-    --background-color: #ffffff;
+  :root:not(.dark) {
+    @include light-theme-variables;
+
+    .theme-toggle {
+      svg {
+        fill: none;
+      }
+    }
+  }
+}
+
+.light {
+  @include light-theme-variables;
+
+  .theme-toggle {
+    svg {
+      fill: none;
+    }
   }
 }

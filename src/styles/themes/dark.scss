@@ -1,11 +1,31 @@
+@mixin dark-theme-variables {
+  --text-color: #ffffff;
+  --link-color: #619fff;
+  --inline-code-text-color: #ff6b6b;
+  --inline-code-border-color: #121212;
+  --inline-code-background-color: #191919;
+  --code-background-color: #191919;
+  --background-color: #212121;
+}
+
 @media (prefers-color-scheme: dark) {
-  :root {
-    --text-color: #ffffff;
-    --link-color: #619fff;
-    --inline-code-text-color: #ff6b6b;
-    --inline-code-border-color: #4a4a4a;
-    --inline-code-background-color: #191919;
-    --code-background-color: #191919;
-    --background-color: #212121;
+  :root:not(.light) {
+    @include dark-theme-variables;
+
+    .theme-toggle {
+      svg {
+        fill: var(--text-color);
+      }
+    }
+  }
+}
+
+.dark {
+  @include dark-theme-variables;
+
+  .theme-toggle {
+    svg {
+      fill: var(--text-color);
+    }
   }
 }

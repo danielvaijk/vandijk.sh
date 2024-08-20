@@ -2,7 +2,18 @@ import type { QwikJSX } from "@builder.io/qwik";
 import { $, component$, useOnDocument, useOnWindow, useSignal } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
-export const NavigationHeaderLinks = component$((): QwikJSX.Element => {
+import { NavigationHeaderThemeToggle } from "src/components/navigation/navigation-header-theme-toggle";
+
+function isClickOutsideRect(clickEvent: MouseEvent, rect: DOMRect): boolean {
+  const { x, y } = clickEvent;
+
+  const isHorizontallyOutside = x < rect.left || x > rect.right;
+  const isVerticallyOutside = y < rect.top || y > rect.bottom;
+
+  return isHorizontallyOutside && isVerticallyOutside;
+}
+
+export const NavigationHeaderItems = component$((): QwikJSX.Element => {
   const isOpen = useSignal(false);
   const listRef = useSignal<HTMLElement>();
   const hamburgerRef = useSignal<HTMLElement>();
@@ -10,35 +21,22 @@ export const NavigationHeaderLinks = component$((): QwikJSX.Element => {
   useOnDocument(
     "click",
     $((clickEvent: MouseEvent): void => {
-      if (typeof listRef.value === "undefined") {
+      const listRefValue = listRef.value;
+      const hamburgerRefValue = hamburgerRef.value;
+
+      if (typeof listRefValue === "undefined") {
         return;
       }
 
-      if (typeof hamburgerRef.value === "undefined") {
+      if (typeof hamburgerRefValue === "undefined") {
         return;
       }
 
-      const { x, y } = clickEvent;
-      const listRect = listRef.value.getBoundingClientRect();
-      const hamburgerRect = hamburgerRef.value.getBoundingClientRect();
-
-      const isClickOutsideRect = (rect: DOMRect): boolean => {
-        if (x < rect.left || x > rect.right) {
-          return true;
-        }
-
-        if (y < rect.top || y > rect.bottom) {
-          return true;
-        }
-
-        return false;
-      };
-
-      if (!isClickOutsideRect(hamburgerRect)) {
+      if (!isClickOutsideRect(clickEvent, hamburgerRefValue.getBoundingClientRect())) {
         return;
       }
 
-      if (isClickOutsideRect(listRect)) {
+      if (isClickOutsideRect(clickEvent, listRefValue.getBoundingClientRect())) {
         isOpen.value = false;
       }
     })
@@ -47,7 +45,9 @@ export const NavigationHeaderLinks = component$((): QwikJSX.Element => {
   useOnWindow(
     "resize",
     $((): void => {
-      isOpen.value = false;
+      if (isOpen.value) {
+        isOpen.value = false;
+      }
     })
   );
 
@@ -111,6 +111,9 @@ export const NavigationHeaderLinks = component$((): QwikJSX.Element => {
           >
             Connect
           </Link>
+        </li>
+        <li class="theme-toggle">
+          <NavigationHeaderThemeToggle />
         </li>
       </ul>
     </nav>
