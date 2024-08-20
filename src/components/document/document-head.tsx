@@ -66,6 +66,16 @@ export const DocumentHead = component$((): QwikJSX.Element => {
         })();
       `}
       ></script>
+
+      <noscript>
+        <style
+          dangerouslySetInnerHTML={`
+          .js-only {
+            display: none !important;
+          }
+        `}
+        ></style>
+      </noscript>
     </head>
   );
 });

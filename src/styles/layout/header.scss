@@ -85,6 +85,8 @@ header {
       }
 
       > li {
+        @include desktop-only(height, 1.8rem);
+
         &:not(:last-child) {
           @include mobile-only(margin-bottom, 0.8rem);
           @include desktop-only(margin-right, 0.8rem);

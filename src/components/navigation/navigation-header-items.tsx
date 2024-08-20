@@ -112,7 +112,7 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
             Connect
           </Link>
         </li>
-        <li class="theme-toggle">
+        <li class="theme-toggle js-only">
           <NavigationHeaderThemeToggle />
         </li>
       </ul>
