@@ -37,16 +37,31 @@ export const DocumentHead = component$((): QwikJSX.Element => {
       <script
         dangerouslySetInnerHTML={`
         (function() {
-          var theme = localStorage.getItem("theme");
+          var currentTheme = localStorage.getItem("theme");
+          var prefersColorScheme = window.matchMedia ? window.matchMedia("(prefers-color-scheme: dark)") : null;
 
-          if (theme) {
-            document.documentElement.className = theme;
-          } else if (window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches) {
-            document.documentElement.className = "dark";
-            localStorage.setItem("theme", "dark");
+          function setAndSaveTheme(targetTheme) {
+            document.documentElement.className = targetTheme;
+            localStorage.setItem("theme", targetTheme);
+          }
+
+          if (currentTheme) {
+            document.documentElement.className = currentTheme;
+          } else if (prefersColorScheme && prefersColorScheme.matches) {
+            setAndSaveTheme("dark");
           } else {
-            document.documentElement.className = "light";
-            localStorage.setItem("theme", "light");
+            setAndSaveTheme("light");
+          }
+
+          // Listen to color scheme system preference changes.
+          if (prefersColorScheme) {
+            prefersColorScheme.addEventListener("change", function(changeEvent) {
+              if (changeEvent.matches) {
+                setAndSaveTheme("dark");
+              } else {
+                setAndSaveTheme("light");
+              }
+            });
           }
         })();
       `}
