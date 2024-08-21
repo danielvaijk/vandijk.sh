@@ -10,7 +10,7 @@ function isClickOutsideRect(clickEvent: MouseEvent, rect: DOMRect): boolean {
   const isHorizontallyOutside = x < rect.left || x > rect.right;
   const isVerticallyOutside = y < rect.top || y > rect.bottom;
 
-  return isHorizontallyOutside && isVerticallyOutside;
+  return isHorizontallyOutside || isVerticallyOutside;
 }
 
 export const NavigationHeaderItems = component$((): QwikJSX.Element => {
