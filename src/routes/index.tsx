@@ -13,11 +13,31 @@ export default component$((): QwikJSX.Element => {
   // eslint-disable-next-line qwik/no-use-visible-task -- It's ok for this to block the main thread.
   useVisibleTask$((): void => {
     /* eslint-disable @typescript-eslint/no-magic-numbers -- Not magic. */
-    new TypeIt("#homepage-title", { loop: true, loopDelay: 10000 })
-      .pause(6000)
+    new TypeIt("#homepage-title", {
+      loop: true,
+      startDelay: 6000,
+      startDelete: true,
+    })
       .delete()
       .pause(1200)
-      .type("Don't be shy...")
+      .type("Don't be shy")
+      .pause(1000)
+      .type(".")
+      .pause(800)
+      .type(".")
+      .pause(800)
+      .type(".")
+      .pause(6000)
+      .delete()
+      .pause(3000)
+      .type("Hey there, I'm")
+      .pause(800)
+      .type(" ")
+      .pause(400)
+      .type("Daniel", { instant: true })
+      .pause(300)
+      .type(".")
+      .pause(10000)
       .go();
     /* eslint-enable @typescript-eslint/no-magic-numbers -- Not magic. */
   });
@@ -25,7 +45,7 @@ export default component$((): QwikJSX.Element => {
   return (
     <div id="homepage">
       <h2 id="homepage-title">Hey there, I'm Daniel.</h2>
-      <p>
+      <strong>
         Feel free to explore my{" "}
         <Link
           target="_blank"
@@ -36,7 +56,7 @@ export default component$((): QwikJSX.Element => {
         </Link>
         ,{" "}
         <Link href="/blog/" prefetch>
-          articles
+          blog
         </Link>
         ,{" "}
         <Link href="/resume/" prefetch>
@@ -51,7 +71,7 @@ export default component$((): QwikJSX.Element => {
           connect
         </Link>{" "}
         on LinkedIn.
-      </p>
+      </strong>
     </div>
   );
 });
