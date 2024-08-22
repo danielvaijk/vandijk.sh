@@ -3,19 +3,19 @@
     #{$property}: $mobile-value;
   }
 
-  @media screen and (min-width: 46rem) {
+  @media (min-width: 46rem) {
     #{$property}: $desktop-value;
   }
 }
 
 @mixin mobile-only($property, $value) {
-  @media screen and (max-width: 46rem) {
+  @media (max-width: 46rem) {
     #{$property}: $value;
   }
 }
 
 @mixin desktop-only($property, $value) {
-  @media screen and (min-width: 46rem) {
+  @media (min-width: 46rem) {
     #{$property}: $value;
   }
 }

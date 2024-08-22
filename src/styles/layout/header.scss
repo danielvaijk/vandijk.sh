@@ -9,10 +9,6 @@ header {
   padding: 0.8rem;
   user-select: none;
 
-  @media print {
-    justify-content: center;
-  }
-
   > #header-name {
     display: flex;
     align-items: center;
@@ -25,10 +21,6 @@ header {
         margin-right: 0.4rem;
         height: auto;
       }
-
-      @media print {
-        display: none;
-      }
     }
 
     > h2 {
@@ -38,10 +30,6 @@ header {
         margin: 0;
       }
 
-      @media print {
-        font-size: 2.4rem;
-      }
-
       &::before {
         content: "D";
         display: inline-block;
@@ -49,13 +37,6 @@ header {
         border: 1px solid var(--text-color);
         margin-right: 0.4rem;
         background-color: var(--background-color);
-
-        @media print {
-          padding: 0;
-          border: 0;
-          margin: 0;
-          background-color: unset;
-        }
       }
     }
   }
@@ -66,10 +47,6 @@ header {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
-
-    @media print {
-      display: none;
-    }
 
     > ul {
       @include responsive(text-align, center, right);
