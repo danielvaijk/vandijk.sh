@@ -8,7 +8,7 @@ interface ResumeExperienceItemProps {
   description: string;
   duration?: string;
   location?: string;
-  name?: string;
+  name: string;
   position?: string;
 }
 
@@ -23,21 +23,8 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
   }): QwikJSX.Element => {
     useStylesScoped$(styles);
 
-    const isAchievementsOnly = typeof name === "undefined";
     const locationOrDuration = experienceLocation ?? duration;
-
-    const renderPositionOrNull = (): QwikJSX.Element | null => {
-      if (typeof position === "string" && position.length > 0) {
-        return (
-          <div class="resume-experience-item-position">
-            <strong>{position}</strong>
-            <strong>{duration}</strong>
-          </div>
-        );
-      } else {
-        return null;
-      }
-    };
+    const hasPosition = typeof position === "string" && position.length > 0;
 
     const renderDescriptionOrNull = (): QwikJSX.Element | null => {
       if (typeof description === "string" && description.length > 0) {
@@ -65,19 +52,19 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
     };
 
     return (
-      <li
-        class={[
-          "resume-experience-item",
-          isAchievementsOnly && "resume-experience-item-achievements-only",
-        ]}
-      >
+      <li class="resume-experience-item">
         <div class="resume-experience-item-content">
-          <div class="resume-experience-item-name">
-            <strong>{experienceName}</strong>
-            <p>{locationOrDuration}</p>
+          <div class="resume-experience-item-header">
+            <div>
+              <i>{experienceName}</i>
+              {hasPosition && <strong>{position}</strong>}
+            </div>
+            <div>
+              <i>{locationOrDuration}</i>
+              {hasPosition && <strong>{duration}</strong>}
+            </div>
           </div>
 
-          {renderPositionOrNull()}
           {renderDescriptionOrNull()}
           {renderAchievementsOrNull()}
         </div>

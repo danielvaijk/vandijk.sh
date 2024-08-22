@@ -23,11 +23,10 @@
   }
 
   ul {
-    margin: 0.8rem 0 0 0;
     @include responsive(padding-left, 0.9rem, 0.8rem);
 
-    li:not(:last-child) {
-      margin-bottom: 0.2rem;
+    & {
+      margin: 0.8rem 0 0 0;
     }
   }
 }
@@ -40,6 +39,30 @@
 
 .resume-section-split-columns {
   > ul {
-    @include responsive(column-count, 3, 4);
+    & {
+      max-width: 100%;
+      display: grid;
+      justify-content: space-between;
+      gap: 0.2rem 1.2rem;
+      grid-template-columns: repeat(2, minmax(0, max-content));
+    }
+
+    @media (min-width: 36rem) {
+      grid-template-columns: repeat(3, minmax(0, max-content));
+    }
+
+    @media (min-width: 60rem) {
+      grid-template-columns: repeat(4, minmax(0, max-content));
+    }
+
+    @media (min-width: 74rem) {
+      grid-template-columns: repeat(5, minmax(0, max-content));
+    }
+
+    li {
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
+    }
   }
 }
