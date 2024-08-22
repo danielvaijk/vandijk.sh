@@ -26,7 +26,7 @@ html {
   background-color: var(--background-color);
 
   @media print {
-    font-size: 12px;
+    font-size: 18px;
   }
 
   body {
@@ -41,5 +41,16 @@ html {
       font-family: "Times New Roman", serif;
       background-image: none;
     }
+  }
+}
+
+@page {
+  size: A3 portrait;
+  margin: 2rem;
+}
+
+@media print {
+  .hide-on-print {
+    display: none;
   }
 }
