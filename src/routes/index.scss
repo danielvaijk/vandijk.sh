@@ -6,11 +6,14 @@
   justify-content: center;
   text-align: center;
 
-  > h2 {
-    margin: 0 0 0.8rem 0;
-  }
-
-  > p {
+  > #homepage-title {
+    height: 2.6rem; // Prevents the ti cursor addition causing layout shifting.
     margin: 0;
+
+    --ti-cursor-font-family: Superclarendon, "Bookman Old Style", "URW Bookman", "URW Bookman L",
+      "Georgia Pro", Georgia, serif;
+    --ti-cursor-font-size: 1.4rem;
+    --ti-cursor-font-weight: 900;
+    --ti-cursor-color: var(--text-color);
   }
 }
