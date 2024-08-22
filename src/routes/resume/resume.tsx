@@ -1,26 +1,26 @@
 import type { QwikJSX } from "@builder.io/qwik";
+import { useStylesScoped$ } from "@builder.io/qwik";
 import { component$ } from "@builder.io/qwik";
 
 import { ResumeExperienceItem } from "src/components/resume/resume-experience-item";
 import { ResumeSection } from "src/components/resume/resume-section";
+import styles from "src/routes/resume/resume.scss?inline";
 
 interface ResumeProps {
   showFull?: boolean;
 }
 
 export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.Element => {
+  useStylesScoped$(styles);
+
   return (
-    <div>
-      <ResumeSection withoutBulletPoints>
-        <li>
-          <p>
-            Dynamic and multidisciplinary <strong>Senior Software Engineer</strong> with over a
-            decade of hands-on experience across various stacks, domains, and sectors. Known for
-            leading high-impact projects, driving technological advancements, and contributing to
-            the open-source community.
-          </p>
-        </li>
-      </ResumeSection>
+    <div class="resume">
+      <p class="resume-intro">
+        Dynamic and multidisciplinary <strong>Senior Software Engineer</strong> with over a decade
+        of hands-on experience in Game, Software, and Web development; across a diverse variety of
+        tech stacks, business domains, and industrial sectors. Known for leading high-impact
+        initiatives, driving technological advancements, and making open-source contributions.
+      </p>
 
       <ResumeSection title="Areas of Expertise" withSplitColumns>
         <li>Software Architecture Design</li>

@@ -1,21 +1,32 @@
 @import "src/styles/abstracts/mixins";
 
-.resume-experience-item:not(:first-of-type) {
-  @include responsive(margin-top, 1.8rem, 1.4rem);
+.resume-experience-item {
+  &:not(:first-of-type) {
+    @include responsive(margin-top, 1.8rem, 1.4rem);
+  }
 
   > .resume-experience-item-content {
     display: flex;
     flex-direction: column;
 
-    > .resume-experience-item-name,
-    > .resume-experience-item-position {
+    > .resume-experience-item-header {
       display: flex;
       justify-content: space-between;
-    }
+      column-gap: 6rem;
 
-    > .resume-experience-item-name {
-      p {
-        margin: 0;
+      > div {
+        display: flex;
+        flex-direction: column;
+        width: 50%;
+
+        &:last-child {
+          text-align: right;
+        }
+
+        > p {
+          margin: 0;
+          text-align: end;
+        }
       }
     }
 
@@ -24,31 +35,20 @@
       margin: 0.6rem 0 0 0;
     }
 
-    > .resume-experience-item-position {
-      i {
-        width: 50%;
-
-        &:last-child {
-          text-align: right;
-        }
-      }
-    }
-
     > .resume-experience-item-key-contributions {
       margin: 1.2rem 0 0 0;
     }
 
     > .resume-experience-item-achievements {
       @include responsive(padding-left, 0.9rem, 0.8rem);
-      text-align: justify;
+
+      & {
+        text-align: justify;
+      }
 
       li:not(:last-child) {
         margin-bottom: 0.4rem;
       }
     }
   }
-}
-
-.resume-experience-item-achievements-only {
-  list-style: none;
 }
