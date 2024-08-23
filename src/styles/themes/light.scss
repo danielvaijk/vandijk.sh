@@ -17,6 +17,10 @@
         fill: none;
       }
     }
+
+    .dark-only {
+      display: none;
+    }
   }
 }
 
@@ -27,5 +31,9 @@
     svg {
       fill: none;
     }
+  }
+
+  .dark-only {
+    display: none;
   }
 }

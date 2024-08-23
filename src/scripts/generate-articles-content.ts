@@ -92,7 +92,7 @@ for (const { id: articleId, ...articleData } of articles) {
   const pageUrl = joinPathNames(originUrl, "blog", articleRoute);
 
   const coverImage = {
-    alt: coverImageContent.caption.text,
+    alt: coverImageContent.caption.altText,
     height: coverImageData.metadata.height,
     markup: coverImageMarkup,
     type: `image/${coverImageData.metadata.format}`,

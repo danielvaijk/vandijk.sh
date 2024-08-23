@@ -23,8 +23,9 @@ import { formatDateAsString } from "src/utilities/time";
 import { slugify } from "src/utilities/url";
 
 interface ImageCaption {
+  altText: string;
   isHidden: boolean;
-  text: string;
+  theme?: string;
 }
 
 interface ImageContent {
@@ -73,6 +74,42 @@ function getRichTextContentFromBlock(block: NotionBlock): string {
   }, "");
 }
 
+function extractCaptionValues(captionRaw: string): ImageCaption {
+  const caption: ImageCaption = {
+    altText: captionRaw,
+    isHidden: false,
+  };
+
+  const prefixRegex = /^\s*(?:\((?<prefixValues>.*?)\))?\s*(?<altText>.*)$/u;
+  const prefixMatch = prefixRegex.exec(captionRaw);
+
+  if (prefixMatch !== null) {
+    const [, prefixContent, altText] = prefixMatch;
+
+    if (typeof prefixContent !== "undefined") {
+      for (const prefixValue of prefixContent.split(",")) {
+        switch (prefixValue.trim()) {
+          case "HIDDEN":
+            caption.isHidden = true;
+            break;
+          case "DARK":
+            caption.theme = "dark";
+            break;
+          case "LIGHT":
+            caption.theme = "light";
+            break;
+          default:
+            break;
+        }
+      }
+    }
+
+    caption.altText = altText;
+  }
+
+  return caption;
+}
+
 function getImageContentFromBlock({
   block,
   captionOverride,
@@ -87,24 +124,15 @@ function getImageContentFromBlock({
   }
 
   const { url } = content[content.type] ?? {};
-  const caption = captionOverride ?? content.caption?.[0]?.plain_text;
+  const captionRaw = captionOverride ?? content.caption?.[0]?.plain_text;
 
   if (typeof url === "undefined" || url.length === 0) {
     throw new Error("Image content is missing a URL.");
-  } else if (typeof caption === "undefined" || caption.length === 0) {
+  } else if (typeof captionRaw === "undefined" || captionRaw.length === 0) {
     throw new Error("Image content is missing a caption.");
   }
 
-  const isCaptionHidden = caption.startsWith("(HIDDEN)");
-  const captionWithoutTag = isCaptionHidden ? caption.slice("(HIDDEN)".length).trim() : caption;
-
-  return {
-    caption: {
-      isHidden: isCaptionHidden,
-      text: captionWithoutTag,
-    },
-    url,
-  };
+  return { caption: extractCaptionValues(captionRaw), url };
 }
 
 function renderImageMarkup({
@@ -130,13 +158,18 @@ function renderImageMarkup({
   const height = `height="${metadata.height}"`;
   const decoding = `decoding="${isPriority ? "sync" : "async"}"`;
   const loading = `loading="${isPriority ? "eager" : "lazy"}"`;
-  const alt = `alt="${caption.text}"`;
+  const alt = `alt="${caption.altText}"`;
 
   const img = `<img ${src} ${width} ${height} ${alt} ${decoding} ${loading} />`;
-  const figcaption = caption.isHidden ? null : `<figcaption>${caption.text}</figcaption>`;
+  const figcaption = caption.isHidden ? null : `<figcaption>${caption.altText}</figcaption>`;
+  let figureOpenTag = "<figure>";
+
+  if (typeof caption.theme !== "undefined") {
+    figureOpenTag = `<figure class="${caption.theme}-only">`;
+  }
 
   if (isSingleImage) {
-    return ["<figure>", img, figcaption, "</figure>"]
+    return [figureOpenTag, img, figcaption, "</figure>"]
       .filter((value): boolean => value !== null)
       .join("\n");
   }
@@ -146,7 +179,7 @@ function renderImageMarkup({
   const webpSourceSet = `srcset="${serializeSourceSet(webpSources)}"`;
 
   return [
-    "<figure>",
+    figureOpenTag,
     "<picture>",
     `<source ${sizes} ${avifSourceSet} />`,
     `<source ${sizes} ${webpSourceSet} />`,

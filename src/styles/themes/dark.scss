@@ -17,6 +17,10 @@
         fill: var(--text-color);
       }
     }
+
+    .light-only {
+      display: none;
+    }
   }
 }
 
@@ -27,5 +31,9 @@
     svg {
       fill: var(--text-color);
     }
+  }
+
+  .light-only {
+    display: none;
   }
 }
