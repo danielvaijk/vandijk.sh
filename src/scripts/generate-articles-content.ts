@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdirSync, writeFileSync } from "node:fs";
 
 import prettierConfig from "@danielvaijk/prettier-config";
 import prettier from "prettier";
@@ -134,9 +134,9 @@ for (const { id: articleId, ...articleData } of articles) {
     }
   );
 
-  await mkdir(articleDirectory, { recursive: true });
-  await writeFile(articleFilePath, articleMarkup);
-  await writeFile(articleMetadataPath, articleMetadata);
+  mkdirSync(articleDirectory, { recursive: true });
+  writeFileSync(articleFilePath, articleMarkup);
+  writeFileSync(articleMetadataPath, articleMetadata);
 }
 
 export {};
