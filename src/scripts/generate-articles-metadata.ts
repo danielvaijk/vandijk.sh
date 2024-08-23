@@ -1,4 +1,4 @@
-import { readFile, readdir, writeFile } from "node:fs/promises";
+import { readdirSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 
 import prettierConfig from "@danielvaijk/prettier-config";
 import prettier from "prettier";
@@ -10,10 +10,11 @@ interface ArticleMetadata {
   date: string;
 }
 
-const ARTICLES_METADATA_FILE_PATH = "./src/media/articles.json";
+const ARTICLE_METADATA_DIRECTORY = "./src/media";
+const ARTICLES_METADATA_FILE_PATH = `${ARTICLE_METADATA_DIRECTORY}/articles.json`;
 const ARTICLES_DIRECTORY = "./src/routes/blog";
 
-const entities = await readdir(ARTICLES_DIRECTORY, { withFileTypes: true });
+const entities = readdirSync(ARTICLES_DIRECTORY, { withFileTypes: true });
 
 const results = [];
 
@@ -23,7 +24,7 @@ for (const entity of entities) {
   }
 
   const metadataFilePath = joinPathNames(ARTICLES_DIRECTORY, entity.name, "meta.json");
-  const metadataContents = await readFile(metadataFilePath, { encoding: "utf-8" });
+  const metadataContents = readFileSync(metadataFilePath, { encoding: "utf-8" });
 
   results.push(JSON.parse(metadataContents));
 }
@@ -41,4 +42,8 @@ const formattedResults = await prettier.format(serializedResults, {
   ...prettierConfig,
 });
 
-await writeFile(ARTICLES_METADATA_FILE_PATH, formattedResults);
+if (!existsSync(ARTICLE_METADATA_DIRECTORY)) {
+  mkdirSync(ARTICLE_METADATA_DIRECTORY);
+}
+
+writeFileSync(ARTICLES_METADATA_FILE_PATH, formattedResults);
