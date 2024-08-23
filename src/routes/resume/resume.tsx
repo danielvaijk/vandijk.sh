@@ -32,7 +32,7 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
         <li>Data Structures & Algorithms</li>
         <li>Full-Stack Development</li>
         <li>Testing & Quality Assurance</li>
-        <li>Innovative Solutions Development</li>
+        <li>Research & Development</li>
         <li>Cloud Computing</li>
         <li>Database Management</li>
         <li>System Optimization</li>
@@ -43,12 +43,12 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
       <ResumeSection title="Technical Proficiencies" withoutBulletPoints>
         <li>
           <strong>Runtimes:</strong> Node.js | <strong>Languages:</strong> JavaScript, TypeScript,
-          Java, Rust, Go, SQL, PHP, C#, C++, Bash | <strong>Frameworks:</strong> React.js,
-          Express.js, Next.js, Spring, Qwik, jQuery, C++ Windows SDK, Windows Forms (WinForms) |{" "}
+          Java, Rust, Go, SQL, PHP, C#, C++, Bash, Liquid | <strong>Frameworks:</strong> React.js,
+          Express.js, Next.js, Spring, Qwik, jQuery, Windows SDK, Windows Forms (WinForms) |{" "}
           <strong>Databases:</strong> PostgreSQL, DynamoDB, MongoDB, MySQL | <strong>Cloud:</strong>{" "}
           Docker, Kubernetes, Apache Kafka, Cloudflare, AWS | <strong>Testing:</strong> Jest,
-          Vitest, Cypress, Playwright | <strong>Tools:</strong> Git, GitLab, Unity Engine, Jenkins |{" "}
-          <strong>Operating Systems:</strong> macOS, Windows, Linux
+          Vitest, Cypress, Playwright | <strong>Tools:</strong> Git, GitHub, GitLab, Unity Engine,
+          Jenkins | <strong>Operating Systems:</strong> macOS, Windows, Linux
         </li>
       </ResumeSection>
 
@@ -57,45 +57,36 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
           <strong>
             <a href="https://github.com/danielvaijk/breakpoint">Breakpoint (2024)</a>:
           </strong>{" "}
-          CLI tool written in <strong>Rust</strong> that flags breaking API changes through static
-          analysis.
+          A linter that statically analyzes public APIs to catch breaking changes, written in{" "}
+          <strong>Rust</strong>.
         </li>
         <li>
           <strong>
             <a href="https://github.com/danielvaijk/synctivity">Synctivity (2024)</a>:
           </strong>{" "}
-          CLI tool written in <strong>Rust</strong> that syncs contribution activity between Git
-          developer platforms.
+          A tool that aggregates Git contribution activity across devices and repositories, written
+          in <strong>Rust</strong>.
         </li>
         <li>
           <strong>
             <a href="https://github.com/danielvaijk/vandijk.sh">vandijk.sh (2023)</a>:
           </strong>{" "}
-          Engineering portfolio and blog built with <strong>TypeScript</strong>,{" "}
-          <strong>Node.js</strong>, <strong>Qwik</strong>, and the <strong>Notion API</strong>. It
-          features a static Notion-to-MDX article generator and a static image optimizer, deployed
-          on <strong>Cloudflare</strong>.
-        </li>
-        <li>
-          <strong>danielspectre.com (2022):</strong> Photography portfolio website to exhibit
-          photography work, employing <strong>TypeScript</strong>, <strong>Node.js</strong>,{" "}
-          <strong>Next.js</strong>, and various other modern web technologies, managed and deployed
-          via <strong>Cloudflare</strong>.
+          A static portfolio website and blog built with <strong>TypeScript</strong>,{" "}
+          <strong>Node.js</strong>, <strong>Qwik</strong>, and the <strong>Notion API</strong>.
         </li>
         <li>
           <strong>
-            <a href="https://github.com/danielvaijk/ev3-controller">
-              EV3 Mindstorm Controller (2017)
-            </a>
-            :
+            <a href="https://github.com/danielvaijk/ev3-controller">EV3 Controller (2017)</a>:
           </strong>{" "}
-          Program built with <strong>WinForms</strong> and <strong>C#</strong> that could control a
-          EV3 Mindstorm AGV remotely via bluetooth, featuring manual and automatic navigation modes.
+          A GUI Windows program to remotely control a EV3 Mindstorm AGV via bluetooth, built with{" "}
+          <strong>C#</strong> and <strong>WinForms</strong>.
         </li>
         <li>
-          <strong>Arma Key Stealer (2012):</strong> Serial key stealer malware disguised as an
-          online cheat for Arma 2: Operation Arrowhead, developed with <strong>WinForms</strong> and{" "}
-          <strong>Visual Basic</strong>, to counteract and discourage wannabe cheaters on mpgh.net.
+          <strong>
+            <a href="https://github.com/danielvaijk/verb-tetris">Verb Tetris (2013)</a>:
+          </strong>{" "}
+          A Tetris-inspired 2D game for a grammar High School project, written in{" "}
+          <strong>C#</strong> powered by the <strong>Unity Engine</strong>.
         </li>
       </ResumeSection>
 
@@ -104,7 +95,7 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
           name="Adidas"
           location="Hybrid (Amsterdam, Netherlands)"
           position="Software Engineer II, Web Frameworks & Tooling"
-          duration="2023 - Present"
+          duration="Aug. 2023 - Present"
           description="Responsible for developing libraries and frameworks to streamline developer productivity across 20 engineering teams, building core systems and APIs that provide a foundation to other crucial services, and improving Jenkins CI/CD pipelines and DevOps processes."
           achievements={
             showFull
@@ -121,7 +112,7 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
           name="Adidas"
           location="Hybrid (Amsterdam, Netherlands)"
           position="Software Engineer, 3rd Party Tools"
-          duration="2022 - 2023"
+          duration="Dec. 2022 - Jul. 2023"
           description="Responsible for vendor integrations on the website spanning a wide array of critical capabilities such as Search, A/B Testing, Personalization, Recommendations, Reviews, Analytics, and Data Collection;  including the development of full-stack integrations and reusable libraries."
           achievements={
             showFull
@@ -138,7 +129,7 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
           name="Adidas"
           location="Hybrid (Amsterdam, Netherlands)"
           position="Software Engineer, Campaign & Storytelling"
-          duration="2021 - 2022"
+          duration="Jul. 2021 - Nov. 2022"
           description="Responsible for mantaining key landing pages, like the homepage, including delivering improvements to page rendering performance, personalization, and overall design and UX. Worked on automating and streamlining content creation, curation, and presentation."
           achievements={
             showFull
@@ -154,7 +145,7 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
           name="Bunq"
           location="Amsterdam, Netherlands"
           position="Front-end Developer"
-          duration="2019 - 2021"
+          duration="Dec. 2019 - Jun. 2021"
           description="Responsible for maintaining several projects in a diverse front-end stack (jQuery, Backbone.js, Mithril.js, React.js, Semantic UI, etc), developing greenfield projects, carrying out admin duties for bunq.com (main website), together.bunq.com (forum), and maintaining their respective PHP/MySQL back-ends."
           achievements={[
             "Facilitated environmental transparency and engagement by building a dynamic 3D forest visualization React iframe widget.",
@@ -168,13 +159,12 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
           name="Stentorian"
           location="Remote (Netherlands)"
           position="Full-Stack Software Engineer"
-          duration="2018 - Present"
+          duration="Mar. 2018 - Present"
           description="Developed, marketed, and sold multiple digital products and solutions as an independent developer."
           achievements={[
-            "Improved and optimized REST API development by creating a Spring-like TypeScript framework for Node.js.",
-            "Developed Offstage, an online platform for event organizers to manage their ambassadors and event promotion efforts.",
-            "Developed a fully custom Shopify store and landing page for a clothing brand with Liquid and React.",
-            "Facilitated client-side state management by developing frameworks for Redux and MobX inspired by ORMs.",
+            "Created Offstage, a multi-app platform for event organizers to manage their ambassadors and event promotion efforts.",
+            "Designed, developed, and deployed several static websites, dynamic web applications, and robust back-end solutions for clients.",
+            "Streamlined development by designing proprietary front-end and back-end frameworks and libraries.",
           ]}
         />
 
@@ -182,7 +172,7 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
           name="JES Pipelines PTE Ltd."
           location="Remote (Netherlands)"
           position="Software Engineer | IT Technician"
-          duration="2016 - 2019"
+          duration="May 2016 - Nov. 2019"
           description="Responsible for developing PowerShell scripts and C#/C++ Windows applications to streamline and automate daily field operations and provide IT support when necessary. Travelled for on-site assignments in the Netherlands, Turkey, Thailand, England, and Spain."
           achievements={[
             "Streamlined weld scan reporting by developing a C++ report generator, reducing task time from hours to minutes.",
@@ -196,13 +186,12 @@ export const Resume = component$<ResumeProps>(({ showFull = false }): QwikJSX.El
           name="Dimensional Games"
           location="Remote (Santa Terezinha de Itaipu, Brazil)"
           position="Game Developer"
-          duration="2012 - 2016"
+          duration="Feb. 2012 - Apr. 2016"
           description="Developed, marketed, and sold multiple assets written in C# for the Unity Engine as an independent developer."
           achievements={[
             "Facilitated learning Unity's built-in networking frameworks by creating multiple assets, including a multiplayer chat.",
             "Simplified the development of RPG/MMO games by creating an inventory system asset with advanced features like item crafting.",
             "Enabled quick learning & project development by releasing a fully-featured multiplayer first-person shooter template asset.",
-            "Promoted educational engagement through gameplay by developing a Tetris-inspired 2D game for a grammar High School project.",
           ]}
         />
       </ResumeSection>
