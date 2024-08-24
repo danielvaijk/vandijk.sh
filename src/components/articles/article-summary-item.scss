@@ -1,3 +1,5 @@
+@import "src/styles/abstracts/mixins";
+
 .article-summary {
   &:not(:last-child) {
     margin-top: 2rem;
@@ -35,7 +37,7 @@
       }
 
       > p {
-        text-align: justify;
+        @include justify-text;
       }
 
       > .article-summary-content-read-info {
