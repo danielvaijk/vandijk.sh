@@ -19,7 +19,7 @@
   }
 
   p {
-    text-align: justify;
+    @include justify-text;
   }
 
   ul {

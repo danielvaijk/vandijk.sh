@@ -43,7 +43,7 @@
       @include responsive(padding-left, 0.9rem, 0.8rem);
 
       & {
-        text-align: justify;
+        @include justify-text;
       }
 
       li:not(:last-child) {
