@@ -12,20 +12,19 @@
     > .resume-experience-item-header {
       display: flex;
       justify-content: space-between;
-      column-gap: 6rem;
+      column-gap: 2rem;
 
       > div {
         display: flex;
         flex-direction: column;
         width: 50%;
 
-        &:last-child {
-          text-align: right;
+        &:first-child {
+          text-align: left;
         }
 
-        > p {
-          margin: 0;
-          text-align: end;
+        &:last-child {
+          text-align: right;
         }
       }
     }
@@ -41,10 +40,6 @@
 
     > .resume-experience-item-achievements {
       @include responsive(padding-left, 0.9rem, 0.8rem);
-
-      & {
-        @include justify-text;
-      }
 
       li:not(:last-child) {
         margin-bottom: 0.4rem;
