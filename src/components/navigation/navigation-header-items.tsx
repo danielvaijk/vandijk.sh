@@ -93,7 +93,7 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
             Blog
           </Link>
         </li>
-        <li class="hide-on-print">
+        <li>
           <Link
             href="/resume/"
             onClick$={(): void => {
@@ -116,7 +116,7 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
             Connect
           </Link>
         </li>
-        <li class="theme-toggle js-only hide-on-print">
+        <li class="theme-toggle js-only">
           <NavigationHeaderThemeToggle />
         </li>
       </ul>

@@ -19,6 +19,7 @@
     height: 1px;
     width: 100%;
     border: none;
+    margin: 0.4rem 0 0 0;
     background-color: var(--text-color);
   }
 
@@ -30,7 +31,7 @@
     @include responsive(padding-left, 0.9rem, 0.8rem);
 
     & {
-      margin: 0.8rem 0 0 0;
+      margin: 1.2rem 0;
     }
 
     > li {

@@ -36,127 +36,185 @@ export const Resume = component$<ResumeData>(
   }): QwikJSX.Element => {
     useStylesScoped$(styles);
 
-    const renderExpertise = (): Array<JSXOutput> => {
-      const results: Array<JSXOutput> = [];
+    const headerProfileItems: Array<string> = [];
+    const renderedCompanies: Record<string, boolean> = {};
 
-      for (const experience of expertise) {
-        for (const area of experience.areas) {
-          results.push(<li key={area}>{area}</li>);
-        }
+    const regionNames = new Intl.DisplayNames(["en"], { type: "region" });
+
+    if (typeof basics.phone === "string" && basics.phone.length > 0) {
+      headerProfileItems.push(basics.phone);
+    }
+
+    if (typeof basics.email === "string" && basics.email.length > 0) {
+      headerProfileItems.push(basics.email);
+    }
+
+    if (
+      typeof basics.location.city === "string" &&
+      basics.location.city.length > 0 &&
+      typeof basics.location.countryCode === "string" &&
+      basics.location.countryCode.length > 0
+    ) {
+      headerProfileItems.push(
+        [basics.location.city, regionNames.of(basics.location.countryCode)].join(", ")
+      );
+    }
+
+    if (typeof basics.url === "string" && basics.url.length > 0) {
+      headerProfileItems.push(basics.url);
+    }
+
+    for (const profile of basics.profiles) {
+      if (typeof profile.url === "string" && profile.url.length > 0) {
+        headerProfileItems.push(profile.url);
       }
+    }
 
-      return results;
+    const hasResumeHeaderName = basics.name.length > 0 && basics.label.length > 0;
+    const hasResumeHeader = hasResumeHeaderName || headerProfileItems.length > 0;
+
+    const renderProfileItem = (item: string): JSXOutput => {
+      return <p key={item}>{item}</p>;
     };
 
-    const renderSkills = (): Array<JSXOutput> => {
-      const results: Array<JSXOutput> = [];
-
-      for (const skill of skills) {
-        results.push(
-          <li key={skill.name}>
-            <strong>{skill.name}:</strong> {skill.keywords.join(", ")}
-          </li>
-        );
-      }
-
-      return results;
+    const renderExpertise = (area: string): JSXOutput => {
+      return <li key={area}>{area}</li>;
     };
 
-    const renderProjects = (): Array<JSXOutput> => {
-      const results: Array<JSXOutput> = [];
-
-      for (const project of projects) {
-        results.push(
-          <li key={project.name}>
-            <strong>
-              <a href={project.url}>
-                {project.name} ({project.startDate})
-              </a>
-              :
-            </strong>{" "}
-            {project.description}
-          </li>
-        );
-      }
-
-      return results;
-    };
-
-    const renderWorkExperiences = (): Array<JSXOutput> => {
-      const results: Array<JSXOutput> = [];
-
-      for (const experience of work) {
-        results.push(
-          <ResumeExperienceItem
-            name={experience.company}
-            location={experience.location}
-            position={experience.position}
-            duration={`${formatDateForDisplay(experience.startDate)} - ${formatDateForDisplay(experience.endDate)}`}
-            description={experience.description ?? ""}
-            achievements={experience.highlights}
-          />
-        );
-      }
-
-      return results;
-    };
-
-    const renderVolunteeringExperiences = (): Array<JSXOutput> => {
-      const results: Array<JSXOutput> = [];
-
-      for (const experience of volunteer) {
-        results.push(
-          <li>
-            <strong>{experience.position}</strong> | {experience.organization},{" "}
-            {experience.location}
-          </li>
-        );
-      }
-
-      return results;
-    };
-
-    const renderEducation = (): JSXOutput => {
-      const results: Array<JSXOutput> = [];
-
-      for (const experience of education) {
-        results.push(<li>{experience.description}</li>);
-      }
-      return results;
-    };
-
-    const renderLanguages = (): JSXOutput => {
+    const renderSkill = (skill: ResumeData["skills"][number]): JSXOutput => {
       return (
-        <li>
-          <strong>Languages:</strong>{" "}
-          {languages.map(({ fluency, language }): string => `${language}, ${fluency}`).join("|")}
+        <li key={skill.name}>
+          <strong>{skill.name}:</strong> {skill.keywords.join(", ")}
         </li>
       );
     };
 
+    const renderProject = (project: ResumeData["projects"][number]): JSXOutput => {
+      return (
+        <li key={project.name}>
+          <strong>
+            <a href={project.url}>
+              {project.name} ({project.startDate})
+            </a>
+            :
+          </strong>{" "}
+          {project.description}
+        </li>
+      );
+    };
+
+    const renderWorkExperience = (experience: ResumeData["work"][number]): JSXOutput => {
+      const startDate = formatDateForDisplay(experience.startDate);
+      const endDate = formatDateForDisplay(experience.endDate);
+      const shouldRenderName = !renderedCompanies[experience.company];
+
+      if (shouldRenderName) {
+        renderedCompanies[experience.company] = true;
+      }
+
+      return (
+        <ResumeExperienceItem
+          name={shouldRenderName ? experience.company : null}
+          location={experience.location}
+          position={experience.position}
+          duration={`${startDate} - ${endDate}`}
+          description={experience.description ?? ""}
+          achievements={experience.highlights}
+        />
+      );
+    };
+
+    const renderVolunteeringExperience = (
+      experience: ResumeData["volunteer"][number]
+    ): JSXOutput => {
+      return (
+        <li>
+          <strong>{experience.position}</strong>: {experience.organization}, {experience.location}
+        </li>
+      );
+    };
+
+    const renderEducation = (experience: ResumeData["education"][number]): JSXOutput => {
+      return (
+        <li>
+          <strong>{experience.institution}</strong> ({experience.startDate} - {experience.endDate})
+          - {experience.description}
+        </li>
+      );
+    };
+
+    const renderLanguage = ({ fluency, language }: ResumeData["languages"][number]): JSXOutput => (
+      <li key={language}>
+        <strong>{language}</strong>: {fluency}
+      </li>
+    );
+
     return (
       <div class="resume">
-        <p class="resume-intro">{basics.summary}</p>
+        {hasResumeHeader && (
+          <div class="resume-header">
+            {hasResumeHeaderName && (
+              <>
+                <div class="resume-header-name">
+                  <h1>{basics.name}</h1>
+                  <h2>{basics.label}</h2>
+                </div>
 
-        <ResumeSection title="Areas of Expertise" withSplitColumns>
-          {renderExpertise()}
-        </ResumeSection>
+                <hr />
+              </>
+            )}
 
-        <ResumeSection title="Technical Proficiencies" withoutBulletPoints>
-          {renderSkills()}
-        </ResumeSection>
+            {headerProfileItems.length > 0 && (
+              <>
+                <div class="resume-header-profile">{headerProfileItems.map(renderProfileItem)}</div>
 
-        <ResumeSection title="Key Projects">{renderProjects()}</ResumeSection>
-        <ResumeSection title="Professional Experience">{renderWorkExperiences()}</ResumeSection>
+                <hr />
+              </>
+            )}
+          </div>
+        )}
 
-        <ResumeSection title="Volunteer Experience" withoutBulletPoints>
-          {renderVolunteeringExperiences()}
-        </ResumeSection>
+        {basics.summary.length > 0 && <p class="resume-intro">{basics.summary}</p>}
 
-        <ResumeSection title="Education & Credentials" withoutBulletPoints>
-          {renderEducation()}
-          {renderLanguages()}
-        </ResumeSection>
+        {expertise.length > 0 && (
+          <ResumeSection title="Areas of Expertise" withSplitColumns>
+            {expertise.map(({ areas }): Array<JSXOutput> => areas.map(renderExpertise))}
+          </ResumeSection>
+        )}
+
+        {skills.length > 0 && (
+          <ResumeSection title="Technical Proficiencies" withoutBulletPoints>
+            {skills.map(renderSkill)}
+          </ResumeSection>
+        )}
+
+        {work.length > 0 && (
+          <ResumeSection title="Professional Experience">
+            {work.map(renderWorkExperience)}
+          </ResumeSection>
+        )}
+
+        {projects.length > 0 && (
+          <ResumeSection title="Key Projects">{projects.map(renderProject)}</ResumeSection>
+        )}
+
+        {education.length > 0 && (
+          <ResumeSection title="Education & Credentials" withoutBulletPoints>
+            {education.map(renderEducation)}
+          </ResumeSection>
+        )}
+
+        {languages.length > 0 && (
+          <ResumeSection title="Languages" withoutBulletPoints>
+            {languages.map(renderLanguage)}
+          </ResumeSection>
+        )}
+
+        {volunteer.length > 0 && (
+          <ResumeSection title="Volunteer Experience" withoutBulletPoints>
+            {volunteer.map(renderVolunteeringExperience)}
+          </ResumeSection>
+        )}
       </div>
     );
   }

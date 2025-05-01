@@ -15,6 +15,7 @@
     "@danielvaijk/eslint-config/qwik"
   ],
   "rules": {
-    "no-console": "off"
+    "no-console": "off",
+    "@typescript-eslint/consistent-indexed-object-style": "off"
   }
 }

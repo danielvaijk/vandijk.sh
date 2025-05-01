@@ -10,7 +10,7 @@ import { createPageMetaTags } from "src/helpers/meta";
 import { Resume } from "src/routes/resume/resume";
 
 interface ResumeData {
-  awards?: Array<{
+  awards: Array<{
     awarder: string;
     date: string;
     summary?: string;
@@ -36,13 +36,13 @@ interface ResumeData {
     summary: string;
     url?: string;
   };
-  certificates?: Array<{
+  certificates: Array<{
     date: string;
     issuer: string;
     name: string;
     url?: string;
   }>;
-  education?: Array<{
+  education: Array<{
     area: string;
     courses?: Array<string>;
     description?: string;
@@ -52,11 +52,11 @@ interface ResumeData {
     startDate?: string;
     studyType: string;
   }>;
-  expertise?: Array<{
+  expertise: Array<{
     areas: Array<string>;
     category: string;
   }>;
-  interests?: Array<{
+  interests: Array<{
     keywords?: Array<string>;
     name: string;
   }>;
@@ -82,14 +82,14 @@ interface ResumeData {
     type?: string;
     url?: string;
   }>;
-  publications?: Array<{
+  publications: Array<{
     name: string;
     publisher: string;
     releaseDate: string;
     summary?: string;
     website?: string;
   }>;
-  references?: Array<{
+  references: Array<{
     company?: string;
     name: string;
     position?: string;
@@ -100,7 +100,7 @@ interface ResumeData {
     level?: string;
     name: string;
   }>;
-  volunteer?: Array<{
+  volunteer: Array<{
     endDate?: string;
     highlights?: Array<string>;
     location?: string;

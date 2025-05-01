@@ -46,7 +46,9 @@
       @include responsive(padding-left, 0.9rem, 0.8rem);
 
       li:not(:last-child) {
-        margin-bottom: 0.4rem;
+        @media not print {
+          margin-bottom: 0.4rem;
+        }
       }
     }
   }

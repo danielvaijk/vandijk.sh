@@ -41,7 +41,7 @@ html {
     overscroll-behavior: none;
 
     @media print {
-      font-family: "Times New Roman", serif;
+      font-family: Georgia, "Times New Roman", Times, serif;
       background-image: none;
     }
   }
@@ -50,10 +50,4 @@ html {
 @page {
   size: A3 portrait;
   margin: 2rem;
-}
-
-@media print {
-  .hide-on-print {
-    display: none;
-  }
 }
