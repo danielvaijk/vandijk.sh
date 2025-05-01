@@ -15,6 +15,7 @@ npm-debug.log*
 .DS_Store
 .idea
 .vscode
+.env
 
 # Generated
 public/assets/*
