@@ -8,7 +8,7 @@ interface ResumeExperienceItemProps {
   description: string;
   duration?: string;
   location?: string;
-  name: string;
+  name?: string | null;
   position?: string;
 }
 
@@ -24,6 +24,8 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
     useStylesScoped$(styles);
 
     const locationOrDuration = experienceLocation ?? duration;
+
+    const hasName = typeof experienceName === "string" && experienceName.length > 0;
     const hasPosition = typeof position === "string" && position.length > 0;
 
     const renderDescriptionOrNull = (): QwikJSX.Element | null => {
@@ -56,11 +58,11 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
         <div class="resume-experience-item-content">
           <div class="resume-experience-item-header">
             <div>
-              <i>{experienceName}</i>
+              {hasName && <i>{experienceName}</i>}
               {hasPosition && <strong>{position}</strong>}
             </div>
             <div>
-              <i>{locationOrDuration}</i>
+              {hasName && <i>{locationOrDuration}</i>}
               {hasPosition && <strong>{duration}</strong>}
             </div>
           </div>
