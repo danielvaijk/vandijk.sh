@@ -2,6 +2,8 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
+import { readFileSync } from "node:fs";
+
 import type {
   NotionBlock,
   NotionBlockType,
@@ -13,7 +15,6 @@ import { joinPathNames } from "src/utilities/url";
 interface NotionResponse {
   has_more: boolean;
   next_cursor: string;
-  // Object: string;
   results: Array<unknown>;
 }
 
@@ -46,19 +47,24 @@ const NOTION_VERSION = "2022-06-28";
 const NOTION_ARTICLES_PAGE_ID = "c15b7465-243e-4966-bfea-63789f645b04";
 
 function getNotionToken(): string {
-  const { NOTION_TOKEN } = process.env;
+  const envRaw = readFileSync(".env", { encoding: "utf8" });
 
-  if (typeof NOTION_TOKEN === "undefined") {
-    throw new Error("Notion API token is missing.");
-  } else {
-    return NOTION_TOKEN;
+  for (const line of envRaw.split("\n")) {
+    const [key, value] = line.split("=");
+
+    if (key === "NOTION_TOKEN") {
+      return value;
+    }
   }
+
+  throw new Error("Notion API token is missing.");
 }
 
 async function createNotionRequest<ResponseBody extends NotionResponse>(
   endpoint: string
 ): Promise<ResponseBody> {
   const url = new URL(joinPathNames("https://api.notion.com/v1", endpoint));
+
   const headers = {
     "Authorization": `Bearer ${getNotionToken()}`,
     "Content-Type": "application/json",
@@ -77,6 +83,11 @@ async function createNotionRequest<ResponseBody extends NotionResponse>(
 
     const currentRequest = await fetch(url, { headers });
     const currentResponse = (await currentRequest.json()) as ResponseBody;
+
+    if (!currentRequest.ok) {
+      console.error(currentResponse);
+      throw new Error("Notion API request failed.");
+    }
 
     if (typeof response !== "undefined") {
       response = {
