@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { env } from "node:process";
 
 import type {
   NotionBlock,
@@ -43,6 +44,12 @@ const NOTION_VERSION = "2022-06-28";
 const NOTION_ARTICLES_PAGE_ID = "c15b7465-243e-4966-bfea-63789f645b04";
 
 function getNotionToken(): string {
+  // Set during Cloudflare Pages build.
+  if (typeof env.NOTION_TOKEN !== "undefined") {
+    return env.NOTION_TOKEN;
+  }
+
+  // Generally used for local development.
   const envRaw = readFileSync(".env", { encoding: "utf8" });
 
   for (const line of envRaw.split("\n")) {
