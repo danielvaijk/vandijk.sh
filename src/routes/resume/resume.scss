@@ -36,11 +36,11 @@
       grid-template-columns: repeat(3, minmax(0, max-content));
       margin: 1.2rem 0;
 
-      p,
-      a {
+      p {
         margin: 0;
         word-wrap: break-word;
         overflow-wrap: break-word;
+        text-align: center;
       }
     }
   }

@@ -9,7 +9,6 @@ import styles from "src/components/resume/resume-experience-item.scss?inline";
 
 interface ResumeExperienceItemProps {
   achievements?: Array<string>;
-  description: string;
   duration?: string;
   location?: string;
   name?: string | null;
@@ -19,7 +18,6 @@ interface ResumeExperienceItemProps {
 export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
   ({
     achievements = [],
-    description,
     duration,
     location: experienceLocation,
     name: experienceName,
@@ -32,25 +30,14 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
     const hasName = typeof experienceName === "string" && experienceName.length > 0;
     const hasPosition = typeof position === "string" && position.length > 0;
 
-    const renderDescriptionOrNull = (): QwikJSX.Element | null => {
-      if (typeof description === "string" && description.length > 0) {
-        return <p class="resume-experience-item-description">{description}</p>;
-      } else {
-        return null;
-      }
-    };
-
     const renderAchievementsOrNull = (): QwikJSX.Element | null => {
       if (achievements.length > 0) {
         return (
-          <>
-            <i class="resume-experience-item-key-contributions">Key Contributions:</i>
-            <ul class="resume-experience-item-achievements">
-              {achievements.map((achievement, index): QwikJSX.Element => {
-                return <li key={index}>{achievement}</li>;
-              })}
-            </ul>
-          </>
+          <ul class="resume-experience-item-achievements">
+            {achievements.map((achievement, index): QwikJSX.Element => {
+              return <li key={index}>{achievement}</li>;
+            })}
+          </ul>
         );
       } else {
         return null;
@@ -62,16 +49,17 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
         <div class="resume-experience-item-content">
           <div class="resume-experience-item-header">
             <div>
-              {hasName && <i>{experienceName}</i>}
-              {hasPosition && <strong>{position}</strong>}
+              {hasName && <strong>{experienceName}</strong>}
+              {hasPosition && <p>{position}</p>}
             </div>
+
             <div>
-              {hasName && <i>{locationOrDuration}</i>}
-              {hasPosition && <strong>{duration}</strong>}
+              {hasName && <strong>{locationOrDuration}</strong>}
+              {hasPosition && <i>{duration}</i>}
             </div>
           </div>
 
-          {renderDescriptionOrNull()}
+          {/* {renderDescriptionOrNull()} */}
           {renderAchievementsOrNull()}
         </div>
       </li>

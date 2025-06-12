@@ -30,16 +30,16 @@
         &:last-child {
           text-align: right;
         }
+
+        p {
+          margin: 0;
+        }
       }
     }
 
     > .resume-experience-item-description,
     > .resume-experience-item-achievements {
       margin: 0.6rem 0 0 0;
-    }
-
-    > .resume-experience-item-key-contributions {
-      margin: 1.2rem 0 0 0;
     }
 
     > .resume-experience-item-achievements {

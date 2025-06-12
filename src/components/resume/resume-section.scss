@@ -12,6 +12,14 @@
 
     &:first-letter {
       font-size: 160%;
+
+      @media print {
+        font-size: unset;
+      }
+    }
+
+    @media print {
+      font-size: 1.2rem;
     }
   }
 

@@ -24,16 +24,7 @@ function formatDateForDisplay(isoDate: string): string {
 }
 
 export const Resume = component$<ResumeData>(
-  ({
-    basics,
-    education = [],
-    expertise = [],
-    languages,
-    projects,
-    skills,
-    volunteer = [],
-    work,
-  }): QwikJSX.Element => {
+  ({ basics, expertise = [], languages, projects, skills, work }): QwikJSX.Element => {
     useStylesScoped$(styles);
 
     const headerProfileItems: Array<string> = [];
@@ -118,28 +109,8 @@ export const Resume = component$<ResumeData>(
           location={experience.location}
           position={experience.position}
           duration={`${startDate} - ${endDate}`}
-          description={experience.description ?? ""}
           achievements={experience.highlights}
         />
-      );
-    };
-
-    const renderVolunteeringExperience = (
-      experience: ResumeData["volunteer"][number]
-    ): JSXOutput => {
-      return (
-        <li>
-          <strong>{experience.position}</strong>: {experience.organization}, {experience.location}
-        </li>
-      );
-    };
-
-    const renderEducation = (experience: ResumeData["education"][number]): JSXOutput => {
-      return (
-        <li>
-          <strong>{experience.institution}</strong> ({experience.startDate} - {experience.endDate})
-          - {experience.description}
-        </li>
       );
     };
 
@@ -198,21 +169,9 @@ export const Resume = component$<ResumeData>(
           <ResumeSection title="Key Projects">{projects.map(renderProject)}</ResumeSection>
         )}
 
-        {education.length > 0 && (
-          <ResumeSection title="Education & Credentials" withoutBulletPoints>
-            {education.map(renderEducation)}
-          </ResumeSection>
-        )}
-
         {languages.length > 0 && (
           <ResumeSection title="Languages" withoutBulletPoints>
             {languages.map(renderLanguage)}
-          </ResumeSection>
-        )}
-
-        {volunteer.length > 0 && (
-          <ResumeSection title="Volunteer Experience" withoutBulletPoints>
-            {volunteer.map(renderVolunteeringExperience)}
           </ResumeSection>
         )}
       </div>
