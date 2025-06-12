@@ -1,3 +1,6 @@
+import fs from "node:fs";
+import path from "node:path";
+
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$ } from "@builder.io/qwik";
 import { routeLoader$, type DocumentHead, type DocumentHeadValue } from "@builder.io/qwik-city";
@@ -119,6 +122,18 @@ interface ResumeData {
 }
 
 const useResumeData = routeLoader$(async ({ env }): Promise<ResumeData> => {
+  const isDeployment = typeof env.get("CF_PAGES") === "string";
+  const localResumeRepositoryPath = path.resolve(process.cwd(), "../resume");
+
+  if (!isDeployment && fs.existsSync(localResumeRepositoryPath)) {
+    console.log("Fetching resume JSON from file system....");
+
+    const filePath = path.join(localResumeRepositoryPath, "schema.json");
+    const dataRaw = fs.readFileSync(filePath, { encoding: "utf8" });
+
+    return JSON.parse(dataRaw) as ResumeData;
+  }
+
   const githubAuthToken = env.get("GITHUB_TOKEN");
 
   if (typeof githubAuthToken === "undefined") {
