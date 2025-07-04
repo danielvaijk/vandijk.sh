@@ -71,6 +71,7 @@ header {
 
       &.is-open {
         display: flex;
+        z-index: 1;
       }
 
       > li {
