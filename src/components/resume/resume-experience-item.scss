@@ -2,11 +2,11 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-@import "src/styles/abstracts/mixins";
+@use "src/styles/abstracts/mixins";
 
 .resume-experience-item {
   &:not(:first-of-type) {
-    @include responsive(margin-top, 1.8rem, 1.4rem);
+    @include mixins.responsive(margin-top, 1.8rem, 1.4rem);
   }
 
   > .resume-experience-item-content {
@@ -43,7 +43,7 @@
     }
 
     > .resume-experience-item-achievements {
-      @include responsive(padding-left, 0.9rem, 0.8rem);
+      @include mixins.responsive(padding-left, 0.9rem, 0.8rem);
 
       li:not(:last-child) {
         @media not print {

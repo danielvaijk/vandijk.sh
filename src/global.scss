@@ -2,14 +2,14 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-@import "src/styles/base/reset";
-@import "src/styles/base/typography";
-@import "src/styles/base/code";
-@import "src/styles/base/image";
+@forward "src/styles/base/reset";
+@forward "src/styles/base/typography";
+@forward "src/styles/base/code";
+@forward "src/styles/base/image";
 
-@import "src/styles/layout/document";
-@import "src/styles/layout/header";
-@import "src/styles/layout/footer";
+@forward "src/styles/layout/document";
+@forward "src/styles/layout/header";
+@forward "src/styles/layout/footer";
 
-@import "src/styles/themes/dark";
-@import "src/styles/themes/light";
+@forward "src/styles/themes/dark";
+@forward "src/styles/themes/light";

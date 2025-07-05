@@ -4,7 +4,7 @@
 
 import { $, type QwikJSX, useOnWindow } from "@builder.io/qwik";
 import { component$ } from "@builder.io/qwik";
-import { RouterOutlet, ServiceWorkerRegister } from "@builder.io/qwik-city";
+import { RouterOutlet } from "@builder.io/qwik-city";
 
 export const DocumentBody = component$((): QwikJSX.Element => {
   useOnWindow(
@@ -19,7 +19,6 @@ export const DocumentBody = component$((): QwikJSX.Element => {
   return (
     <body>
       <RouterOutlet />
-      <ServiceWorkerRegister />
     </body>
   );
 });

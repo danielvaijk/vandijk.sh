@@ -2,7 +2,7 @@
 // This source code is licensed under the MIT license found in the
 // LICENSE file in the root directory of this source tree.
 
-@import "src/styles/abstracts/mixins";
+@use "src/styles/abstracts/mixins";
 
 header {
   width: 100%;
@@ -23,7 +23,7 @@ header {
     color: inherit;
 
     > img {
-      @include responsive(width, 40px, 60px);
+      @include mixins.responsive(width, 40px, 60px);
 
       & {
         margin-right: 0.4rem;
@@ -32,7 +32,7 @@ header {
     }
 
     > h2 {
-      @include responsive(font-size, 1.6rem, 2rem);
+      @include mixins.responsive(font-size, 1.6rem, 2rem);
 
       & {
         margin: 0;
@@ -57,16 +57,16 @@ header {
     align-items: flex-end;
 
     > ul {
-      @include responsive(text-align, center, right);
-      @include responsive(display, none, flex);
-      @include responsive(flex-direction, column, row);
+      @include mixins.responsive(text-align, center, right);
+      @include mixins.responsive(display, none, flex);
+      @include mixins.responsive(flex-direction, column, row);
 
-      @include mobile-only(padding, 0.8rem);
-      @include mobile-only(position, absolute);
-      @include mobile-only(top, 2rem);
-      @include mobile-only(background-color, var(--background-color));
-      @include mobile-only(box-shadow, 4px 4px 0 0 rgba(0, 0, 0, 0.15));
-      @include mobile-only(border, 1px solid var(--text-color));
+      @include mixins.mobile-only(padding, 0.8rem);
+      @include mixins.mobile-only(position, absolute);
+      @include mixins.mobile-only(top, 2rem);
+      @include mixins.mobile-only(background-color, var(--background-color));
+      @include mixins.mobile-only(box-shadow, 4px 4px 0 0 rgba(0, 0, 0, 0.15));
+      @include mixins.mobile-only(border, 1px solid var(--text-color));
 
       & {
         list-style: none;
@@ -79,11 +79,11 @@ header {
       }
 
       > li {
-        @include desktop-only(height, 1.8rem);
+        @include mixins.desktop-only(height, 1.8rem);
 
         &:not(:last-child) {
-          @include mobile-only(margin-bottom, 0.8rem);
-          @include desktop-only(margin-right, 0.8rem);
+          @include mixins.mobile-only(margin-bottom, 0.8rem);
+          @include mixins.desktop-only(margin-right, 0.8rem);
         }
 
         a {
@@ -95,7 +95,7 @@ header {
     }
 
     > .hamburger {
-      @include responsive(display, flex, none);
+      @include mixins.responsive(display, flex, none);
 
       & {
         padding: 0.6rem;
