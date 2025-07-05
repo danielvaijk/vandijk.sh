@@ -1,4 +1,4 @@
-@import "src/styles/abstracts/mixins";
+@use "src/styles/abstracts/mixins";
 
 .resume-section {
   margin: 1.2rem 0;
@@ -28,18 +28,18 @@
   }
 
   p {
-    @include justify-text;
+    @include mixins.justify-text;
   }
 
   ul {
-    @include responsive(padding-left, 0.9rem, 0.8rem);
+    @include mixins.responsive(padding-left, 0.9rem, 0.8rem);
 
     & {
       margin: 1.2rem 0;
     }
 
     > li {
-      @include justify-text;
+      @include mixins.justify-text;
     }
   }
 }

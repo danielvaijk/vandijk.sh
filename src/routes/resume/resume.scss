@@ -1,4 +1,4 @@
-@import "src/styles/abstracts/mixins";
+@use "src/styles/abstracts/mixins";
 
 .resume {
   > .resume-header {
@@ -42,7 +42,8 @@
   }
 
   > .resume-intro {
-    @include justify-text;
     margin: 1.2rem 0;
+
+    @include mixins.justify-text;
   }
 }

@@ -1,4 +1,4 @@
-@import "src/styles/abstracts/mixins";
+@use "src/styles/abstracts/mixins";
 
 .article-summary {
   &:not(:last-child) {
@@ -41,7 +41,7 @@
       }
 
       > p {
-        @include justify-text;
+        @include mixins.justify-text;
       }
 
       > .article-summary-content-read-info {

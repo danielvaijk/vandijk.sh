@@ -1,4 +1,4 @@
-@import "src/styles/abstracts/mixins";
+@use "src/styles/abstracts/mixins";
 
 article {
   width: 100%;
@@ -92,7 +92,7 @@ article {
   }
 
   p {
-    @include justify-text;
+    @include mixins.justify-text;
   }
 
   > pre {
@@ -119,7 +119,7 @@ article {
 
   ul {
     li {
-      @include justify-text;
+      @include mixins.justify-text;
     }
   }
 }
