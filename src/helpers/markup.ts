@@ -1,26 +1,12 @@
-import prettierConfig from "@danielvaijk/prettier-config";
-import prettier from "prettier";
-
-import {
-  NotionBlockType,
-  type NotionBlock,
-  type NotionBlockContents,
-  type NotionRichText,
-} from "src/definition/notion";
 import {
   ImageFormat,
   createImageVariants,
-  fetchAndProcessImage,
   type ProcessedImage,
   type ImageSourceSet,
   createSourceSetFromImageVariants,
-  saveImage,
   serializeSourceSet,
 } from "src/helpers/image";
-import { isNextIndexBlockOfType } from "src/helpers/notion";
-import { getReadTimeInMinutesFromWordCount, getWordCount } from "src/utilities/text";
 import { formatDateAsString } from "src/utilities/time";
-import { slugify } from "src/utilities/url";
 
 interface ImageCaption {
   altText: string;
@@ -28,50 +14,11 @@ interface ImageCaption {
   theme?: string;
 }
 
-interface ImageContent {
+interface GenerateImagesWithMarkupOptions {
   caption: ImageCaption;
-  url: string;
-}
-
-interface ConvertedMarkup {
-  anchorLinks: string;
-  articleContent: string;
-  readTime: number;
-}
-
-function getRichTextContentFromBlock(block: NotionBlock): string {
-  const blockContent = block[block.type] as NotionBlockContents;
-  const richTextList = blockContent.rich_text ?? [];
-
-  return richTextList.reduce((result: string, richText: NotionRichText): string => {
-    const { annotations = {} } = richText;
-    const { content = "", link } = richText.text ?? {};
-
-    let text = content;
-
-    if (typeof text === "undefined" || text.length === 0) {
-      return result;
-    }
-
-    if (typeof link !== "undefined" && link !== null) {
-      text = `[${text}](${link.url})`;
-    }
-
-    // Bold and italic must come after each other, since bold & italic is ***.
-    if (annotations.italic) {
-      text = ["*", text, "*"].join("");
-    }
-
-    if (annotations.bold) {
-      text = ["**", text, "**"].join("");
-    }
-
-    if (annotations.code) {
-      text = ["`", text, "`"].join("");
-    }
-
-    return result + text;
-  }, "");
+  image: ProcessedImage;
+  isPriority?: boolean;
+  publicPath?: string;
 }
 
 function extractCaptionValues(captionRaw: string): ImageCaption {
@@ -108,31 +55,6 @@ function extractCaptionValues(captionRaw: string): ImageCaption {
   }
 
   return caption;
-}
-
-function getImageContentFromBlock({
-  block,
-  captionOverride,
-}: {
-  block: NotionBlock;
-  captionOverride?: string;
-}): ImageContent {
-  const content = block[block.type] as NotionBlockContents;
-
-  if (typeof content.type === "undefined") {
-    throw new Error("Image content is missing a content type.");
-  }
-
-  const { url } = content[content.type] ?? {};
-  const captionRaw = captionOverride ?? content.caption?.[0]?.plain_text;
-
-  if (typeof url === "undefined" || url.length === 0) {
-    throw new Error("Image content is missing a URL.");
-  } else if (typeof captionRaw === "undefined" || captionRaw.length === 0) {
-    throw new Error("Image content is missing a caption.");
-  }
-
-  return { caption: extractCaptionValues(captionRaw), url };
 }
 
 function renderImageMarkup({
@@ -192,13 +114,6 @@ function renderImageMarkup({
     .join("\n");
 }
 
-interface GenerateImagesWithMarkupOptions {
-  caption: ImageCaption;
-  image: ProcessedImage;
-  isPriority?: boolean;
-  publicPath?: string;
-}
-
 async function generateImagesWithMarkup({
   caption,
   image,
@@ -226,160 +141,8 @@ async function generateImagesWithMarkup({
     image,
     isPriority,
     publicPath: webpSourceSet[0].path,
-    // We use the smallest WebP variant as fallback.
     webpSourceSet,
   });
-}
-
-async function getCodeContentFromBlock(block: NotionBlock): Promise<string> {
-  const content = block[block.type] as NotionBlockContents;
-  const code = content.rich_text?.[0]?.plain_text;
-
-  if (typeof code === "undefined" || code.length === 0) {
-    return ["```", "", "```"].join("\n");
-  }
-
-  const prettierSupportInfo = await prettier.getSupportInfo();
-
-  const { language = "" } = content;
-  const supportedLanguages = prettierSupportInfo.languages.map(({ name: languageName }): string =>
-    languageName.toLowerCase()
-  );
-
-  let codeOutput = `${code}\n`;
-
-  if (supportedLanguages.includes(language)) {
-    codeOutput = await prettier.format(code, {
-      ...prettierConfig,
-      parser: language,
-      printWidth: 80,
-    });
-  }
-
-  return [
-    "{/* prettier-ignore-start */}",
-    "\n",
-    "```",
-    language,
-    "\n",
-    codeOutput,
-    "```",
-    "\n",
-    "{/* prettier-ignore-end */}",
-  ].join("");
-}
-
-async function convertBlocksToMarkup(blocks: Array<NotionBlock>): Promise<ConvertedMarkup> {
-  let articleContent = "";
-  let anchorLinks = "";
-
-  let wordCount = 0;
-  let numberedItemCount = 0;
-
-  for (let index = 0; index < blocks.length; index++) {
-    const block = blocks[index];
-
-    let content = "";
-    let prefix = "";
-    let spacer = "\n\n";
-
-    switch (block.type) {
-      case NotionBlockType.PARAGRAPH:
-        content = getRichTextContentFromBlock(block);
-        wordCount += getWordCount(content);
-        break;
-
-      case NotionBlockType.BULLETED_LIST_ITEM:
-        prefix = "-";
-        content = getRichTextContentFromBlock(block);
-        wordCount += getWordCount(content);
-
-        if (isNextIndexBlockOfType(blocks, index, NotionBlockType.BULLETED_LIST_ITEM)) {
-          spacer = "\n";
-        }
-        break;
-
-      case NotionBlockType.NUMBERED_LIST_ITEM:
-        numberedItemCount += 1;
-        prefix = `${numberedItemCount}.`;
-        content = getRichTextContentFromBlock(block);
-        wordCount += getWordCount(content);
-
-        if (isNextIndexBlockOfType(blocks, index, NotionBlockType.NUMBERED_LIST_ITEM)) {
-          spacer = "\n";
-        } else {
-          numberedItemCount = 0;
-        }
-        break;
-
-      case NotionBlockType.HEADING_ONE:
-        prefix = "#";
-        content = getRichTextContentFromBlock(block);
-        wordCount += getWordCount(content);
-        break;
-
-      case NotionBlockType.HEADING_TWO:
-        prefix = "##";
-        content = getRichTextContentFromBlock(block);
-        wordCount += getWordCount(content);
-
-        content = `[${content}](#${slugify(content)})`;
-        anchorLinks += `- ${content}\n`;
-        break;
-
-      case NotionBlockType.HEADING_THREE:
-        prefix = "###";
-        content = getRichTextContentFromBlock(block);
-        wordCount += getWordCount(content);
-
-        content = `[${content}](#${slugify(content)})`;
-        anchorLinks += `  - ${content}\n`;
-        break;
-
-      case NotionBlockType.IMAGE:
-        {
-          const imageContent = getImageContentFromBlock({ block });
-          const imageData = await fetchAndProcessImage(imageContent.url);
-
-          const generateOptions: GenerateImagesWithMarkupOptions = {
-            caption: imageContent.caption,
-            image: imageData,
-          };
-
-          if (imageData.willUseOriginal) {
-            generateOptions.publicPath = await saveImage(imageData);
-          }
-
-          content = await generateImagesWithMarkup(generateOptions);
-        }
-        break;
-
-      case NotionBlockType.CODE:
-        content = await getCodeContentFromBlock(block);
-        break;
-
-      default:
-        throw new Error(`Block type "${block.type}" is not supported.`);
-    }
-
-    if (content.length === 0) {
-      continue;
-    }
-
-    if (prefix.length > 0) {
-      articleContent += `${prefix} ${content}${spacer}`;
-    } else {
-      articleContent += content + spacer;
-    }
-  }
-
-  const readTime = getReadTimeInMinutesFromWordCount(wordCount);
-
-  return {
-    anchorLinks,
-    articleContent,
-    readTime,
-  };
 }
 
 function generateMdxArticlePage({
@@ -412,8 +175,8 @@ function generateMdxArticlePage({
 }): string {
   return `
 ---
-title: ${title}
-description: "${description}"
+title: ${JSON.stringify(title)}
+description: ${JSON.stringify(description)}
 author: Daniel van Dijk
 opengraph:
   - title: true
@@ -422,11 +185,11 @@ opengraph:
   - url: ${pageUrl}
   - article:author: Daniel van Dijk
   - article:published_time: ${date.toISOString()}
-  - tag: ${topic}
+  - tag: ${JSON.stringify(topic)}
   - locale: en_US
   - site_name: Daniel van Dijk
   - image: ${coverImage.url}
-    image:alt: ${coverImage.alt}
+    image:alt: ${JSON.stringify(coverImage.alt)}
     image:type: ${coverImage.type}
     image:width: ${coverImage.width}
     image:height: ${coverImage.height}
@@ -458,10 +221,4 @@ ${articleContent}
   `;
 }
 
-export {
-  getImageContentFromBlock,
-  convertBlocksToMarkup,
-  getRichTextContentFromBlock,
-  generateMdxArticlePage,
-  generateImagesWithMarkup,
-};
+export { extractCaptionValues, generateMdxArticlePage, generateImagesWithMarkup };

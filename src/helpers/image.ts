@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { writeFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
 
 import sharp, { type Sharp } from "sharp";
 
@@ -49,18 +49,24 @@ async function fetchAndProcessImage(
   url: string,
   purpose = ImagePurpose.OTHER
 ): Promise<ProcessedImage> {
-  // Enforce consistency where we expect images to be uploaded directly to Notion's
-  // S3 bucket. This ensures that the image files don't change or get deleted after
-  // it's initially downloaded during a build (or referenced for an article).
-  if (!url.startsWith("https://prod-files-secure.s3.us-west-2.amazonaws.com")) {
-    throw new Error("Only images from Notion's S3 bucket can be loaded.");
-  }
-
   console.debug(`Sending GET request to ${url}`);
 
   const response = await fetch(url);
   const blob = await response.blob();
-  const image = sharp(await blob.arrayBuffer());
+  const buffer = Buffer.from(await blob.arrayBuffer());
+
+  return processImage(buffer, purpose);
+}
+
+async function readAndProcessImage(
+  path: string,
+  purpose = ImagePurpose.OTHER
+): Promise<ProcessedImage> {
+  return processImage(await readFile(path), purpose);
+}
+
+async function processImage(input: Buffer, purpose = ImagePurpose.OTHER): Promise<ProcessedImage> {
+  const image = sharp(input);
   const { format = "unknown", height = 0, width = 0 } = await image.metadata();
   const metadata = { format, height, width };
 
@@ -81,17 +87,17 @@ async function fetchAndProcessImage(
   switch (format) {
     case ImageFormat.SVG:
       willUseOriginal = true;
-      output = await blob.text();
+      output = input.toString("utf-8");
       break;
 
     case ImageFormat.GIF:
       willUseOriginal = true;
-      output = Buffer.from(await blob.arrayBuffer());
+      output = input;
       break;
 
     default:
       willUseOriginal = false;
-      output = Buffer.from(await blob.arrayBuffer());
+      output = input;
       break;
   }
 
@@ -199,6 +205,7 @@ export {
   ImageFormat,
   ImagePurpose,
   fetchAndProcessImage,
+  readAndProcessImage,
   createImageVariants,
   createSourceSetFromImageVariants,
   serializeSourceSet,
