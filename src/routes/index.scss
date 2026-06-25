@@ -1,10 +1,33 @@
 #homepage {
+  width: 100%;
   height: 100%;
   padding: 0 0.8rem;
   display: flex;
   flex-direction: column;
   justify-content: center;
   text-align: center;
+  color: #f4f4f4;
+
+  > #homepage-splash {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    background: #050505;
+  }
+
+  > #homepage-splash-overlay {
+    position: fixed;
+    inset: 0;
+    background: #050505;
+    opacity: 0.78;
+  }
+
+  > #homepage-title,
+  > strong {
+    position: relative;
+    z-index: 1;
+  }
 
   > #homepage-title {
     height: 2.6rem; // Prevents the ti cursor addition causing layout shifting.
@@ -15,6 +38,10 @@
       serif;
     --ti-cursor-font-size: 1.4rem;
     --ti-cursor-font-weight: 900;
-    --ti-cursor-color: var(--text-color);
+    --ti-cursor-color: currentColor;
+  }
+
+  a {
+    color: inherit;
   }
 }
