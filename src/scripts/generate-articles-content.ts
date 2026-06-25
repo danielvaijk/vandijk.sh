@@ -11,9 +11,6 @@ import {
 import { homedir } from "node:os";
 import { join } from "node:path";
 
-import prettierConfig from "@danielvaijk/prettier-config";
-import prettier from "prettier";
-
 import {
   fetchAndProcessImage,
   readAndProcessImage,
@@ -92,7 +89,7 @@ function getRequiredGitHubToken(): string {
   }
 
   throw new Error(
-    "WIKI_GITHUB_TOKEN is required to fetch wiki articles. Locally, run `gh auth login`."
+    "WIKI_GITHUB_TOKEN is required to fetch wiki articles. Locally, run `gh auth login`.",
   );
 }
 
@@ -106,12 +103,12 @@ function getContentsApiUrl(repository: string, path: string): string {
 }
 
 async function fetchGitHubContents(
-  url: string
+  url: string,
 ): Promise<GitHubContentItem | Array<GitHubContentItem>> {
   const response = await fetch(url, {
     headers: {
-      "Accept": "application/vnd.github+json",
-      "Authorization": `Bearer ${getRequiredGitHubToken()}`,
+      Accept: "application/vnd.github+json",
+      Authorization: `Bearer ${getRequiredGitHubToken()}`,
       "X-GitHub-Api-Version": "2022-11-28",
     },
   });
@@ -335,26 +332,20 @@ for (const { content, data, filePath } of articles) {
     width: coverImageData.metadata.width,
   };
 
-  const articleMarkup = await prettier.format(
-    generateMdxArticlePage({
-      anchorLinks: getAnchorLinks(articleContent),
-      articleContent,
-      coverImage,
-      date,
-      description,
-      pageUrl,
-      readTime,
-      title,
-      topic,
-    }),
-    {
-      parser: "mdx",
-      printWidth: Infinity,
-    }
-  );
+  const articleMarkup = generateMdxArticlePage({
+    anchorLinks: getAnchorLinks(articleContent),
+    articleContent,
+    coverImage,
+    date,
+    description,
+    pageUrl,
+    readTime,
+    title,
+    topic,
+  });
 
-  const articleMetadata = await prettier.format(
-    JSON.stringify({
+  const articleMetadata = `${JSON.stringify(
+    {
       date: date.toISOString(),
       path: articleRoute,
       title,
@@ -362,12 +353,10 @@ for (const { content, data, filePath } of articles) {
       description,
       readTime,
       topic,
-    }),
-    {
-      parser: "json",
-      ...prettierConfig,
-    }
-  );
+    },
+    null,
+    2,
+  )}\n`;
 
   mkdirSync(articleDirectory, { recursive: true });
   writeFileSync(articleFilePath, articleMarkup);

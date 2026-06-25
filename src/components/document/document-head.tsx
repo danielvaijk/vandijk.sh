@@ -16,7 +16,7 @@ export const DocumentHead = component$((): QwikJSX.Element => {
       {head.meta.map(
         ({ key, ...props }): QwikJSX.Element => (
           <meta key={key} {...props} />
-        )
+        ),
       )}
 
       <link rel="canonical" href={url.href} />
@@ -25,13 +25,13 @@ export const DocumentHead = component$((): QwikJSX.Element => {
       {head.links.map(
         ({ key, ...props }): QwikJSX.Element => (
           <link key={key} {...props} />
-        )
+        ),
       )}
 
       {head.styles.map(
         ({ key, props, style }): QwikJSX.Element => (
           <style key={key} {...props} dangerouslySetInnerHTML={style} />
-        )
+        ),
       )}
 
       <script

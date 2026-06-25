@@ -43,7 +43,7 @@ export const Resume = component$<ResumeData>(
       basics.location.countryCode.length > 0
     ) {
       headerProfileItems.push(
-        [basics.location.city, regionNames.of(basics.location.countryCode)].join(", ")
+        [basics.location.city, regionNames.of(basics.location.countryCode)].join(", "),
       );
     }
 
@@ -172,5 +172,5 @@ export const Resume = component$<ResumeData>(
         )}
       </div>
     );
-  }
+  },
 );

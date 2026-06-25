@@ -18,5 +18,5 @@ export const CenteredTitle = component$<CenteredTitleProps>(
         <p>{subtitle}</p>
       </div>
     );
-  }
+  },
 );

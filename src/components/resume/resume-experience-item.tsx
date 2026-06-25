@@ -60,5 +60,5 @@ export const ResumeExperienceItem = component$<ResumeExperienceItemProps>(
         </div>
       </li>
     );
-  }
+  },
 );

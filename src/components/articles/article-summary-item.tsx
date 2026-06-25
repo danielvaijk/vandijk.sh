@@ -27,7 +27,7 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
     // figure, picture, and img HTML elements in the markup string.
     const coverImageWithScopeId = coverImageMarkup.replace(
       /<(?<tag>figure|picture|img)(?<attributes>[^>]*)>/gu,
-      (_, tag: string, attributes: string): string => `<${tag}${attributes} class="${scopeId}">`
+      (_, tag: string, attributes: string): string => `<${tag}${attributes} class="${scopeId}">`,
     );
 
     return (
@@ -52,5 +52,5 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
         </Link>
       </li>
     );
-  }
+  },
 );

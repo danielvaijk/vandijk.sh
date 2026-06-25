@@ -7,9 +7,9 @@ export const DocumentBody = component$((): QwikJSX.Element => {
     "load",
     $((): void => {
       console.info(
-        "Hello there! If you're looking for the source code, you can find it here: https://github.com/danielvaijk/vandijk.sh"
+        "Hello there! If you're looking for the source code, you can find it here: https://github.com/danielvaijk/vandijk.sh",
       );
-    })
+    }),
   );
 
   return (

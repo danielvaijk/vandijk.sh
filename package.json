@@ -1,47 +1,45 @@
 {
   "name": "vandijk.sh",
-  "description": "The vandijk.sh website.",
   "private": true,
+  "description": "The vandijk.sh website.",
   "type": "module",
-  "trustedDependencies": [
-    "sharp"
-  ],
   "scripts": {
-    "build": "npm run build.articles && qwik build",
-    "build.articles": "npm run build.articles.content && npm run build.articles.metadata",
-    "build.articles.content": "tsx src/scripts/generate-articles-content.ts",
-    "build.articles.metadata": "tsx src/scripts/generate-articles-metadata.ts",
+    "build": "bun run build.articles && qwik build",
+    "build.articles": "bun run build.articles.content && bun run build.articles.metadata",
+    "build.articles.content": "bun src/scripts/generate-articles-content.ts",
+    "build.articles.metadata": "bun src/scripts/generate-articles-metadata.ts",
     "build.client": "vite build",
     "build.preview": "vite build --ssr src/entry.preview.tsx",
     "build.server": "vite build -c adapters/vite.config.ts",
     "build.types": "tsc --incremental --noEmit",
-    "dev": "npm run build.articles && vite --mode ssr",
-    "dev.debug": "node --inspect-brk ./node_modules/vite/bin/vite.js --mode ssr --force",
-    "fmt": "prettier --write .",
-    "fmt.check": "prettier --check .",
-    "lint": "eslint src",
-    "preview": "PREVIEW_BUILD=true npm run build.articles && qwik build preview && vite preview --open",
+    "dev": "bun run build.articles && vite --mode ssr",
+    "dev.debug": "bun --inspect-brk ./node_modules/vite/bin/vite.js --mode ssr --force",
+    "fmt": "oxfmt --write .",
+    "fmt.check": "oxfmt --check .",
+    "lint": "oxlint src adapters vite.config.ts",
+    "preview": "PREVIEW_BUILD=true bun run build.articles && qwik build preview && vite preview --open",
     "start": "vite --open --mode ssr",
     "qwik": "qwik"
+  },
+  "dependencies": {
+    "modern-normalize": "3.0.0",
+    "typeit": "8.8.3"
   },
   "devDependencies": {
     "@builder.io/qwik": "1.14.1",
     "@builder.io/qwik-city": "1.14.1",
     "@danielvaijk/editor-config": "1.0.1",
-    "@danielvaijk/eslint-config": "1.0.1",
-    "@danielvaijk/prettier-config": "1.0.2",
     "@types/node": "20.8.4",
-    "eslint": "8.57.0",
-    "prettier": "3.3.3",
+    "oxfmt": "^0.56.0",
+    "oxlint": "^1.71.0",
     "sass": "1.89.2",
     "sharp": "0.34.2",
-    "tsx": "4.6.2",
     "typescript": "^5.2.2",
     "vite": "5.4.19",
     "vite-tsconfig-paths": "4.2.1"
   },
-  "dependencies": {
-    "modern-normalize": "3.0.0",
-    "typeit": "8.8.3"
-  }
+  "packageManager": "bun@1.3.14",
+  "trustedDependencies": [
+    "sharp"
+  ]
 }

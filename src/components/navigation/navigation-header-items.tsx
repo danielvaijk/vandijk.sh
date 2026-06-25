@@ -39,7 +39,7 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
       if (isClickOutsideRect(clickEvent, listRefValue.getBoundingClientRect())) {
         isOpen.value = false;
       }
-    })
+    }),
   );
 
   useOnWindow(
@@ -48,7 +48,7 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
       if (isOpen.value) {
         isOpen.value = false;
       }
-    })
+    }),
   );
 
   return (

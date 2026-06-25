@@ -1,8 +1,5 @@
 import { readdirSync, readFileSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 
-import prettierConfig from "@danielvaijk/prettier-config";
-import prettier from "prettier";
-
 import { joinPathNames } from "src/utilities/url";
 
 interface ArticleMetadata {
@@ -36,14 +33,10 @@ const sortedResults = results.sort((a: ArticleMetadata, b: ArticleMetadata): num
   return dateB.getTime() - dateA.getTime();
 });
 
-const serializedResults = JSON.stringify(sortedResults);
-const formattedResults = await prettier.format(serializedResults, {
-  parser: "json",
-  ...prettierConfig,
-});
+const serializedResults = `${JSON.stringify(sortedResults, null, 2)}\n`;
 
 if (!existsSync(ARTICLE_METADATA_DIRECTORY)) {
   mkdirSync(ARTICLE_METADATA_DIRECTORY);
 }
 
-writeFileSync(ARTICLES_METADATA_FILE_PATH, formattedResults);
+writeFileSync(ARTICLES_METADATA_FILE_PATH, serializedResults);

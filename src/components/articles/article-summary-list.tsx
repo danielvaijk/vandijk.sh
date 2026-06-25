@@ -20,9 +20,9 @@ export const ArticleSummaryList = component$<ArticleSummaryListProps>(
         {articles.map(
           ({ path, ...rest }): QwikJSX.Element => (
             <ArticleSummaryItem key={path} path={path} {...rest} />
-          )
+          ),
         )}
       </ul>
     );
-  }
+  },
 );

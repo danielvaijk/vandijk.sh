@@ -173,8 +173,7 @@ function generateMdxArticlePage({
   title: string;
   topic: string;
 }): string {
-  return `
----
+  return `---
 title: ${JSON.stringify(title)}
 description: ${JSON.stringify(description)}
 author: Daniel van Dijk
@@ -218,7 +217,7 @@ ${anchorLinks}
 ---
 
 ${articleContent}
-  `;
+`;
 }
 
 export { extractCaptionValues, generateMdxArticlePage, generateImagesWithMarkup };

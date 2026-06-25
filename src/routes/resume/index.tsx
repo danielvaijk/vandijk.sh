@@ -149,7 +149,7 @@ const useResumeData = routeLoader$(async ({ env }): Promise<ResumeData> => {
         Accept: "application/vnd.github.v3.raw",
         Authorization: `token ${githubAuthToken}`,
       },
-    }
+    },
   );
 
   const responseBody: unknown = await githubResumeResponse.json();

@@ -42,5 +42,5 @@ export const ResumeSection = component$<ResumeSectionProps>(
         </ul>
       </div>
     );
-  }
+  },
 );

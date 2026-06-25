@@ -47,7 +47,7 @@ const MAX_EFFORT_AVIF = 9;
 
 async function fetchAndProcessImage(
   url: string,
-  purpose = ImagePurpose.OTHER
+  purpose = ImagePurpose.OTHER,
 ): Promise<ProcessedImage> {
   console.debug(`Sending GET request to ${url}`);
 
@@ -60,7 +60,7 @@ async function fetchAndProcessImage(
 
 async function readAndProcessImage(
   path: string,
-  purpose = ImagePurpose.OTHER
+  purpose = ImagePurpose.OTHER,
 ): Promise<ProcessedImage> {
   return processImage(await readFile(path), purpose);
 }
@@ -106,7 +106,7 @@ async function processImage(input: Buffer, purpose = ImagePurpose.OTHER): Promis
 
 async function createImageVariants(
   { image: original, metadata }: ProcessedImage,
-  format: ImageFormat
+  format: ImageFormat,
 ): Promise<Array<ProcessedImage>> {
   let image = original.clone();
 
@@ -136,13 +136,12 @@ async function createImageVariants(
   const variants: Array<ProcessedImage> = [];
   const { width = 0 } = metadata;
 
-  // eslint-disable-next-line @typescript-eslint/no-magic-numbers -- Defined inline.
   for (const resizeWidth of [480, 705, 960, 1410, 1440, 2115]) {
     const targetWidth = resizeWidth < width ? resizeWidth : width;
     const resizedImage = image.resize(targetWidth);
 
     console.debug(
-      `Resizing image from format ${metadata.format} to ${format} with width ${targetWidth}...`
+      `Resizing image from format ${metadata.format} to ${format} with width ${targetWidth}...`,
     );
 
     const { data, info } = await resizedImage.toBuffer({
@@ -183,7 +182,7 @@ async function saveImage({ metadata, output }: ProcessedImage): Promise<string> 
 }
 
 async function createSourceSetFromImageVariants(
-  variants: Array<ProcessedImage>
+  variants: Array<ProcessedImage>,
 ): Promise<Array<ImageSourceSet>> {
   const imageSources = [];
 
