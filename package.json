@@ -17,8 +17,11 @@
     "fmt": "oxfmt --write .",
     "fmt.check": "oxfmt --check .",
     "lint": "oxlint src adapters vite.config.ts",
+    "preinstall": "bun scripts/setup.ts",
     "preview": "PREVIEW_BUILD=true bun run build.articles && qwik build preview && vite preview --open",
+    "setup": "bun scripts/setup.ts",
     "start": "vite --open --mode ssr",
+    "test": "bun test --pass-with-no-tests",
     "qwik": "qwik"
   },
   "dependencies": {
