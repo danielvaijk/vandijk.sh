@@ -1,7 +1,7 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
 import type { DocumentHeadValue } from "@builder.io/qwik-city";
-import { Link, type DocumentHead } from "@builder.io/qwik-city";
+import { type DocumentHead } from "@builder.io/qwik-city";
 import TypeIt from "typeit";
 
 import { createPageMetaTags } from "src/helpers/meta";
@@ -17,12 +17,28 @@ const SPLASH_HORIZONTAL_SCALE = 1.09;
 export default component$((): QwikJSX.Element => {
   useStylesScoped$(styles);
 
-  useVisibleTask$((): void => {
-    new TypeIt("#homepage-title", {
+  useVisibleTask$(({ cleanup }): void => {
+    const continueToHome = (event: KeyboardEvent): void => {
+      if (event.key !== "Enter" && event.code !== "Enter") return;
+
+      window.location.assign("/home/");
+    };
+
+    window.addEventListener("keydown", continueToHome, { capture: true });
+
+    cleanup(() => {
+      window.removeEventListener("keydown", continueToHome, { capture: true });
+    });
+  });
+
+  useVisibleTask$(({ cleanup }): void => {
+    const typeIt = new TypeIt("#homepage-title", {
       loop: true,
       startDelay: 6000,
       startDelete: true,
-    })
+    });
+
+    typeIt
       .delete()
       .pause(1200)
       .type("Don't be shy")
@@ -44,6 +60,10 @@ export default component$((): QwikJSX.Element => {
       .type(".")
       .pause(10000)
       .go();
+
+    cleanup(() => {
+      typeIt.destroy();
+    });
   });
 
   useVisibleTask$(async ({ cleanup }): Promise<void> => {
@@ -146,38 +166,12 @@ export default component$((): QwikJSX.Element => {
   });
 
   return (
-    <div id="homepage">
+    <section class="homepage-splash-stage">
       <canvas id="homepage-splash" aria-hidden="true" />
       <div id="homepage-splash-overlay" aria-hidden="true" />
       <h2 id="homepage-title">Hey there, I'm Daniel.</h2>
-      <strong>
-        Feel free to explore my{" "}
-        <Link
-          target="_blank"
-          rel="noopener noreferrer"
-          href="https://github.com/danielvaijk?tab=repositories"
-        >
-          projects
-        </Link>
-        ,{" "}
-        <Link href="/blog/" prefetch>
-          blog
-        </Link>
-        ,{" "}
-        <Link href="/resume/" prefetch>
-          resume
-        </Link>
-        , or{" "}
-        <Link
-          target="_blank"
-          rel="noopener noreferrer"
-          href="https://www.linkedin.com/in/danielvaijk/"
-        >
-          connect
-        </Link>{" "}
-        on LinkedIn.
-      </strong>
-    </div>
+      <strong>press enter to continue</strong>
+    </section>
   );
 });
 
