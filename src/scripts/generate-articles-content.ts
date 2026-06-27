@@ -23,7 +23,7 @@ import {
   generateMdxArticlePage,
   generateImagesWithMarkup,
 } from "src/helpers/markup";
-import { getReadTimeInMinutesFromWordCount, getWordCount } from "src/utilities/text";
+import { getReadTimeInMinutesFromWordCount, getMarkdownProseWordCount } from "src/utilities/text";
 import { joinPathNames, slugify, determineOriginUrl } from "src/utilities/url";
 
 interface ArticleFrontmatter {
@@ -321,7 +321,7 @@ for (const { content, data, filePath } of articles) {
     image: coverImageData,
     isPriority: true,
   });
-  const readTime = getReadTimeInMinutesFromWordCount(getWordCount(articleContent));
+  const readTime = getReadTimeInMinutesFromWordCount(getMarkdownProseWordCount(articleContent));
 
   const coverImage = {
     alt: coverAlt,
