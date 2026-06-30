@@ -261,9 +261,24 @@ const solarSurfaceBrightness = (col: number, row: number, time: number, seed: nu
     seed + 211,
   );
   const shear = fractalNoise(x * 0.32 - seconds * 0.02, y * 0.32 + seconds * 0.03, seed + 353);
-  const displacement = convection * 2.8;
-  const flowX = x + displacement + Math.sin(y * 1.3 + seconds * 0.45 + shear * 2.4) * 0.7;
-  const flowY = y + shear * 2.2 + Math.cos(x * 1.1 - seconds * 0.38 + convection * 2.1) * 0.6;
+  const burstNoise = fractalNoise(
+    x * 0.72 - seconds * 0.11 + convection * 0.35,
+    y * 0.72 + seconds * 0.09 + shear * 0.35,
+    seed + 1201,
+  );
+  const burst = smoothstep(0.48, 0.88, (burstNoise + 1) * 0.5);
+  const displacement = convection * 2.4 + burst * 1.15;
+  const arc = Math.sin((x - y) * 1.65 + seconds * 0.62 + convection * 3.4) * (0.28 + burst * 0.95);
+  const twistX = Math.sin(y * 2.1 + seconds * 0.86 + shear * 4.2) * burst * 1.05;
+  const twistY = Math.cos(x * 1.9 - seconds * 0.74 + convection * 4.0) * burst * 0.92;
+  const flowX =
+    x + displacement + arc + twistX + Math.sin(y * 1.3 + seconds * 0.45 + shear * 2.4) * 0.45;
+  const flowY =
+    y +
+    shear * 1.85 -
+    arc * 0.72 +
+    twistY +
+    Math.cos(x * 1.1 - seconds * 0.38 + convection * 2.1) * 0.42;
   const plumeNoise = fractalNoise(
     flowX * 0.95 - seconds * 0.24,
     flowY * 0.95 + seconds * 0.18,
@@ -276,7 +291,8 @@ const solarSurfaceBrightness = (col: number, row: number, time: number, seed: nu
   );
   const cells = smoothstep(0.34, 0.78, (plumeNoise + 1) * 0.5);
   const filaments = smoothstep(0.5, 0.9, (filamentNoise + 1) * 0.5);
-  const pulse = 0.5 + Math.sin(seconds * 0.7 + convection * 3.2 + shear * 2.4) * 0.08;
+  const pulse =
+    0.5 + Math.sin(seconds * 0.7 + convection * 3.2 + shear * 2.4) * 0.06 + burst * 0.12;
 
   return clamp(0.22 + (cells * 0.5 + filaments * 0.28 + (convection + 1) * 0.11) * pulse, 0, 1);
 };
@@ -774,9 +790,17 @@ float glyphSolarBrightness(vec2 cell, float time, float seed) {
     vec2(x * 0.32 - seconds * 0.02, y * 0.32 + seconds * 0.03),
     seed + 353.0
   );
-  float displacement = convection * 2.8;
-  float flowX = x + displacement + sin(y * 1.3 + seconds * 0.45 + shear * 2.4) * 0.7;
-  float flowY = y + shear * 2.2 + cos(x * 1.1 - seconds * 0.38 + convection * 2.1) * 0.6;
+  float burstNoise = glyphFractalNoise(
+    vec2(x * 0.72 - seconds * 0.11 + convection * 0.35, y * 0.72 + seconds * 0.09 + shear * 0.35),
+    seed + 1201.0
+  );
+  float burst = smoothstep(0.48, 0.88, (burstNoise + 1.0) * 0.5);
+  float displacement = convection * 2.4 + burst * 1.15;
+  float arc = sin((x - y) * 1.65 + seconds * 0.62 + convection * 3.4) * (0.28 + burst * 0.95);
+  float twistX = sin(y * 2.1 + seconds * 0.86 + shear * 4.2) * burst * 1.05;
+  float twistY = cos(x * 1.9 - seconds * 0.74 + convection * 4.0) * burst * 0.92;
+  float flowX = x + displacement + arc + twistX + sin(y * 1.3 + seconds * 0.45 + shear * 2.4) * 0.45;
+  float flowY = y + shear * 1.85 - arc * 0.72 + twistY + cos(x * 1.1 - seconds * 0.38 + convection * 2.1) * 0.42;
   float plumeNoise = glyphFractalNoise(
     vec2(flowX * 0.95 - seconds * 0.24, flowY * 0.95 + seconds * 0.18),
     seed + 401.0
@@ -787,7 +811,7 @@ float glyphSolarBrightness(vec2 cell, float time, float seed) {
   );
   float cells = smoothstep(0.34, 0.78, (plumeNoise + 1.0) * 0.5);
   float filaments = smoothstep(0.5, 0.9, (filamentNoise + 1.0) * 0.5);
-  float pulse = 0.5 + sin(seconds * 0.7 + convection * 3.2 + shear * 2.4) * 0.08;
+  float pulse = 0.5 + sin(seconds * 0.7 + convection * 3.2 + shear * 2.4) * 0.06 + burst * 0.12;
 
   return clamp(0.22 + (cells * 0.5 + filaments * 0.28 + (convection + 1.0) * 0.11) * pulse, 0.0, 1.0);
 }
