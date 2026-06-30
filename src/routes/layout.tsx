@@ -3,7 +3,7 @@ import { component$, Slot, useStylesScoped$ } from "@builder.io/qwik";
 import { useLocation } from "@builder.io/qwik-city";
 
 import { NavigationHeader } from "src/components/navigation/navigation-header";
-import { SplashBackground } from "src/components/splash-background";
+import { GlyphRaster } from "src/components/glyph-raster";
 import styles from "src/routes/layout.scss?inline";
 
 export default component$((): QwikJSX.Element => {
@@ -14,7 +14,7 @@ export default component$((): QwikJSX.Element => {
 
   return (
     <>
-      {!isHomepage && <SplashBackground />}
+      {!isHomepage && <GlyphRaster source={{ type: "procedural-noise" }} />}
 
       <div class={isHomepage ? undefined : "page-pane"}>
         {!isHomepage && <NavigationHeader />}

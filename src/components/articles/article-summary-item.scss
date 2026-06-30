@@ -10,8 +10,20 @@
     text-decoration: none;
 
     > .article-summary-cover-image {
+      position: relative;
+      aspect-ratio: 16 / 9;
+      background: #050505;
+      overflow: hidden;
+
+      > div {
+        position: absolute;
+        inset: 0;
+        z-index: 1;
+      }
+
       figure {
-        aspect-ratio: 16 / 9;
+        width: 100%;
+        height: 100%;
         margin: 0;
         overflow: hidden;
 
@@ -19,6 +31,7 @@
           width: 100%;
           height: 100%;
           object-fit: cover;
+          opacity: 0;
         }
       }
 

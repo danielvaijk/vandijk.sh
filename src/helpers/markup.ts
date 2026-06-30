@@ -162,6 +162,7 @@ function generateMdxArticlePage({
     alt: string;
     height: number;
     markup: string;
+    publicPath: string;
     type: string;
     url: string;
     width: number;
@@ -194,11 +195,21 @@ opengraph:
     image:height: ${coverImage.height}
 ---
 
+import { GlyphRaster } from "src/components/glyph-raster";
+
 export default function Layout({ children: content }) {
   return <article>{content}</article>;
 }
 
+<div class="article-cover-glyph-raster">
+  <GlyphRaster
+    layout="fill"
+    source={{ type: "image", url: ${JSON.stringify(coverImage.publicPath)} }}
+    opacity={1}
+  />
+
 ${coverImage.markup}
+</div>
 
 # ${title}
 

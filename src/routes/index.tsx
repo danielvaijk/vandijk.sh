@@ -4,7 +4,7 @@ import type { DocumentHeadValue } from "@builder.io/qwik-city";
 import { type DocumentHead } from "@builder.io/qwik-city";
 import TypeIt from "typeit";
 
-import { SplashBackground } from "src/components/splash-background";
+import { GlyphRaster } from "src/components/glyph-raster";
 import { createPageMetaTags } from "src/helpers/meta";
 import styles from "src/routes/index.scss?inline";
 
@@ -62,7 +62,7 @@ export default component$((): QwikJSX.Element => {
 
   return (
     <section class="homepage-splash-stage">
-      <SplashBackground variant="eye" />
+      <GlyphRaster source={{ type: "frames", url: "/terminal-splash.frames" }} />
       <h2 id="homepage-title">Hey there, I'm Daniel.</h2>
       <strong>press enter to continue</strong>
     </section>

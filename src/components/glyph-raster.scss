@@ -1,0 +1,17 @@
+.glyph-raster {
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  background: var(--glyph-raster-color, #050505);
+  opacity: var(--glyph-raster-opacity, 0.32);
+  pointer-events: none;
+  z-index: 0;
+
+  &--fixed {
+    position: fixed;
+  }
+
+  &--fill {
+    position: absolute;
+  }
+}

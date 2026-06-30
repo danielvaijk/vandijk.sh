@@ -7,6 +7,28 @@ article {
   line-height: 1.7777778;
   padding: 2.2rem 0 1.2rem;
 
+  .article-cover-glyph-raster {
+    position: relative;
+    aspect-ratio: 16 / 9;
+    margin: 1em 0;
+    background: #050505;
+    overflow: hidden;
+
+    figure:first-of-type {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
+      margin: 0;
+
+      picture,
+      img {
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+      }
+    }
+  }
+
   figure {
     margin-inline: 0;
 

@@ -2,11 +2,13 @@ import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
+import { GlyphRaster } from "src/components/glyph-raster";
 import styles from "src/components/articles/article-summary-item.scss?inline";
 import { formatDateAsString } from "src/utilities/time";
 
 export interface ArticleSummaryProps {
   coverImageMarkup: string;
+  coverImagePublicPath: string;
   date: string;
   description: string;
   path: string;
@@ -16,7 +18,16 @@ export interface ArticleSummaryProps {
 }
 
 export const ArticleSummaryItem = component$<ArticleSummaryProps>(
-  ({ coverImageMarkup, date, description, path, readTime, title, topic }): QwikJSX.Element => {
+  ({
+    coverImageMarkup,
+    coverImagePublicPath,
+    date,
+    description,
+    path,
+    readTime,
+    title,
+    topic,
+  }): QwikJSX.Element => {
     const { scopeId } = useStylesScoped$(styles);
 
     const dateParsed = new Date(date);
@@ -33,10 +44,15 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
     return (
       <li class="article-summary">
         <Link class={scopeId} href={`/blog/${path}/`} prefetch>
-          <div
-            class="article-summary-cover-image"
-            dangerouslySetInnerHTML={coverImageWithScopeId}
-          ></div>
+          <div class="article-summary-cover-image">
+            <GlyphRaster
+              layout="fill"
+              source={{ type: "image", url: coverImagePublicPath }}
+              opacity={1}
+            />
+
+            <div dangerouslySetInnerHTML={coverImageWithScopeId}></div>
+          </div>
 
           <div class="article-summary-content">
             <time dateTime={dateParsed.toISOString()}>{dateFormatted}</time>
