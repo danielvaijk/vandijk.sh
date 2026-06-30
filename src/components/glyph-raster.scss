@@ -15,3 +15,14 @@
     position: absolute;
   }
 }
+
+.glyph-raster-region {
+  display: block;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+
+  &--fill {
+    position: absolute;
+  }
+}
