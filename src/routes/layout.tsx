@@ -3,6 +3,7 @@ import { component$, Slot, useStylesScoped$ } from "@builder.io/qwik";
 import { useLocation } from "@builder.io/qwik-city";
 
 import { NavigationHeader } from "src/components/navigation/navigation-header";
+import { SplashBackground } from "src/components/splash-background";
 import styles from "src/routes/layout.scss?inline";
 
 export default component$((): QwikJSX.Element => {
@@ -12,12 +13,16 @@ export default component$((): QwikJSX.Element => {
   const isHomepage = url.pathname === "/";
 
   return (
-    <div class={isHomepage ? undefined : "page-pane"}>
-      {!isHomepage && <NavigationHeader />}
+    <>
+      {!isHomepage && <SplashBackground />}
 
-      <main class={isHomepage ? "is-homepage" : undefined}>
-        <Slot />
-      </main>
-    </div>
+      <div class={isHomepage ? undefined : "page-pane"}>
+        {!isHomepage && <NavigationHeader />}
+
+        <main class={isHomepage ? "is-homepage" : undefined}>
+          <Slot />
+        </main>
+      </div>
+    </>
   );
 });

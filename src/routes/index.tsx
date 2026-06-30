@@ -62,7 +62,7 @@ export default component$((): QwikJSX.Element => {
 
   return (
     <section class="homepage-splash-stage">
-      <SplashBackground />
+      <SplashBackground variant="eye" />
       <h2 id="homepage-title">Hey there, I'm Daniel.</h2>
       <strong>press enter to continue</strong>
     </section>
