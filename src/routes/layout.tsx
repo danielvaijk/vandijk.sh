@@ -2,8 +2,9 @@ import type { QwikJSX } from "@builder.io/qwik";
 import { component$, Slot, useStylesScoped$ } from "@builder.io/qwik";
 import { useLocation } from "@builder.io/qwik-city";
 
-import { NavigationHeader } from "src/components/navigation/navigation-header";
 import { GlyphRaster } from "src/components/glyph-raster";
+import { GlyphTextReveal } from "src/components/glyph-text-reveal";
+import { NavigationHeader } from "src/components/navigation/navigation-header";
 import styles from "src/routes/layout.scss?inline";
 
 export default component$((): QwikJSX.Element => {
@@ -23,6 +24,8 @@ export default component$((): QwikJSX.Element => {
           <Slot />
         </main>
       </div>
+
+      {!isHomepage && <GlyphTextReveal routeKey={url.pathname} />}
     </>
   );
 });
