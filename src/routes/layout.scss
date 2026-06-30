@@ -1,10 +1,76 @@
+.page-pane {
+  --page-pane-padding: 0.8rem;
+  --page-pane-padding-top: 0;
+  --header-mark-size: 3.3125rem;
+  --header-connector-offset: calc(var(--header-mark-size) / 2);
+  --page-pane-corner-radius: 0.35rem;
+
+  position: relative;
+  z-index: 1;
+  width: calc(100% - 1.6rem);
+  max-width: 80rem;
+  min-height: calc(100vh - 1.6rem);
+  margin: 0.8rem;
+  padding: var(--page-pane-padding-top) var(--page-pane-padding) var(--page-pane-padding);
+  display: flex;
+  flex-direction: column;
+
+  &::before,
+  &::after {
+    content: "";
+    position: absolute;
+    top: var(--header-connector-offset);
+    bottom: 0;
+    width: var(--page-pane-padding);
+    border-top: 1px solid var(--text-color);
+    border-bottom: 1px solid var(--text-color);
+    pointer-events: none;
+  }
+
+  &::before {
+    left: 0;
+    border-left: 1px solid var(--text-color);
+    border-top-left-radius: var(--page-pane-corner-radius);
+    border-bottom-left-radius: var(--page-pane-corner-radius);
+  }
+
+  &::after {
+    right: 0;
+    border-right: 1px solid var(--text-color);
+    border-top-right-radius: var(--page-pane-corner-radius);
+    border-bottom-right-radius: var(--page-pane-corner-radius);
+  }
+
+  > main::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    height: var(--page-pane-corner-radius);
+    border-bottom: 1px solid var(--text-color);
+    border-radius: 0 0 var(--page-pane-corner-radius) var(--page-pane-corner-radius);
+    pointer-events: none;
+  }
+
+  @media (min-width: 46rem) {
+    --header-mark-size: 3.75rem;
+  }
+}
+
 main {
   width: 100%;
-  max-width: 80rem;
   height: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding: 0.8rem;
+
+  &:not(.is-homepage) {
+    flex: 1;
+  }
+
+  &.is-homepage {
+    padding: 0.8rem;
+  }
 }

@@ -277,11 +277,18 @@ function cleanGeneratedArticles(): void {
 }
 
 async function processArticleCover(cover: string): Promise<ProcessedImage> {
-  if (/^https?:\/\//u.test(cover)) {
-    return fetchAndProcessImage(cover, ImagePurpose.ARTICLE_COVER);
-  }
+  try {
+    if (/^https?:\/\//u.test(cover)) {
+      return await fetchAndProcessImage(cover, ImagePurpose.ARTICLE_COVER);
+    }
 
-  return readAndProcessImage(join(WIKI_ARTICLES_DIRECTORY, cover), ImagePurpose.ARTICLE_COVER);
+    return await readAndProcessImage(
+      join(WIKI_ARTICLES_DIRECTORY, cover),
+      ImagePurpose.ARTICLE_COVER,
+    );
+  } catch (error) {
+    throw new Error(`Article cover "${cover}" failed validation.`, { cause: error });
+  }
 }
 
 await downloadWikiArticles();

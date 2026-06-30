@@ -68,25 +68,13 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
       <ul ref={listRef} class={isOpen.value ? "is-open" : null}>
         <li>
           <Link
-            target="_blank"
-            rel="noopener noreferrer"
-            href="https://github.com/danielvaijk?tab=repositories"
-            onClick$={(): void => {
-              isOpen.value = !isOpen.value;
-            }}
-          >
-            Projects
-          </Link>
-        </li>
-        <li>
-          <Link
             href="/blog/"
             onClick$={(): void => {
               isOpen.value = !isOpen.value;
             }}
             prefetch
           >
-            Blog
+            Articles
           </Link>
         </li>
         <li>
@@ -104,12 +92,24 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
           <Link
             target="_blank"
             rel="noopener noreferrer"
+            href="https://github.com/danielvaijk"
+            onClick$={(): void => {
+              isOpen.value = !isOpen.value;
+            }}
+          >
+            GitHub
+          </Link>
+        </li>
+        <li>
+          <Link
+            target="_blank"
+            rel="noopener noreferrer"
             href="https://www.linkedin.com/in/danielvaijk/"
             onClick$={(): void => {
               isOpen.value = !isOpen.value;
             }}
           >
-            Connect
+            LinkedIn
           </Link>
         </li>
         <li class="theme-toggle js-only">

@@ -2,18 +2,27 @@
 
 header {
   width: 100%;
-  max-width: 80rem;
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
-  padding: 0.8rem;
+  align-items: center;
+  margin-bottom: 0.8rem;
   user-select: none;
+
+  &::before {
+    content: "";
+    order: 2;
+    flex: 1;
+    height: 1px;
+    margin: 0 0.8rem;
+    background-color: var(--text-color);
+  }
 
   @media print {
     display: none;
   }
 
   > #header-name {
+    order: 1;
     display: flex;
     align-items: center;
     color: inherit;
@@ -39,6 +48,7 @@ header {
         display: inline-block;
         padding: 0.7128rem 1.097rem; // These are set to bring the box as close to 60x60px as possible on desktop.
         border: 1px solid var(--text-color);
+        border-radius: var(--page-pane-corner-radius);
         margin-right: 0.4rem;
         background-color: var(--background-color);
       }
@@ -47,7 +57,8 @@ header {
 
   > nav {
     position: relative;
-    margin: 0 0 6px 0;
+    order: 3;
+    margin: 0;
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -57,7 +68,6 @@ header {
       @include mixins.responsive(display, none, flex);
       @include mixins.responsive(flex-direction, column, row);
 
-      @include mixins.mobile-only(padding, 0.8rem);
       @include mixins.mobile-only(position, absolute);
       @include mixins.mobile-only(top, 2rem);
       @include mixins.mobile-only(background-color, var(--background-color));
@@ -67,6 +77,7 @@ header {
       & {
         list-style: none;
         margin: 0;
+        padding: 0;
       }
 
       &.is-open {

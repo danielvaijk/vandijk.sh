@@ -11,16 +11,20 @@
 
     > .article-summary-cover-image {
       figure {
+        aspect-ratio: 16 / 9;
         margin: 0;
+        overflow: hidden;
 
         img {
           width: 100%;
-          height: auto;
+          height: 100%;
+          object-fit: cover;
         }
       }
 
       picture {
-        display: flex;
+        display: block;
+        height: 100%;
       }
     }
 

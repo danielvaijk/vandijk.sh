@@ -16,6 +16,21 @@ article {
       display: block; // Removes any extra white space below the image.
     }
 
+    &:first-of-type {
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+
+      picture {
+        display: block;
+        height: 100%;
+      }
+
+      img {
+        height: 100%;
+        object-fit: cover;
+      }
+    }
+
     > figcaption {
       margin-top: 0.4rem;
       text-align: center;

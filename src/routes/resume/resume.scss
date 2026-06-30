@@ -1,6 +1,11 @@
 @use "src/styles/abstracts/mixins";
 
 .resume {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+  width: 100%;
+
   > .resume-header {
     display: none;
 
@@ -42,7 +47,7 @@
   }
 
   > .resume-intro {
-    margin: 1.2rem 0;
+    margin: 0;
 
     @include mixins.justify-text;
   }

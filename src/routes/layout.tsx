@@ -12,12 +12,12 @@ export default component$((): QwikJSX.Element => {
   const isHomepage = url.pathname === "/";
 
   return (
-    <>
+    <div class={isHomepage ? undefined : "page-pane"}>
       {!isHomepage && <NavigationHeader />}
 
-      <main>
+      <main class={isHomepage ? "is-homepage" : undefined}>
         <Slot />
       </main>
-    </>
+    </div>
   );
 });

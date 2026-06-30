@@ -45,6 +45,17 @@ const MAX_EFFORT_WEBP = 6;
 const MIN_EFFORT_AVIF = 0;
 const MAX_EFFORT_AVIF = 9;
 
+function warnOnUnexpectedArticleCoverAspectRatio({ height, width }: ImageMetadata): void {
+  if (width <= 0 || height <= 0) {
+    console.warn("Cover image aspect ratio could not be checked because dimensions are missing.");
+    return;
+  }
+
+  if (width * 9 !== height * 16) {
+    console.warn(`Cover images should use a 16:9 aspect ratio. Received ${width}x${height}.`);
+  }
+}
+
 async function fetchAndProcessImage(
   url: string,
   purpose = ImagePurpose.OTHER,
@@ -79,6 +90,8 @@ async function processImage(input: Buffer, purpose = ImagePurpose.OTHER): Promis
       default:
         throw new Error("Cover images must be either in JPEG or PNG format.");
     }
+
+    warnOnUnexpectedArticleCoverAspectRatio(metadata);
   }
 
   let output = null;
