@@ -12,6 +12,7 @@ type SplashBackgroundProps = {
 const SPLASH_CHARS =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%&*+=-~.:;|/\\<>";
 const SPLASH_COLORS = ["#2e2e2e", "#585858", "#8a8a8a", "#d0d0d0", "#f4f4f4"];
+const NOISE_COLORS = ["#3a3a3a", "#565656", "#737373", "#9a9a9a", "#c8c8c8"];
 const SPLASH_FONT_FAMILY = 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif';
 const SPLASH_HORIZONTAL_SCALE = 1.09;
 const NOISE_CELL_WIDTH = 8;
@@ -71,6 +72,42 @@ const fractalNoise = (x: number, y: number, seed: number): number => {
   return total / range;
 };
 
+const smoothstep = (edgeStart: number, edgeEnd: number, value: number): number => {
+  const amount = clamp((value - edgeStart) / (edgeEnd - edgeStart), 0, 1);
+
+  return amount * amount * (3 - 2 * amount);
+};
+
+const solarSurfaceBrightness = (col: number, row: number, time: number, seed: number): number => {
+  const seconds = time / 1000;
+  const x = col * 0.075;
+  const y = row * 0.075;
+  const convection = fractalNoise(
+    x * 0.55 + seconds * 0.035,
+    y * 0.55 - seconds * 0.025,
+    seed + 211,
+  );
+  const shear = fractalNoise(x * 0.32 - seconds * 0.02, y * 0.32 + seconds * 0.03, seed + 353);
+  const displacement = convection * 2.8;
+  const flowX = x + displacement + Math.sin(y * 1.3 + seconds * 0.45 + shear * 2.4) * 0.7;
+  const flowY = y + shear * 2.2 + Math.cos(x * 1.1 - seconds * 0.38 + convection * 2.1) * 0.6;
+  const plumeNoise = fractalNoise(
+    flowX * 0.95 - seconds * 0.24,
+    flowY * 0.95 + seconds * 0.18,
+    seed + 401,
+  );
+  const filamentNoise = fractalNoise(
+    flowX * 2.6 + plumeNoise * 1.4 - seconds * 0.5,
+    flowY * 1.8 - convection * 1.2 + seconds * 0.28,
+    seed + 809,
+  );
+  const cells = smoothstep(0.34, 0.78, (plumeNoise + 1) * 0.5);
+  const filaments = smoothstep(0.5, 0.9, (filamentNoise + 1) * 0.5);
+  const pulse = 0.5 + Math.sin(seconds * 0.7 + convection * 3.2 + shear * 2.4) * 0.08;
+
+  return clamp(0.22 + (cells * 0.5 + filaments * 0.28 + (convection + 1) * 0.11) * pulse, 0, 1);
+};
+
 export const SplashBackground = component$(
   ({ variant = "noise" }: SplashBackgroundProps): QwikJSX.Element => {
     const splashId = `splash-background-${Math.random().toString(36).slice(2)}`;
@@ -113,9 +150,6 @@ export const SplashBackground = component$(
 
           const offsetX = (canvas.clientWidth - cols * NOISE_CELL_WIDTH) / 2;
           const offsetY = (canvas.clientHeight - rows * NOISE_CELL_HEIGHT) / 2;
-          const driftX = time * 0.00006;
-          const driftY = time * 0.00004;
-
           context.fillStyle = "#050505";
           context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
           context.font = `${NOISE_FONT_SIZE}px ${SPLASH_FONT_FAMILY}`;
@@ -124,8 +158,7 @@ export const SplashBackground = component$(
           for (let row = 0; row < rows; row += 1) {
             for (let col = 0; col < cols; col += 1) {
               const index = row * cols + col;
-              const noise = fractalNoise(col * 0.09 + driftX, row * 0.09 + driftY, seed);
-              const brightness = clamp((noise + 1) * 0.5, 0, 1) ** 1.2;
+              const brightness = solarSurfaceBrightness(col, row, time, seed);
 
               if (
                 (brightness > 0.58 && Math.random() < 0.22) ||
@@ -136,8 +169,8 @@ export const SplashBackground = component$(
               }
 
               context.fillStyle =
-                SPLASH_COLORS[
-                  Math.min(SPLASH_COLORS.length - 1, Math.floor(brightness * SPLASH_COLORS.length))
+                NOISE_COLORS[
+                  Math.min(NOISE_COLORS.length - 1, Math.floor(brightness * NOISE_COLORS.length))
                 ];
               context.fillText(
                 grid[index],
