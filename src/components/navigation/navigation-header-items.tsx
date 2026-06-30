@@ -79,17 +79,6 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
         </li>
         <li>
           <Link
-            href="/resume/"
-            onClick$={(): void => {
-              isOpen.value = !isOpen.value;
-            }}
-            prefetch
-          >
-            Resume
-          </Link>
-        </li>
-        <li>
-          <Link
             target="_blank"
             rel="noopener noreferrer"
             href="https://github.com/danielvaijk"
