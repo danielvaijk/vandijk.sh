@@ -202,11 +202,7 @@ export default function Layout({ children: content }) {
 }
 
 <div class="article-cover-glyph-raster">
-  <GlyphRaster
-    layout="fill"
-    source={{ type: "image", url: ${JSON.stringify(coverImage.publicPath)} }}
-    opacity={1}
-  />
+  <GlyphRaster source={{ type: "image", url: ${JSON.stringify(coverImage.publicPath)} }} />
 
 ${coverImage.markup}
 </div>

@@ -3,26 +3,19 @@ import { component$, useId, useStylesScoped$, useVisibleTask$ } from "@builder.i
 
 import styles from "src/components/glyph-raster.scss?inline";
 
-type GlyphRasterVariant = "eye" | "noise";
-
-export type GlyphRasterFit = "contain" | "cover";
-export type GlyphRasterLayout = "fill" | "fixed";
+type GlyphRasterLayout = "fill" | "fixed";
 
 export type GlyphRasterFrameSource = {
-  horizontalScale?: number;
   type: "frames";
   url: string;
 };
 
 export type GlyphRasterImageSource = {
-  fit?: GlyphRasterFit;
-  invert?: boolean;
   type: "image";
   url: string;
 };
 
 export type GlyphRasterNoiseSource = {
-  seed?: number;
   type: "procedural-noise";
 };
 
@@ -32,18 +25,7 @@ export type GlyphRasterSource =
   | GlyphRasterNoiseSource;
 
 export type GlyphRasterProps = {
-  backgroundColor?: string;
-  cellHeight?: number;
-  cellWidth?: number;
-  characters?: string;
-  colors?: string[];
-  fps?: number;
-  fontSize?: number;
-  layout?: GlyphRasterLayout;
-  opacity?: number;
   source?: GlyphRasterSource;
-  speed?: number;
-  variant?: GlyphRasterVariant;
 };
 
 type SourceAdapter = {
@@ -57,7 +39,62 @@ type SourceAdapter = {
     time: number,
     frame: number,
   ) => number;
+  gpuNoiseSeed?: number;
   resize?: (cols: number, rows: number) => void;
+};
+
+type GlyphEntropyMode = "cpu" | "shader";
+
+type GlyphRenderer = {
+  draw: (state: GlyphRenderState) => void;
+  resize: (size: GlyphRenderSize) => void;
+  supportsShaderEntropy?: boolean;
+  usesGpuGlyphSelection?: boolean;
+};
+
+type GlyphRenderSize = {
+  cssHeight: number;
+  cssWidth: number;
+  pixelRatio: number;
+};
+
+type GlyphRenderState = {
+  backgroundColor: string;
+  brightnessValues: Float32Array;
+  cellHeight: number;
+  cellWidth: number;
+  changedGlyphCount: number;
+  changedGlyphIndices: Uint32Array;
+  colors: string[];
+  cols: number;
+  entropySampleTime: number;
+  gpuNoiseSeed?: number;
+  glyphCharacters: string[];
+  glyphEntropyPositions: Float32Array;
+  glyphEntropyScales: Float32Array;
+  glyphIndices: Uint16Array;
+  glyphFrameRate: number;
+  offsetX: number;
+  offsetY: number;
+  rows: number;
+  entropyMode: GlyphEntropyMode;
+  shouldUpdateBrightness: boolean;
+  sourceTime: number;
+};
+
+type ActiveGlyphRaster = {
+  canRender: () => boolean;
+  render: (time: number) => void;
+};
+
+type GlyphRasterPreset = {
+  backgroundColor: string;
+  cellHeight: number;
+  cellWidth: number;
+  colors: string[];
+  fontSize: number;
+  layout: GlyphRasterLayout;
+  opacity: number;
 };
 
 const GLYPH_CHARS =
@@ -72,11 +109,56 @@ const NOISE_FONT_SIZE = 13;
 const DEFAULT_FRAME_RATE = 18;
 const MIN_FRAME_RATE = 1;
 const MAX_FRAME_RATE = 60;
-const MIN_SPEED = 0.01;
-const MAX_SPEED = 4;
+const PROCEDURAL_ENTROPY_SAMPLE_RATE = 9;
+const MAX_GLYPH_ATLAS_CACHE_SIZE = 8;
+const MAX_FRAME_BRIGHTNESS_CACHE_SIZE = 8;
+const MAX_IMAGE_BRIGHTNESS_CACHE_SIZE = 16;
+const MAX_PARSED_COLOR_CACHE_SIZE = 32;
+const DIAGONAL_GRADIENT = Math.SQRT1_2;
+const FRACTAL_NOISE_RANGE = 0.52 + 0.26 + 0.13 + 0.065;
+const GLYPH_QUAD_CORNERS = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
+const glyphAtlasCache = new Map<
+  string,
+  {
+    canvas: HTMLCanvasElement;
+    glyphUvs: Float32Array;
+  }
+>();
+const frameBrightnessCache = new Map<string, Uint8Array>();
+const imageBrightnessCache = new Map<string, Float32Array>();
+const parsedColorCache = new Map<string, [number, number, number, number]>();
+const activeGlyphRasters = new Set<ActiveGlyphRaster>();
+let activeGlyphRasterFrame = 0;
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
+
+function getCachedValue<Value>(cache: Map<string, Value>, key: string): Value | undefined {
+  const value = cache.get(key);
+  if (value === undefined) return undefined;
+
+  cache.delete(key);
+  cache.set(key, value);
+
+  return value;
+}
+
+function setCachedValue<Value>(
+  cache: Map<string, Value>,
+  key: string,
+  value: Value,
+  maxSize: number,
+): void {
+  cache.delete(key);
+  cache.set(key, value);
+
+  while (cache.size > maxSize) {
+    const oldestKey = cache.keys().next().value;
+    if (oldestKey === undefined) return;
+
+    cache.delete(oldestKey);
+  }
+}
 
 const fade = (value: number): number => value * value * value * (value * (value * 6 - 15) + 10);
 
@@ -90,9 +172,24 @@ const hash = (x: number, y: number, seed: number): number => {
 };
 
 const gradient = (x: number, y: number, seed: number, dx: number, dy: number): number => {
-  const angle = (hash(x, y, seed) / 0xffffffff) * Math.PI * 2;
-
-  return Math.cos(angle) * dx + Math.sin(angle) * dy;
+  switch (hash(x, y, seed) & 7) {
+    case 0:
+      return dx;
+    case 1:
+      return -dx;
+    case 2:
+      return dy;
+    case 3:
+      return -dy;
+    case 4:
+      return (dx + dy) * DIAGONAL_GRADIENT;
+    case 5:
+      return (dx - dy) * DIAGONAL_GRADIENT;
+    case 6:
+      return (-dx + dy) * DIAGONAL_GRADIENT;
+    default:
+      return (-dx - dy) * DIAGONAL_GRADIENT;
+  }
 };
 
 const perlin = (x: number, y: number, seed: number): number => {
@@ -113,25 +210,45 @@ const perlin = (x: number, y: number, seed: number): number => {
 };
 
 const fractalNoise = (x: number, y: number, seed: number): number => {
-  let amplitude = 0.52;
-  let frequency = 1;
-  let total = 0;
-  let range = 0;
+  const total =
+    perlin(x, y, seed) * 0.52 +
+    perlin(x * 2, y * 2, seed + 101) * 0.26 +
+    perlin(x * 4, y * 4, seed + 202) * 0.13 +
+    perlin(x * 8, y * 8, seed + 303) * 0.065;
 
-  for (let octave = 0; octave < 4; octave += 1) {
-    total += perlin(x * frequency, y * frequency, seed + octave * 101) * amplitude;
-    range += amplitude;
-    amplitude *= 0.5;
-    frequency *= 2;
-  }
-
-  return total / range;
+  return total / FRACTAL_NOISE_RANGE;
 };
 
 const smoothstep = (edgeStart: number, edgeEnd: number, value: number): number => {
   const amount = clamp((value - edgeStart) / (edgeEnd - edgeStart), 0, 1);
 
   return amount * amount * (3 - 2 * amount);
+};
+
+const hasActiveGlyphRaster = (): boolean => {
+  for (const raster of activeGlyphRasters) {
+    if (raster.canRender()) return true;
+  }
+
+  return false;
+};
+
+const renderActiveGlyphRasters = (time: number): void => {
+  activeGlyphRasterFrame = 0;
+
+  for (const raster of activeGlyphRasters) {
+    raster.render(time);
+  }
+
+  if (hasActiveGlyphRaster()) {
+    activeGlyphRasterFrame = requestAnimationFrame(renderActiveGlyphRasters);
+  }
+};
+
+const scheduleActiveGlyphRasters = (): void => {
+  if (activeGlyphRasterFrame !== 0 || !hasActiveGlyphRaster()) return;
+
+  activeGlyphRasterFrame = requestAnimationFrame(renderActiveGlyphRasters);
 };
 
 const solarSurfaceBrightness = (col: number, row: number, time: number, seed: number): number => {
@@ -164,25 +281,29 @@ const solarSurfaceBrightness = (col: number, row: number, time: number, seed: nu
   return clamp(0.22 + (cells * 0.5 + filaments * 0.28 + (convection + 1) * 0.11) * pulse, 0, 1);
 };
 
-const resolveSource = (
-  source: GlyphRasterSource | undefined,
-  variant: GlyphRasterVariant | undefined,
-): GlyphRasterSource => {
+const resolveSource = (source: GlyphRasterSource | undefined): GlyphRasterSource => {
   if (source) return source;
-
-  if (variant === "eye") {
-    return { type: "frames", url: "/terminal-splash.frames" };
-  }
 
   return { type: "procedural-noise" };
 };
 
-const createNoiseAdapter = (source: GlyphRasterNoiseSource): SourceAdapter => {
-  const seed = source.seed ?? Math.floor(Math.random() * 0xffffffff);
+const resolvePreset = (source: GlyphRasterSource): GlyphRasterPreset => ({
+  backgroundColor: "#050505",
+  cellHeight: NOISE_CELL_HEIGHT,
+  cellWidth: NOISE_CELL_WIDTH,
+  colors: source.type === "procedural-noise" ? NOISE_COLORS : GLYPH_COLORS,
+  fontSize: NOISE_FONT_SIZE,
+  layout: source.type === "image" ? "fill" : "fixed",
+  opacity: source.type === "image" ? 1 : source.type === "frames" ? 0.22 : 0.32,
+});
+
+const createNoiseAdapter = (): SourceAdapter => {
+  const seed = Math.floor(Math.random() * 0xffffffff);
 
   return {
     defaultFps: DEFAULT_FRAME_RATE,
     getBrightness: (col, row, _cols, _rows, time) => solarSurfaceBrightness(col, row, time, seed),
+    gpuNoiseSeed: seed,
   };
 };
 
@@ -208,15 +329,23 @@ const createFramesAdapter = async (source: GlyphRasterFrameSource): Promise<Sour
   };
   const frames = raw.subarray(headerEnd + 1);
   const frameSize = header.cols * header.rows;
-  const horizontalScale = source.horizontalScale ?? GLYPH_HORIZONTAL_SCALE;
+  const horizontalScale = GLYPH_HORIZONTAL_SCALE;
+  const sourceWidth = header.cols / horizontalScale;
+  const sourceStart = (header.cols - sourceWidth) / 2;
+  let sampledFrames = new Uint8Array();
+  let sampledFrameSize = 0;
 
   return {
     defaultFps: header.fps ?? DEFAULT_FRAME_RATE,
     frameCount: header.n_frames,
     getBrightness: (col, row, cols, rows, _time, frame) => {
+      if (sampledFrames.length > 0) {
+        const frameIndex = Math.floor(frame) % header.n_frames;
+
+        return sampledFrames[frameIndex * sampledFrameSize + row * cols + col] / 255;
+      }
+
       const frameOffset = Math.floor(frame) * frameSize;
-      const sourceWidth = header.cols / horizontalScale;
-      const sourceStart = (header.cols - sourceWidth) / 2;
       const sourceRow = Math.min(header.rows - 1, Math.floor(((row + 0.5) * header.rows) / rows));
       const sourceCol = Math.min(
         header.cols - 1,
@@ -224,6 +353,55 @@ const createFramesAdapter = async (source: GlyphRasterFrameSource): Promise<Sour
       );
 
       return frames[frameOffset + sourceRow * header.cols + sourceCol] / 255;
+    },
+    resize: (cols, rows) => {
+      sampledFrameSize = cols * rows;
+
+      const cacheKey = [
+        source.url,
+        header.cols,
+        header.rows,
+        header.n_frames,
+        horizontalScale,
+        cols,
+        rows,
+      ].join(":");
+      const cachedFrames = getCachedValue(frameBrightnessCache, cacheKey);
+      if (cachedFrames) {
+        sampledFrames = cachedFrames;
+        return;
+      }
+
+      sampledFrames = new Uint8Array(header.n_frames * sampledFrameSize);
+
+      for (let frame = 0; frame < header.n_frames; frame += 1) {
+        const sourceFrameOffset = frame * frameSize;
+        const sampledFrameOffset = frame * sampledFrameSize;
+
+        for (let row = 0; row < rows; row += 1) {
+          const sourceRow = Math.min(
+            header.rows - 1,
+            Math.floor(((row + 0.5) * header.rows) / rows),
+          );
+
+          for (let col = 0; col < cols; col += 1) {
+            const sourceCol = Math.min(
+              header.cols - 1,
+              Math.max(0, Math.floor(sourceStart + ((col + 0.5) * sourceWidth) / cols)),
+            );
+
+            sampledFrames[sampledFrameOffset + row * cols + col] =
+              frames[sourceFrameOffset + sourceRow * header.cols + sourceCol];
+          }
+        }
+      }
+
+      setCachedValue(
+        frameBrightnessCache,
+        cacheKey,
+        sampledFrames,
+        MAX_FRAME_BRIGHTNESS_CACHE_SIZE,
+      );
     },
   };
 };
@@ -257,11 +435,16 @@ const createImageAdapter = async (source: GlyphRasterImageSource): Promise<Sourc
   return {
     getBrightness: (col, row, cols) => brightnessGrid[row * cols + col] ?? 0,
     resize: (cols, rows) => {
-      const fit = source.fit ?? "cover";
+      const cacheKey = [source.url, imageCanvas.width, imageCanvas.height, cols, rows].join(":");
+      const cachedBrightnessGrid = getCachedValue(imageBrightnessCache, cacheKey);
+      if (cachedBrightnessGrid) {
+        brightnessGrid = cachedBrightnessGrid;
+        return;
+      }
+
       const sourceAspect = imageCanvas.width / imageCanvas.height;
       const targetAspect = cols / rows;
-      const shouldMatchTargetWidth =
-        fit === "cover" ? sourceAspect < targetAspect : sourceAspect >= targetAspect;
+      const shouldMatchTargetWidth = sourceAspect < targetAspect;
       const drawWidth = shouldMatchTargetWidth ? cols : rows * sourceAspect;
       const drawHeight = drawWidth / sourceAspect;
       const drawX = (cols - drawWidth) / 2;
@@ -287,9 +470,16 @@ const createImageAdapter = async (source: GlyphRasterImageSource): Promise<Sourc
               255) *
             alpha;
 
-          brightnessGrid[row * cols + col] = source.invert ? 1 - brightness : brightness;
+          brightnessGrid[row * cols + col] = brightness;
         }
       }
+
+      setCachedValue(
+        imageBrightnessCache,
+        cacheKey,
+        brightnessGrid,
+        MAX_IMAGE_BRIGHTNESS_CACHE_SIZE,
+      );
     },
   };
 };
@@ -298,181 +488,1171 @@ const createSourceAdapter = async (source: GlyphRasterSource): Promise<SourceAda
   if (source.type === "frames") return createFramesAdapter(source);
   if (source.type === "image") return createImageAdapter(source);
 
-  return createNoiseAdapter(source);
+  return createNoiseAdapter();
 };
 
-const shouldRefreshCharacter = (brightness: number, source: GlyphRasterSource): boolean => {
-  if (source.type === "frames") {
-    return (
-      (brightness > 0.5 && Math.random() < 0.35) ||
-      (brightness > 0.2 && Math.random() < 0.06) ||
-      Math.random() < 0.008
-    );
+const brightnessEntropy = (brightness: number): number =>
+  0.04 + smoothstep(0.08, 0.92, brightness) * 0.24;
+
+const proceduralEntropyBrightness = (brightness: number): number =>
+  smoothstep(0.22, 0.78, brightness);
+
+const shouldRefreshCharacter = (brightness: number): boolean =>
+  Math.random() < brightnessEntropy(brightness);
+
+const parseColor = (color: string): [number, number, number, number] => {
+  const cachedColor = getCachedValue(parsedColorCache, color);
+  if (cachedColor) return cachedColor;
+
+  let parsedColor: [number, number, number, number];
+
+  if (/^#[\da-f]{3}$/iu.test(color)) {
+    parsedColor = [
+      Number.parseInt(color[1] + color[1], 16) / 255,
+      Number.parseInt(color[2] + color[2], 16) / 255,
+      Number.parseInt(color[3] + color[3], 16) / 255,
+      1,
+    ];
+  } else if (/^#[\da-f]{6}$/iu.test(color)) {
+    parsedColor = [
+      Number.parseInt(color.slice(1, 3), 16) / 255,
+      Number.parseInt(color.slice(3, 5), 16) / 255,
+      Number.parseInt(color.slice(5, 7), 16) / 255,
+      1,
+    ];
+  } else {
+    parsedColor = [1, 1, 1, 1];
   }
 
-  if (source.type === "image") {
-    return (
-      (brightness > 0.55 && Math.random() < 0.16) ||
-      (brightness > 0.25 && Math.random() < 0.06) ||
-      Math.random() < 0.01
-    );
-  }
+  setCachedValue(parsedColorCache, color, parsedColor, MAX_PARSED_COLOR_CACHE_SIZE);
 
-  return (
-    (brightness > 0.58 && Math.random() < 0.22) ||
-    (brightness > 0.32 && Math.random() < 0.06) ||
-    Math.random() < 0.012
-  );
+  return parsedColor;
 };
 
-export const GlyphRaster = component$(
-  ({
-    backgroundColor = "#050505",
-    cellHeight = NOISE_CELL_HEIGHT,
-    cellWidth = NOISE_CELL_WIDTH,
-    characters = GLYPH_CHARS,
-    colors,
-    fps,
-    fontSize = NOISE_FONT_SIZE,
-    layout = "fixed",
-    opacity,
-    source,
-    speed = 1,
-    variant,
-  }: GlyphRasterProps): QwikJSX.Element => {
-    const rasterId = useId();
-    const resolvedSource = resolveSource(source, variant);
-    const resolvedCharacters = characters.length > 0 ? characters : GLYPH_CHARS;
-    const resolvedColors =
-      colors && colors.length > 0
-        ? colors
-        : resolvedSource.type === "procedural-noise"
-          ? NOISE_COLORS
-          : GLYPH_COLORS;
-    const resolvedSpeed = clamp(speed, MIN_SPEED, MAX_SPEED);
-    const resolvedOpacity =
-      opacity ?? (resolvedSource.type === "frames" || variant === "eye" ? 0.22 : 0.32);
-    const style = `--glyph-raster-opacity: ${resolvedOpacity}; --glyph-raster-color: ${backgroundColor};`;
+const hasVisibleRasterPixels = (
+  gl: WebGL2RenderingContext,
+  width: number,
+  height: number,
+  backgroundColor: string,
+): boolean => {
+  if (width <= 0 || height <= 0) return true;
 
-    useStylesScoped$(styles);
+  const pixels = new Uint8Array(width * height * 4);
+  const [backgroundRed, backgroundGreen, backgroundBlue] = parseColor(backgroundColor);
+  const red = Math.round(backgroundRed * 255);
+  const green = Math.round(backgroundGreen * 255);
+  const blue = Math.round(backgroundBlue * 255);
 
-    useVisibleTask$(async ({ cleanup }): Promise<void> => {
-      const canvas = document.getElementById(rasterId) as HTMLCanvasElement | null;
-      const context = canvas?.getContext("2d");
-      if (!canvas || !context) return;
+  gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
 
-      let animationFrame = 0;
-      let isCleanedUp = false;
-      let removeResize = (): void => {};
+  for (let index = 0; index < pixels.length; index += 4) {
+    const distance =
+      Math.abs(pixels[index] - red) +
+      Math.abs(pixels[index + 1] - green) +
+      Math.abs(pixels[index + 2] - blue);
 
-      cleanup(() => {
-        isCleanedUp = true;
-        cancelAnimationFrame(animationFrame);
-        removeResize();
-      });
+    if (distance > 24) return true;
+  }
 
-      const adapter = await createSourceAdapter(resolvedSource);
-      if (isCleanedUp) return;
+  return false;
+};
 
-      let cols = 0;
-      let rows = 0;
-      let grid: string[] = [];
-      let framePosition = 0;
-      let lastFrameAt = 0;
+const compileShader = (
+  gl: WebGL2RenderingContext,
+  source: string,
+  type: number,
+): WebGLShader | null => {
+  const shader = gl.createShader(type);
+  if (!shader) return null;
 
-      const randomCharacter = (): string =>
-        resolvedCharacters[Math.floor(Math.random() * resolvedCharacters.length)];
+  gl.shaderSource(shader, source);
+  gl.compileShader(shader);
 
-      const scheduleRender = (): void => {
-        if (animationFrame !== 0 || isCleanedUp) return;
+  if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
+    gl.deleteShader(shader);
+    return null;
+  }
 
-        animationFrame = requestAnimationFrame(render);
-      };
+  return shader;
+};
 
-      const resize = (): void => {
-        const pixelRatio = window.devicePixelRatio || 1;
-        canvas.width = canvas.clientWidth * pixelRatio;
-        canvas.height = canvas.clientHeight * pixelRatio;
-        context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+const createProgram = (
+  gl: WebGL2RenderingContext,
+  vertexSource: string,
+  fragmentSource: string,
+): WebGLProgram | null => {
+  const vertexShader = compileShader(gl, vertexSource, gl.VERTEX_SHADER);
+  const fragmentShader = compileShader(gl, fragmentSource, gl.FRAGMENT_SHADER);
+  const program = gl.createProgram();
 
-        cols = Math.max(1, Math.ceil(canvas.clientWidth / cellWidth));
-        rows = Math.max(1, Math.ceil(canvas.clientHeight / cellHeight));
-        grid = Array.from({ length: cols * rows }, randomCharacter);
-        adapter.resize?.(cols, rows);
-        scheduleRender();
-      };
+  if (!vertexShader || !fragmentShader || !program) return null;
 
-      const render = (time: number): void => {
-        animationFrame = 0;
+  gl.attachShader(program, vertexShader);
+  gl.attachShader(program, fragmentShader);
+  gl.linkProgram(program);
+  gl.deleteShader(vertexShader);
+  gl.deleteShader(fragmentShader);
 
-        const frameRate = clamp(
-          fps ?? adapter.defaultFps ?? DEFAULT_FRAME_RATE,
-          MIN_FRAME_RATE,
-          MAX_FRAME_RATE,
-        );
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+    gl.deleteProgram(program);
+    return null;
+  }
 
-        if (time - lastFrameAt < 1000 / frameRate) {
-          scheduleRender();
-          return;
+  return program;
+};
+
+const createGlyphAtlas = ({
+  cellHeight,
+  cellWidth,
+  characters,
+  fontSize,
+  pixelRatio,
+}: {
+  cellHeight: number;
+  cellWidth: number;
+  characters: string[];
+  fontSize: number;
+  pixelRatio: number;
+}): {
+  canvas: HTMLCanvasElement;
+  glyphUvs: Float32Array;
+} => {
+  const cacheKey = [cellHeight, cellWidth, characters.join(""), fontSize, pixelRatio].join(":");
+  const cachedAtlas = getCachedValue(glyphAtlasCache, cacheKey);
+  if (cachedAtlas) return cachedAtlas;
+
+  const atlasCols = Math.ceil(Math.sqrt(characters.length));
+  const atlasRows = Math.ceil(characters.length / atlasCols);
+  const atlasCellWidth = Math.max(1, Math.ceil(cellWidth * pixelRatio));
+  const atlasCellHeight = Math.max(1, Math.ceil(cellHeight * pixelRatio));
+  const canvas = document.createElement("canvas");
+  const context = canvas.getContext("2d");
+  const glyphUvs = new Float32Array(characters.length * 4);
+
+  canvas.width = atlasCols * atlasCellWidth;
+  canvas.height = atlasRows * atlasCellHeight;
+
+  if (!context) return { canvas, glyphUvs };
+
+  context.clearRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#ffffff";
+  context.font = `${fontSize * pixelRatio}px ${GLYPH_FONT_FAMILY}`;
+  context.textBaseline = "top";
+
+  for (let index = 0; index < characters.length; index += 1) {
+    const glyph = characters[index];
+    const col = index % atlasCols;
+    const row = Math.floor(index / atlasCols);
+    const x = col * atlasCellWidth;
+    const y = row * atlasCellHeight;
+    const uvIndex = index * 4;
+
+    context.fillText(glyph, x, y);
+    glyphUvs[uvIndex] = x / canvas.width;
+    glyphUvs[uvIndex + 1] = y / canvas.height;
+    glyphUvs[uvIndex + 2] = atlasCellWidth / canvas.width;
+    glyphUvs[uvIndex + 3] = atlasCellHeight / canvas.height;
+  }
+
+  const atlas = { canvas, glyphUvs };
+  setCachedValue(glyphAtlasCache, cacheKey, atlas, MAX_GLYPH_ATLAS_CACHE_SIZE);
+
+  return atlas;
+};
+
+const createCanvasGlyphRenderer = (
+  canvas: HTMLCanvasElement,
+  fontSize: number,
+): GlyphRenderer | null => {
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+
+  return {
+    draw: ({
+      backgroundColor,
+      brightnessValues,
+      cellHeight,
+      cellWidth,
+      colors,
+      cols,
+      glyphCharacters,
+      glyphIndices,
+      offsetX,
+      offsetY,
+      rows,
+    }: GlyphRenderState): void => {
+      context.fillStyle = backgroundColor;
+      context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
+      context.font = `${fontSize}px ${GLYPH_FONT_FAMILY}`;
+      context.textBaseline = "top";
+
+      let currentColor = backgroundColor;
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let col = 0; col < cols; col += 1) {
+          const index = row * cols + col;
+          const color =
+            colors[
+              Math.min(colors.length - 1, Math.floor(brightnessValues[index] * colors.length))
+            ];
+
+          if (color !== currentColor) {
+            context.fillStyle = color;
+            currentColor = color;
+          }
+
+          context.fillText(
+            glyphCharacters[glyphIndices[index]],
+            offsetX + col * cellWidth,
+            offsetY + row * cellHeight,
+          );
         }
+      }
+    },
+    resize: ({ cssHeight, cssWidth, pixelRatio }: GlyphRenderSize): void => {
+      canvas.width = cssWidth * pixelRatio;
+      canvas.height = cssHeight * pixelRatio;
+      context.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+    },
+  };
+};
 
-        const elapsedFrames = lastFrameAt === 0 ? 1 : ((time - lastFrameAt) / 1000) * frameRate;
-        const currentFrame = adapter.frameCount
-          ? Math.floor(framePosition) % adapter.frameCount
-          : 0;
-        const offsetX = (canvas.clientWidth - cols * cellWidth) / 2;
-        const offsetY = (canvas.clientHeight - rows * cellHeight) / 2;
+const GLYPH_NOISE_GLSL = `
+float glyphHash(vec2 value, float seed) {
+  vec3 seeded = fract(vec3(value, seed) * vec3(0.1031, 0.11369, 0.13787));
+  seeded += dot(seeded, seeded.yzx + 19.19);
+  return fract((seeded.x + seeded.y) * seeded.z);
+}
 
-        lastFrameAt = time;
+float glyphGradient(vec2 cell, vec2 offset, float seed) {
+  float angle = glyphHash(cell, seed) * 6.28318530718;
+  return dot(vec2(cos(angle), sin(angle)), offset);
+}
 
-        context.fillStyle = backgroundColor;
-        context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
-        context.font = `${fontSize}px ${GLYPH_FONT_FAMILY}`;
-        context.textBaseline = "top";
+float glyphPerlin(vec2 point, float seed) {
+  vec2 cell = floor(point);
+  vec2 offset = point - cell;
+  vec2 fade = offset * offset * offset * (offset * (offset * 6.0 - 15.0) + 10.0);
+  float top = mix(
+    glyphGradient(cell, offset, seed),
+    glyphGradient(cell + vec2(1.0, 0.0), offset - vec2(1.0, 0.0), seed),
+    fade.x
+  );
+  float bottom = mix(
+    glyphGradient(cell + vec2(0.0, 1.0), offset - vec2(0.0, 1.0), seed),
+    glyphGradient(cell + vec2(1.0, 1.0), offset - vec2(1.0, 1.0), seed),
+    fade.x
+  );
+  return mix(top, bottom, fade.y);
+}
 
+float glyphFractalNoise(vec2 point, float seed) {
+  float amplitude = 0.52;
+  float frequency = 1.0;
+  float total = 0.0;
+  float range = 0.0;
+
+  for (int octave = 0; octave < 4; octave += 1) {
+    total += glyphPerlin(point * frequency, seed + float(octave) * 101.0) * amplitude;
+    range += amplitude;
+    amplitude *= 0.5;
+    frequency *= 2.0;
+  }
+
+  return total / range;
+}
+
+float glyphSolarBrightness(vec2 cell, float time, float seed) {
+  float seconds = time / 1000.0;
+  float x = cell.x * 0.075;
+  float y = cell.y * 0.075;
+  float convection = glyphFractalNoise(
+    vec2(x * 0.55 + seconds * 0.035, y * 0.55 - seconds * 0.025),
+    seed + 211.0
+  );
+  float shear = glyphFractalNoise(
+    vec2(x * 0.32 - seconds * 0.02, y * 0.32 + seconds * 0.03),
+    seed + 353.0
+  );
+  float displacement = convection * 2.8;
+  float flowX = x + displacement + sin(y * 1.3 + seconds * 0.45 + shear * 2.4) * 0.7;
+  float flowY = y + shear * 2.2 + cos(x * 1.1 - seconds * 0.38 + convection * 2.1) * 0.6;
+  float plumeNoise = glyphFractalNoise(
+    vec2(flowX * 0.95 - seconds * 0.24, flowY * 0.95 + seconds * 0.18),
+    seed + 401.0
+  );
+  float filamentNoise = glyphFractalNoise(
+    vec2(flowX * 2.6 + plumeNoise * 1.4 - seconds * 0.5, flowY * 1.8 - convection * 1.2 + seconds * 0.28),
+    seed + 809.0
+  );
+  float cells = smoothstep(0.34, 0.78, (plumeNoise + 1.0) * 0.5);
+  float filaments = smoothstep(0.5, 0.9, (filamentNoise + 1.0) * 0.5);
+  float pulse = 0.5 + sin(seconds * 0.7 + convection * 3.2 + shear * 2.4) * 0.08;
+
+  return clamp(0.22 + (cells * 0.5 + filaments * 0.28 + (convection + 1.0) * 0.11) * pulse, 0.0, 1.0);
+}
+`;
+
+const createWebGlGlyphRenderer = ({
+  canvas,
+  cellHeight,
+  cellWidth,
+  characters,
+  fontSize,
+  gpuNoiseSeed,
+}: {
+  canvas: HTMLCanvasElement;
+  cellHeight: number;
+  cellWidth: number;
+  characters: string[];
+  fontSize: number;
+  gpuNoiseSeed?: number;
+}): GlyphRenderer | null => {
+  const gl = canvas.getContext("webgl2", {
+    alpha: true,
+    antialias: false,
+    depth: false,
+    premultipliedAlpha: false,
+    stencil: false,
+  });
+  if (!gl) return null;
+
+  const usesGpuNoise = gpuNoiseSeed !== undefined;
+  const fragmentSource = usesGpuNoise
+    ? `#version 300 es
+    precision highp float;
+    uniform sampler2D u_atlas;
+    uniform sampler2D u_palette;
+    uniform int u_color_count;
+    uniform float u_noise_seed;
+    uniform float u_source_time;
+    uniform vec2 u_brightness_size;
+    in vec2 v_uv;
+    in vec2 v_brightness_uv;
+    out vec4 out_color;
+    ${GLYPH_NOISE_GLSL}
+    void main() {
+      float alpha = texture(u_atlas, v_uv).a;
+      vec2 cell = floor(v_brightness_uv * u_brightness_size);
+      float brightness = glyphSolarBrightness(cell, u_source_time, u_noise_seed);
+      int color_index = min(u_color_count - 1, int(floor(clamp(brightness, 0.0, 0.999999) * float(u_color_count))));
+      vec4 color = texelFetch(u_palette, ivec2(color_index, 0), 0);
+      out_color = vec4(color.rgb, color.a * alpha);
+    }`
+    : `#version 300 es
+    precision mediump float;
+    uniform sampler2D u_atlas;
+    uniform sampler2D u_brightness;
+    uniform sampler2D u_palette;
+    uniform int u_color_count;
+    in vec2 v_uv;
+    in vec2 v_brightness_uv;
+    out vec4 out_color;
+    void main() {
+      float alpha = texture(u_atlas, v_uv).a;
+      float brightness = texture(u_brightness, v_brightness_uv).r;
+      int color_index = min(u_color_count - 1, int(floor(clamp(brightness, 0.0, 0.999999) * float(u_color_count))));
+      vec4 color = texelFetch(u_palette, ivec2(color_index, 0), 0);
+      out_color = vec4(color.rgb, color.a * alpha);
+    }`;
+
+  const vertexSource = usesGpuNoise
+    ? `#version 300 es
+    in vec2 a_corner;
+    in vec2 a_position;
+    in vec2 a_brightness_uv;
+    in float a_entropy_position;
+    in float a_entropy_scale;
+    uniform float u_entropy_seed;
+    uniform float u_glyph_count;
+    uniform float u_noise_seed;
+    uniform float u_source_time;
+    uniform float u_entropy_sample_time;
+    uniform float u_glyph_frame_rate;
+    uniform vec2 u_atlas_grid;
+    uniform vec2 u_brightness_size;
+    uniform vec2 u_canvas_size;
+    uniform vec2 u_cell_size;
+    out vec2 v_uv;
+    out vec2 v_brightness_uv;
+    ${GLYPH_NOISE_GLSL}
+    float hash(vec3 value) {
+      value = fract(value * vec3(0.1031, 0.11369, 0.13787));
+      value += dot(value, value.yxz + 19.19);
+      return fract((value.x + value.y) * value.z);
+    }
+    float glyphBrightnessEntropy(float brightness) {
+      return 0.04 + smoothstep(0.08, 0.92, brightness) * 0.24;
+    }
+    float glyphProceduralEntropyBrightness(float brightness) {
+      return smoothstep(0.22, 0.78, brightness);
+    }
+    void main() {
+      vec2 cell = floor(a_brightness_uv * u_brightness_size);
+      float brightness = glyphSolarBrightness(cell, u_entropy_sample_time, u_noise_seed);
+      float entropy_brightness = glyphProceduralEntropyBrightness(brightness);
+      float entropy_position =
+        a_entropy_position +
+        max(u_source_time - u_entropy_sample_time, 0.0) * 0.001 *
+        u_glyph_frame_rate *
+        glyphBrightnessEntropy(entropy_brightness) *
+        a_entropy_scale;
+      float phase = hash(vec3(cell, u_entropy_seed));
+      float epoch = floor(entropy_position + phase);
+      float glyph_index = floor(hash(vec3(cell, epoch + u_entropy_seed)) * u_glyph_count);
+      vec2 glyph_cell = vec2(mod(glyph_index, u_atlas_grid.x), floor(glyph_index / u_atlas_grid.x));
+      vec2 pixel = a_position + a_corner * u_cell_size;
+      vec2 clip = pixel / u_canvas_size * 2.0 - 1.0;
+      gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
+      v_uv = (glyph_cell + a_corner) / u_atlas_grid;
+      v_brightness_uv = a_brightness_uv;
+    }`
+    : `#version 300 es
+    in vec2 a_corner;
+    in vec2 a_position;
+    in vec2 a_brightness_uv;
+    in float a_entropy_position;
+    in float a_entropy_scale;
+    uniform float u_entropy_seed;
+    uniform float u_glyph_count;
+    uniform float u_source_time;
+    uniform float u_glyph_frame_rate;
+    uniform float u_shader_entropy;
+    uniform sampler2D u_brightness;
+    uniform vec2 u_atlas_grid;
+    uniform vec2 u_brightness_size;
+    uniform vec2 u_canvas_size;
+    uniform vec2 u_cell_size;
+    out vec2 v_uv;
+    out vec2 v_brightness_uv;
+    float hash(vec3 value) {
+      value = fract(value * vec3(0.1031, 0.11369, 0.13787));
+      value += dot(value, value.yxz + 19.19);
+      return fract((value.x + value.y) * value.z);
+    }
+    float glyphBrightnessEntropy(float brightness) {
+      return 0.04 + smoothstep(0.08, 0.92, brightness) * 0.24;
+    }
+    void main() {
+      vec2 cell = floor(a_brightness_uv * u_brightness_size);
+      float brightness = texture(u_brightness, a_brightness_uv).r;
+      float shader_entropy_position =
+        u_source_time * 0.001 *
+        u_glyph_frame_rate *
+        glyphBrightnessEntropy(brightness) *
+        a_entropy_scale;
+      float entropy_position = mix(a_entropy_position, shader_entropy_position, u_shader_entropy);
+      float phase = hash(vec3(cell, u_entropy_seed));
+      float epoch = floor(entropy_position + phase);
+      float glyph_index = floor(hash(vec3(cell, epoch + u_entropy_seed)) * u_glyph_count);
+      vec2 glyph_cell = vec2(mod(glyph_index, u_atlas_grid.x), floor(glyph_index / u_atlas_grid.x));
+      vec2 pixel = a_position + a_corner * u_cell_size;
+      vec2 clip = pixel / u_canvas_size * 2.0 - 1.0;
+      gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
+      v_uv = (glyph_cell + a_corner) / u_atlas_grid;
+      v_brightness_uv = a_brightness_uv;
+    }`;
+
+  const program = createProgram(gl, vertexSource, fragmentSource);
+  if (!program) return null;
+
+  const vertexArray = gl.createVertexArray();
+  const cornerBuffer = gl.createBuffer();
+  const positionBuffer = gl.createBuffer();
+  const brightnessUvBuffer = gl.createBuffer();
+  const entropyPositionBuffer = gl.createBuffer();
+  const entropyScaleBuffer = gl.createBuffer();
+  const atlasTexture = gl.createTexture();
+  const brightnessTexture = gl.createTexture();
+  const paletteTexture = gl.createTexture();
+  const cornerLocation = gl.getAttribLocation(program, "a_corner");
+  const positionLocation = gl.getAttribLocation(program, "a_position");
+  const brightnessUvLocation = gl.getAttribLocation(program, "a_brightness_uv");
+  const entropyPositionLocation = gl.getAttribLocation(program, "a_entropy_position");
+  const entropyScaleLocation = gl.getAttribLocation(program, "a_entropy_scale");
+  const atlasGridLocation = gl.getUniformLocation(program, "u_atlas_grid");
+  const brightnessSizeLocation = gl.getUniformLocation(program, "u_brightness_size");
+  const canvasSizeLocation = gl.getUniformLocation(program, "u_canvas_size");
+  const cellSizeLocation = gl.getUniformLocation(program, "u_cell_size");
+  const atlasLocation = gl.getUniformLocation(program, "u_atlas");
+  const brightnessLocation = gl.getUniformLocation(program, "u_brightness");
+  const paletteLocation = gl.getUniformLocation(program, "u_palette");
+  const colorCountLocation = gl.getUniformLocation(program, "u_color_count");
+  const entropySeedLocation = gl.getUniformLocation(program, "u_entropy_seed");
+  const glyphCountLocation = gl.getUniformLocation(program, "u_glyph_count");
+  const noiseSeedLocation = usesGpuNoise ? gl.getUniformLocation(program, "u_noise_seed") : null;
+  const sourceTimeLocation = gl.getUniformLocation(program, "u_source_time");
+  const entropySampleTimeLocation = usesGpuNoise
+    ? gl.getUniformLocation(program, "u_entropy_sample_time")
+    : null;
+  const glyphFrameRateLocation = gl.getUniformLocation(program, "u_glyph_frame_rate");
+  const shaderEntropyLocation = usesGpuNoise
+    ? null
+    : gl.getUniformLocation(program, "u_shader_entropy");
+
+  if (
+    !vertexArray ||
+    !cornerBuffer ||
+    !positionBuffer ||
+    !brightnessUvBuffer ||
+    !entropyPositionBuffer ||
+    !entropyScaleBuffer ||
+    !atlasTexture ||
+    !brightnessTexture ||
+    !paletteTexture ||
+    cornerLocation < 0 ||
+    positionLocation < 0 ||
+    brightnessUvLocation < 0 ||
+    entropyPositionLocation < 0 ||
+    entropyScaleLocation < 0 ||
+    !atlasGridLocation ||
+    !brightnessSizeLocation ||
+    !canvasSizeLocation ||
+    !cellSizeLocation ||
+    !atlasLocation ||
+    (!usesGpuNoise && !brightnessLocation) ||
+    !paletteLocation ||
+    !colorCountLocation ||
+    !entropySeedLocation ||
+    !glyphCountLocation ||
+    !sourceTimeLocation ||
+    !glyphFrameRateLocation ||
+    (usesGpuNoise && (!noiseSeedLocation || !entropySampleTimeLocation)) ||
+    (!usesGpuNoise && !shaderEntropyLocation)
+  ) {
+    return null;
+  }
+
+  let brightnessUvs = new Float32Array();
+  let brightnessBytes = new Uint8Array();
+  let lastBrightnessTextureHeight = 0;
+  let lastBrightnessTextureWidth = 0;
+  let lastEntropyBufferLength = 0;
+  let positions = new Float32Array();
+  let lastPixelRatio = 0;
+  let lastColorsKey = "";
+  let lastPositionKey = "";
+  const atlasCols = Math.ceil(Math.sqrt(characters.length));
+  const atlasRows = Math.ceil(characters.length / atlasCols);
+  const entropySeed = Math.random() * 100000;
+
+  gl.useProgram(program);
+  gl.bindVertexArray(vertexArray);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, cornerBuffer);
+  gl.bufferData(gl.ARRAY_BUFFER, GLYPH_QUAD_CORNERS, gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(cornerLocation);
+  gl.vertexAttribPointer(cornerLocation, 2, gl.FLOAT, false, 0, 0);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+  gl.enableVertexAttribArray(positionLocation);
+  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(positionLocation, 1);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, brightnessUvBuffer);
+  gl.enableVertexAttribArray(brightnessUvLocation);
+  gl.vertexAttribPointer(brightnessUvLocation, 2, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(brightnessUvLocation, 1);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, entropyPositionBuffer);
+  gl.enableVertexAttribArray(entropyPositionLocation);
+  gl.vertexAttribPointer(entropyPositionLocation, 1, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(entropyPositionLocation, 1);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, entropyScaleBuffer);
+  gl.enableVertexAttribArray(entropyScaleLocation);
+  gl.vertexAttribPointer(entropyScaleLocation, 1, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(entropyScaleLocation, 1);
+
+  gl.uniform1i(atlasLocation, 0);
+  if (brightnessLocation) {
+    gl.uniform1i(brightnessLocation, 2);
+  }
+  gl.uniform1i(paletteLocation, 1);
+  gl.uniform1f(entropySeedLocation, entropySeed);
+  gl.uniform1f(glyphCountLocation, characters.length);
+  gl.uniform2f(atlasGridLocation, atlasCols, atlasRows);
+  gl.uniform2f(cellSizeLocation, cellWidth, cellHeight);
+  gl.enable(gl.BLEND);
+  gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  const uploadAtlas = (pixelRatio: number): void => {
+    const atlas = createGlyphAtlas({ cellHeight, cellWidth, characters, fontSize, pixelRatio });
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, atlasTexture);
+    gl.pixelStorei(gl.UNPACK_PREMULTIPLY_ALPHA_WEBGL, false);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas.canvas);
+  };
+
+  const uploadPalette = (colors: string[]): void => {
+    const palette = new Uint8Array(colors.length * 4);
+
+    for (let index = 0; index < colors.length; index += 1) {
+      const [red, green, blue, alpha] = parseColor(colors[index]);
+      const valueIndex = index * 4;
+
+      palette[valueIndex] = Math.round(red * 255);
+      palette[valueIndex + 1] = Math.round(green * 255);
+      palette[valueIndex + 2] = Math.round(blue * 255);
+      palette[valueIndex + 3] = Math.round(alpha * 255);
+    }
+
+    gl.activeTexture(gl.TEXTURE1);
+    gl.bindTexture(gl.TEXTURE_2D, paletteTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.RGBA,
+      colors.length,
+      1,
+      0,
+      gl.RGBA,
+      gl.UNSIGNED_BYTE,
+      palette,
+    );
+    gl.useProgram(program);
+    gl.uniform1i(colorCountLocation, colors.length);
+  };
+
+  const uploadBrightness = (brightnessValues: Float32Array, cols: number, rows: number): void => {
+    const didResize = cols !== lastBrightnessTextureWidth || rows !== lastBrightnessTextureHeight;
+
+    if (brightnessBytes.length !== brightnessValues.length) {
+      brightnessBytes = new Uint8Array(brightnessValues.length);
+    }
+
+    for (let index = 0; index < brightnessValues.length; index += 1) {
+      brightnessBytes[index] = Math.round(clamp(brightnessValues[index], 0, 1) * 255);
+    }
+
+    gl.activeTexture(gl.TEXTURE2);
+    gl.bindTexture(gl.TEXTURE_2D, brightnessTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    if (didResize) {
+      lastBrightnessTextureWidth = cols;
+      lastBrightnessTextureHeight = rows;
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.R8,
+        cols,
+        rows,
+        0,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        brightnessBytes,
+      );
+      return;
+    }
+
+    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, rows, gl.RED, gl.UNSIGNED_BYTE, brightnessBytes);
+  };
+
+  const uploadEntropyPositions = (entropyValues: Float32Array, usage: number): void => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, entropyPositionBuffer);
+
+    if (entropyValues.length !== lastEntropyBufferLength) {
+      lastEntropyBufferLength = entropyValues.length;
+      gl.bufferData(gl.ARRAY_BUFFER, entropyValues, usage);
+      return;
+    }
+
+    gl.bufferSubData(gl.ARRAY_BUFFER, 0, entropyValues);
+  };
+
+  const uploadEntropyScales = (entropyScales: Float32Array): void => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, entropyScaleBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, entropyScales, gl.STATIC_DRAW);
+  };
+
+  return {
+    draw: ({
+      backgroundColor,
+      brightnessValues,
+      cellHeight,
+      cellWidth,
+      colors,
+      cols,
+      entropySampleTime,
+      gpuNoiseSeed: stateGpuNoiseSeed,
+      offsetX,
+      offsetY,
+      glyphEntropyPositions,
+      glyphEntropyScales,
+      glyphFrameRate,
+      rows,
+      entropyMode,
+      shouldUpdateBrightness,
+      sourceTime,
+    }: GlyphRenderState): void => {
+      const cellCount = cols * rows;
+      const didResize = positions.length !== cellCount * 2;
+
+      if (didResize) {
+        brightnessUvs = new Float32Array(cellCount * 2);
+        positions = new Float32Array(cellCount * 2);
+        lastPositionKey = "";
+      }
+
+      const colorsKey = colors.join("|");
+      if (colorsKey !== lastColorsKey) {
+        lastColorsKey = colorsKey;
+        uploadPalette(colors);
+      }
+
+      const positionKey = [cols, rows, offsetX, offsetY, cellWidth, cellHeight].join(":");
+      const shouldUploadPositions = positionKey !== lastPositionKey;
+      const shouldUploadBrightness = didResize || shouldUpdateBrightness;
+      if (shouldUploadPositions) {
+        lastPositionKey = positionKey;
+      }
+
+      if (shouldUploadPositions) {
         for (let row = 0; row < rows; row += 1) {
           for (let col = 0; col < cols; col += 1) {
             const index = row * cols + col;
-            const brightness = adapter.getBrightness(
-              col,
-              row,
-              cols,
-              rows,
-              time * resolvedSpeed,
-              currentFrame,
-            );
+            const positionIndex = index * 2;
 
-            if (shouldRefreshCharacter(brightness, resolvedSource)) {
-              grid[index] = randomCharacter();
-            }
-
-            context.fillStyle =
-              resolvedColors[
-                Math.min(resolvedColors.length - 1, Math.floor(brightness * resolvedColors.length))
-              ];
-            context.fillText(grid[index], offsetX + col * cellWidth, offsetY + row * cellHeight);
+            brightnessUvs[positionIndex] = (col + 0.5) / cols;
+            brightnessUvs[positionIndex + 1] = (row + 0.5) / rows;
+            positions[positionIndex] = offsetX + col * cellWidth;
+            positions[positionIndex + 1] = offsetY + row * cellHeight;
           }
         }
+      }
 
-        if (adapter.frameCount) {
-          framePosition = (framePosition + elapsedFrames * resolvedSpeed) % adapter.frameCount;
+      const [red, green, blue, alpha] = parseColor(backgroundColor);
+      gl.clearColor(red, green, blue, alpha);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.useProgram(program);
+      gl.bindVertexArray(vertexArray);
+      gl.uniform2f(brightnessSizeLocation, cols, rows);
+
+      if (
+        usesGpuNoise &&
+        noiseSeedLocation &&
+        sourceTimeLocation &&
+        entropySampleTimeLocation &&
+        glyphFrameRateLocation
+      ) {
+        gl.uniform1f(noiseSeedLocation, stateGpuNoiseSeed ?? 0);
+        gl.uniform1f(sourceTimeLocation, sourceTime);
+        gl.uniform1f(entropySampleTimeLocation, entropySampleTime);
+        gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
+      } else if (
+        !usesGpuNoise &&
+        sourceTimeLocation &&
+        glyphFrameRateLocation &&
+        shaderEntropyLocation
+      ) {
+        gl.uniform1f(sourceTimeLocation, sourceTime);
+        gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
+        gl.uniform1f(shaderEntropyLocation, entropyMode === "shader" ? 1 : 0);
+      }
+
+      if (shouldUploadPositions) {
+        uploadEntropyScales(glyphEntropyScales);
+      }
+
+      if (usesGpuNoise) {
+        if (shouldUpdateBrightness) {
+          uploadEntropyPositions(glyphEntropyPositions, gl.DYNAMIC_DRAW);
         }
+      } else if (shouldUploadPositions || entropyMode === "cpu") {
+        uploadEntropyPositions(glyphEntropyPositions, gl.DYNAMIC_DRAW);
+      }
 
-        scheduleRender();
-      };
+      if (shouldUploadPositions) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, brightnessUvBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, brightnessUvs, gl.STATIC_DRAW);
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
+      }
 
-      resize();
-      window.addEventListener("resize", resize);
-      removeResize = () => window.removeEventListener("resize", resize);
+      if (!usesGpuNoise && shouldUploadBrightness) {
+        uploadBrightness(brightnessValues, cols, rows);
+      }
+
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cellCount);
+    },
+    resize: ({ cssHeight, cssWidth, pixelRatio }: GlyphRenderSize): void => {
+      canvas.width = cssWidth * pixelRatio;
+      canvas.height = cssHeight * pixelRatio;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(program);
+      gl.uniform2f(canvasSizeLocation, cssWidth, cssHeight);
+
+      if (pixelRatio !== lastPixelRatio) {
+        lastPixelRatio = pixelRatio;
+        uploadAtlas(pixelRatio);
+      }
+    },
+    supportsShaderEntropy: true,
+    usesGpuGlyphSelection: true,
+  };
+};
+
+const createGpuNoiseGlyphRenderer = ({
+  canvas,
+  cellHeight,
+  cellWidth,
+  characters,
+  fontSize,
+  gpuNoiseSeed,
+}: {
+  canvas: HTMLCanvasElement;
+  cellHeight: number;
+  cellWidth: number;
+  characters: string[];
+  fontSize: number;
+  gpuNoiseSeed: number;
+}): GlyphRenderer | null => {
+  const gpuRenderer = createWebGlGlyphRenderer({
+    canvas,
+    cellHeight,
+    cellWidth,
+    characters,
+    fontSize,
+    gpuNoiseSeed,
+  });
+  if (!gpuRenderer) return null;
+
+  const fallbackRenderer = createWebGlGlyphRenderer({
+    canvas,
+    cellHeight,
+    cellWidth,
+    characters,
+    fontSize,
+  });
+  const gl = canvas.getContext("webgl2");
+  let didCheckGpuNoise = false;
+  let useFallback = false;
+
+  if (!fallbackRenderer || !gl) return gpuRenderer;
+
+  return {
+    draw: (state: GlyphRenderState): void => {
+      if (useFallback) {
+        fallbackRenderer.draw({ ...state, gpuNoiseSeed: undefined });
+        return;
+      }
+
+      gpuRenderer.draw(state);
+
+      if (!didCheckGpuNoise) {
+        didCheckGpuNoise = true;
+
+        if (!hasVisibleRasterPixels(gl, canvas.width, canvas.height, state.backgroundColor)) {
+          useFallback = true;
+          fallbackRenderer.draw({ ...state, gpuNoiseSeed: undefined });
+        }
+      }
+    },
+    resize: (size: GlyphRenderSize): void => {
+      gpuRenderer.resize(size);
+      fallbackRenderer.resize(size);
+      didCheckGpuNoise = false;
+      useFallback = false;
+    },
+    get supportsShaderEntropy() {
+      return !useFallback && gpuRenderer.supportsShaderEntropy === true;
+    },
+    usesGpuGlyphSelection: true,
+  };
+};
+
+export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.Element => {
+  const rasterId = useId();
+  const resolvedSource = resolveSource(source);
+  const preset = resolvePreset(resolvedSource);
+  const resolvedCharacters = Array.from(new Set(GLYPH_CHARS));
+  const style = `--glyph-raster-opacity: ${preset.opacity}; --glyph-raster-color: ${preset.backgroundColor};`;
+
+  useStylesScoped$(styles);
+
+  useVisibleTask$(async ({ cleanup }): Promise<void> => {
+    const canvas = document.getElementById(rasterId) as HTMLCanvasElement | null;
+    if (!canvas) return;
+
+    let isDocumentVisible = document.visibilityState === "visible";
+    let isCleanedUp = false;
+    let isRasterVisible = preset.layout === "fixed";
+    let activeRaster: ActiveGlyphRaster | null = null;
+    let removeResize = (): void => {};
+    let removeVisibilityListener = (): void => {};
+    let removeVisibilityObserver = (): void => {};
+
+    cleanup(() => {
+      isCleanedUp = true;
+      if (activeRaster) {
+        activeGlyphRasters.delete(activeRaster);
+      }
+      removeResize();
+      removeVisibilityListener();
+      removeVisibilityObserver();
     });
 
-    return (
-      <canvas
-        id={rasterId}
-        class={`glyph-raster glyph-raster--${layout} glyph-raster--${resolvedSource.type}`}
-        style={style}
-        aria-hidden="true"
-      />
-    );
-  },
-);
+    const adapter = await createSourceAdapter(resolvedSource);
+    if (isCleanedUp) return;
+    const gpuNoiseSeed = adapter.gpuNoiseSeed;
+    const renderer =
+      (gpuNoiseSeed === undefined
+        ? null
+        : createGpuNoiseGlyphRenderer({
+            canvas,
+            cellHeight: preset.cellHeight,
+            cellWidth: preset.cellWidth,
+            characters: resolvedCharacters,
+            fontSize: preset.fontSize,
+            gpuNoiseSeed,
+          })) ??
+      createWebGlGlyphRenderer({
+        canvas,
+        cellHeight: preset.cellHeight,
+        cellWidth: preset.cellWidth,
+        characters: resolvedCharacters,
+        fontSize: preset.fontSize,
+      }) ??
+      createCanvasGlyphRenderer(canvas, preset.fontSize);
+    if (!renderer) return;
+
+    const usesGpuGlyphSelection = renderer.usesGpuGlyphSelection === true;
+    let cols = 0;
+    let rows = 0;
+    let changedGlyphCount = 0;
+    let changedGlyphIndices = new Uint32Array();
+    let brightnessValues = new Float32Array();
+    let glyphEntropyPositions = new Float32Array();
+    let glyphEntropyScales = new Float32Array();
+    let glyphIndices = new Uint16Array();
+    let framePosition = 0;
+    let hasStaticBrightnessValues = false;
+    let lastFrameAt = 0;
+    let lastBrightnessSampleAt = 0;
+    let lastEntropySampleSourceTime = 0;
+    let sourceTime = 0;
+    let lastCssHeight = 0;
+    let lastCssWidth = 0;
+    let lastPixelRatio = 0;
+
+    const randomGlyphIndex = (): number => Math.floor(Math.random() * resolvedCharacters.length);
+    const randomGlyphIndexExcept = (currentIndex: number): number => {
+      if (resolvedCharacters.length < 2) return currentIndex;
+
+      const nextIndex = Math.floor(Math.random() * (resolvedCharacters.length - 1));
+
+      return nextIndex >= currentIndex ? nextIndex + 1 : nextIndex;
+    };
+
+    const canRender = (): boolean => isDocumentVisible && isRasterVisible;
+
+    const resize = (): void => {
+      const pixelRatio = window.devicePixelRatio || 1;
+      const cssWidth = canvas.clientWidth;
+      const cssHeight = canvas.clientHeight;
+
+      if (
+        cssHeight === lastCssHeight &&
+        cssWidth === lastCssWidth &&
+        pixelRatio === lastPixelRatio
+      ) {
+        scheduleActiveGlyphRasters();
+        return;
+      }
+
+      lastCssHeight = cssHeight;
+      lastCssWidth = cssWidth;
+      lastPixelRatio = pixelRatio;
+
+      renderer.resize({ cssHeight, cssWidth, pixelRatio });
+
+      cols = Math.max(1, Math.ceil(cssWidth / preset.cellWidth));
+      rows = Math.max(1, Math.ceil(cssHeight / preset.cellHeight));
+      changedGlyphCount = 0;
+      changedGlyphIndices = new Uint32Array(cols * rows);
+      brightnessValues = new Float32Array(cols * rows);
+      glyphEntropyPositions = new Float32Array(cols * rows);
+      glyphEntropyScales = new Float32Array(cols * rows);
+      glyphIndices = new Uint16Array(cols * rows);
+      for (let index = 0; index < glyphIndices.length; index += 1) {
+        glyphIndices[index] = randomGlyphIndex();
+        glyphEntropyScales[index] = 0.82 + Math.random() * 0.36;
+      }
+      hasStaticBrightnessValues = false;
+      lastBrightnessSampleAt = 0;
+      lastEntropySampleSourceTime = 0;
+      adapter.resize?.(cols, rows);
+      scheduleActiveGlyphRasters();
+    };
+
+    const render = (time: number): void => {
+      if (!canRender()) return;
+
+      const frameRate = clamp(
+        adapter.defaultFps ?? DEFAULT_FRAME_RATE,
+        MIN_FRAME_RATE,
+        MAX_FRAME_RATE,
+      );
+
+      if (time - lastFrameAt < 1000 / frameRate) {
+        return;
+      }
+
+      const elapsedMilliseconds = lastFrameAt === 0 ? 1000 / frameRate : time - lastFrameAt;
+      const elapsedFrames = (elapsedMilliseconds / 1000) * frameRate;
+      const currentFrame = adapter.frameCount ? Math.floor(framePosition) % adapter.frameCount : 0;
+      const offsetX = (canvas.clientWidth - cols * preset.cellWidth) / 2;
+      const offsetY = (canvas.clientHeight - rows * preset.cellHeight) / 2;
+      const entropyMode: GlyphEntropyMode =
+        renderer.supportsShaderEntropy === true &&
+        (resolvedSource.type === "procedural-noise" || resolvedSource.type === "image")
+          ? "shader"
+          : "cpu";
+      const shouldThrottleBrightnessSamples =
+        entropyMode === "shader" && resolvedSource.type === "procedural-noise";
+      const shouldSampleBrightness =
+        !shouldThrottleBrightnessSamples ||
+        lastBrightnessSampleAt === 0 ||
+        time - lastBrightnessSampleAt >= 1000 / PROCEDURAL_ENTROPY_SAMPLE_RATE;
+      const shouldUpdateBrightness =
+        resolvedSource.type === "image" ? !hasStaticBrightnessValues : shouldSampleBrightness;
+
+      changedGlyphCount = 0;
+      lastFrameAt = time;
+      sourceTime += elapsedMilliseconds;
+      const entropySampleFrames =
+        lastEntropySampleSourceTime === 0
+          ? elapsedFrames
+          : ((sourceTime - lastEntropySampleSourceTime) / 1000) * frameRate;
+      if (shouldUpdateBrightness) {
+        lastBrightnessSampleAt = time;
+      }
+
+      if (entropyMode === "cpu" || shouldUpdateBrightness || !usesGpuGlyphSelection) {
+        for (let row = 0; row < rows; row += 1) {
+          for (let col = 0; col < cols; col += 1) {
+            const index = row * cols + col;
+            const brightness = shouldUpdateBrightness
+              ? adapter.getBrightness(col, row, cols, rows, sourceTime, currentFrame)
+              : brightnessValues[index];
+
+            if (shouldUpdateBrightness) {
+              brightnessValues[index] = brightness;
+            }
+
+            const entropyBrightness =
+              resolvedSource.type === "procedural-noise"
+                ? proceduralEntropyBrightness(brightness)
+                : brightness;
+
+            if (entropyMode === "cpu") {
+              glyphEntropyPositions[index] +=
+                elapsedFrames * brightnessEntropy(entropyBrightness) * glyphEntropyScales[index];
+            } else if (shouldUpdateBrightness) {
+              glyphEntropyPositions[index] +=
+                entropySampleFrames *
+                brightnessEntropy(entropyBrightness) *
+                glyphEntropyScales[index];
+            }
+
+            if (!usesGpuGlyphSelection && shouldRefreshCharacter(entropyBrightness)) {
+              glyphIndices[index] = randomGlyphIndexExcept(glyphIndices[index]);
+              changedGlyphIndices[changedGlyphCount] = index;
+              changedGlyphCount += 1;
+            }
+          }
+        }
+      }
+
+      if (entropyMode === "shader" && shouldUpdateBrightness) {
+        lastEntropySampleSourceTime = sourceTime;
+      }
+
+      renderer.draw({
+        backgroundColor: preset.backgroundColor,
+        brightnessValues,
+        cellHeight: preset.cellHeight,
+        cellWidth: preset.cellWidth,
+        changedGlyphCount,
+        changedGlyphIndices,
+        colors: preset.colors,
+        cols,
+        entropySampleTime: lastEntropySampleSourceTime,
+        gpuNoiseSeed,
+        glyphCharacters: resolvedCharacters,
+        glyphEntropyPositions,
+        glyphEntropyScales,
+        glyphIndices,
+        glyphFrameRate: frameRate,
+        offsetX,
+        offsetY,
+        rows,
+        entropyMode,
+        shouldUpdateBrightness,
+        sourceTime,
+      });
+
+      if (adapter.frameCount) {
+        framePosition = (framePosition + elapsedFrames) % adapter.frameCount;
+      }
+
+      if (resolvedSource.type === "image") {
+        hasStaticBrightnessValues = true;
+      }
+    };
+
+    activeRaster = { canRender, render };
+    activeGlyphRasters.add(activeRaster);
+    resize();
+    window.addEventListener("resize", resize);
+    removeResize = () => window.removeEventListener("resize", resize);
+
+    const onVisibilityChange = (): void => {
+      isDocumentVisible = document.visibilityState === "visible";
+      if (isDocumentVisible) {
+        lastFrameAt = 0;
+        scheduleActiveGlyphRasters();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    removeVisibilityListener = () =>
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+
+    if (preset.layout === "fill") {
+      const observer = new IntersectionObserver(
+        ([entry]): void => {
+          isRasterVisible = Boolean(entry?.isIntersecting);
+          if (isRasterVisible) {
+            lastFrameAt = 0;
+            scheduleActiveGlyphRasters();
+          }
+        },
+        { threshold: 0.01 },
+      );
+      observer.observe(canvas);
+      removeVisibilityObserver = () => observer.disconnect();
+    }
+  });
+
+  return (
+    <canvas
+      id={rasterId}
+      class={`glyph-raster glyph-raster--${preset.layout} glyph-raster--${resolvedSource.type}`}
+      style={style}
+      aria-hidden="true"
+    />
+  );
+});

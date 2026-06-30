@@ -10,6 +10,15 @@ const GLYPH_CHARS =
 const REVEAL_DURATION_MS = 720;
 const REVEAL_STAGGER_MS = 260;
 const REVEAL_FRAME_RATE = 1000 / 24;
+const REVEAL_CONTAINER_SELECTOR = [
+  "article > *",
+  "footer",
+  "header",
+  "main > :not(article):not(section)",
+  "nav",
+  "section > *",
+  "ul > li",
+].join(",");
 const EXCLUDED_SELECTOR = [
   "canvas",
   "code",
@@ -27,11 +36,24 @@ const EXCLUDED_SELECTOR = [
   "[data-glyph-text-reveal]",
 ].join(",");
 const revealedElements = new WeakSet<Element>();
+const scannedContainers = new WeakSet<Element>();
 
 type AnimatedGlyphToken = {
+  isComplete: boolean;
   original: string;
+  originalCharacters: string[];
+  originalElement: HTMLSpanElement;
   overlay: HTMLSpanElement;
+  overlayCharacters: string[];
   startOffset: number;
+};
+
+type ActiveGlyphReveal = {
+  cancel: () => void;
+  complete: () => void;
+  lastFrameAt: number;
+  render: (time: number) => boolean;
+  startedAt: number;
 };
 
 type GlyphTextRevealTarget = {
@@ -44,7 +66,19 @@ type WrappedTextNode = {
   wrapper: HTMLSpanElement;
 };
 
-const randomGlyph = (): string => GLYPH_CHARS[Math.floor(Math.random() * GLYPH_CHARS.length)];
+const activeReveals = new Set<ActiveGlyphReveal>();
+let sharedAnimationFrame = 0;
+let randomSeed = Math.floor(Math.random() * 0xffffffff) || 1;
+
+const randomUnit = (): number => {
+  randomSeed ^= randomSeed << 13;
+  randomSeed ^= randomSeed >>> 17;
+  randomSeed ^= randomSeed << 5;
+
+  return (randomSeed >>> 0) / 0x100000000;
+};
+
+const randomGlyph = (): string => GLYPH_CHARS[Math.floor(randomUnit() * GLYPH_CHARS.length)];
 
 const shouldAnimateTextNode = (node: Text): boolean => {
   const parent = node.parentElement;
@@ -54,15 +88,23 @@ const shouldAnimateTextNode = (node: Text): boolean => {
   return node.data.trim().length > 0;
 };
 
-const createScrambledText = (text: string, progress: number): string => {
-  const revealCount = Math.floor(text.length * progress);
+const createScrambledCharacters = (characters: string[]): string[] =>
+  characters.map((): string => randomGlyph());
 
-  return Array.from(text, (character, index): string => {
-    if (/\s/u.test(character)) return character;
-    if (index < revealCount) return character;
+const updateScrambledText = (token: AnimatedGlyphToken, progress: number): void => {
+  if (progress >= 1) {
+    token.overlay.textContent = token.original;
+    return;
+  }
 
-    return randomGlyph();
-  }).join("");
+  const revealCount = Math.floor(token.originalCharacters.length * progress);
+
+  for (let index = 0; index < token.originalCharacters.length; index += 1) {
+    token.overlayCharacters[index] =
+      index < revealCount ? token.originalCharacters[index] : randomGlyph();
+  }
+
+  token.overlay.textContent = token.overlayCharacters.join("");
 };
 
 const createGlyphToken = (
@@ -71,6 +113,8 @@ const createGlyphToken = (
   const element = document.createElement("span");
   const original = document.createElement("span");
   const overlay = document.createElement("span");
+  const originalCharacters = Array.from(text);
+  const overlayCharacters = createScrambledCharacters(originalCharacters);
 
   element.dataset.glyphTextReveal = "";
   element.style.position = "relative";
@@ -81,7 +125,7 @@ const createGlyphToken = (
   original.textContent = text;
   original.style.color = "transparent";
 
-  overlay.textContent = createScrambledText(text, 0);
+  overlay.textContent = overlayCharacters.join("");
   overlay.ariaHidden = "true";
   overlay.style.position = "absolute";
   overlay.style.inset = "0";
@@ -93,14 +137,18 @@ const createGlyphToken = (
   return {
     element,
     token: {
+      isComplete: false,
       original: text,
+      originalCharacters,
+      originalElement: original,
       overlay,
-      startOffset: Math.random() * REVEAL_STAGGER_MS,
+      overlayCharacters,
+      startOffset: randomUnit() * REVEAL_STAGGER_MS,
     },
   };
 };
 
-const createRevealTargets = (root: HTMLElement): GlyphTextRevealTarget[] => {
+const createRevealTargets = (root: Element): GlyphTextRevealTarget[] => {
   const textNodesByElement = new Map<Element, Text[]>();
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (node): number =>
@@ -113,13 +161,51 @@ const createRevealTargets = (root: HTMLElement): GlyphTextRevealTarget[] => {
     const parent = textNode.parentElement;
 
     if (parent && !revealedElements.has(parent)) {
-      textNodesByElement.set(parent, [...(textNodesByElement.get(parent) ?? []), textNode]);
+      const textNodes = textNodesByElement.get(parent);
+
+      if (textNodes) {
+        textNodes.push(textNode);
+      } else {
+        textNodesByElement.set(parent, [textNode]);
+      }
     }
 
     currentNode = walker.nextNode();
   }
 
   return Array.from(textNodesByElement, ([element, textNodes]) => ({ element, textNodes }));
+};
+
+const createRevealContainers = (root: HTMLElement): Element[] => {
+  const containers = Array.from(root.querySelectorAll(REVEAL_CONTAINER_SELECTOR)).filter(
+    (element): boolean => !element.closest(EXCLUDED_SELECTOR),
+  );
+
+  return containers.length > 0 ? containers : [root];
+};
+
+const scheduleSharedAnimation = (): void => {
+  if (sharedAnimationFrame !== 0 || activeReveals.size === 0) return;
+
+  sharedAnimationFrame = requestAnimationFrame(renderActiveReveals);
+};
+
+const renderActiveReveals = (time: number): void => {
+  sharedAnimationFrame = 0;
+
+  for (const reveal of activeReveals) {
+    if (reveal.startedAt === 0) reveal.startedAt = time;
+    if (time - reveal.lastFrameAt < REVEAL_FRAME_RATE) continue;
+
+    reveal.lastFrameAt = time;
+
+    if (reveal.render(time)) {
+      activeReveals.delete(reveal);
+      reveal.complete();
+    }
+  }
+
+  scheduleSharedAnimation();
 };
 
 const animateTextNodes = (textNodes: Text[]): (() => void) => {
@@ -155,12 +241,9 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
 
   if (tokens.length === 0) return (): void => {};
 
-  let animationFrame = 0;
-  let startedAt = 0;
-  let lastFrameAt = 0;
   let isRestored = false;
 
-  const restoreText = (): void => {
+  const cancelReveal = (): void => {
     if (isRestored) return;
     isRestored = true;
 
@@ -169,41 +252,51 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
     }
   };
 
-  const render = (time: number): void => {
-    if (startedAt === 0) startedAt = time;
+  const completeReveal = (): void => {
+    if (isRestored) return;
+    isRestored = true;
 
-    if (time - lastFrameAt < REVEAL_FRAME_RATE) {
-      animationFrame = requestAnimationFrame(render);
-      return;
-    }
-
-    lastFrameAt = time;
-
-    let isComplete = true;
-
-    for (const { original, overlay, startOffset } of tokens) {
-      const progress = Math.min(1, (time - startedAt - startOffset) / REVEAL_DURATION_MS);
-
-      if (progress < 1) {
-        isComplete = false;
-        overlay.textContent = createScrambledText(original, Math.max(0, progress));
-      } else {
-        overlay.textContent = original;
-      }
-    }
-
-    if (!isComplete) {
-      animationFrame = requestAnimationFrame(render);
-    } else {
-      restoreText();
+    for (const { originalElement, overlay } of tokens) {
+      originalElement.style.color = "";
+      overlay.remove();
     }
   };
 
-  animationFrame = requestAnimationFrame(render);
+  const reveal: ActiveGlyphReveal = {
+    cancel: cancelReveal,
+    complete: completeReveal,
+    lastFrameAt: 0,
+    render: (time: number): boolean => {
+      let isComplete = true;
+
+      for (const token of tokens) {
+        if (token.isComplete) continue;
+
+        const progress = Math.min(
+          1,
+          (time - reveal.startedAt - token.startOffset) / REVEAL_DURATION_MS,
+        );
+
+        if (progress < 1) {
+          isComplete = false;
+          updateScrambledText(token, Math.max(0, progress));
+        } else {
+          token.overlay.textContent = token.original;
+          token.isComplete = true;
+        }
+      }
+
+      return isComplete;
+    },
+    startedAt: 0,
+  };
+
+  activeReveals.add(reveal);
+  scheduleSharedAnimation();
 
   return (): void => {
-    cancelAnimationFrame(animationFrame);
-    restoreText();
+    activeReveals.delete(reveal);
+    cancelReveal();
   };
 };
 
@@ -216,7 +309,9 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
     if (!root || prefersReducedMotion) return;
 
     const restoreAnimations = new Set<() => void>();
-    const observer = new IntersectionObserver(
+    const targetsByElement = new Map<Element, Text[]>();
+    const observedRevealTargets = new WeakSet<Element>();
+    const targetObserver = new IntersectionObserver(
       (entries): void => {
         for (const entry of entries) {
           if (!entry.isIntersecting) continue;
@@ -225,7 +320,7 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
           const textNodes = targetsByElement.get(target);
           if (!textNodes) continue;
 
-          observer.unobserve(target);
+          targetObserver.unobserve(target);
           targetsByElement.delete(target);
           revealedElements.add(target);
 
@@ -235,17 +330,39 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
       },
       { threshold: 0.01 },
     );
-    const targets = createRevealTargets(root);
-    const targetsByElement = new Map<Element, Text[]>(
-      targets.map(({ element, textNodes }) => [element, textNodes]),
-    );
+    const observeContainerTargets = (container: Element): void => {
+      if (scannedContainers.has(container)) return;
+      scannedContainers.add(container);
 
-    for (const { element } of targets) {
-      observer.observe(element);
+      for (const { element, textNodes } of createRevealTargets(container)) {
+        if (observedRevealTargets.has(element) || revealedElements.has(element)) continue;
+
+        observedRevealTargets.add(element);
+        targetsByElement.set(element, textNodes);
+        targetObserver.observe(element);
+      }
+    };
+    const containerObserver = new IntersectionObserver(
+      (entries): void => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+
+          const container = entry.target;
+          containerObserver.unobserve(container);
+          observeContainerTargets(container);
+        }
+      },
+      { rootMargin: "200px 0px", threshold: 0.01 },
+    );
+    const containers = createRevealContainers(root);
+
+    for (const container of containers) {
+      containerObserver.observe(container);
     }
 
     cleanup(() => {
-      observer.disconnect();
+      containerObserver.disconnect();
+      targetObserver.disconnect();
 
       for (const restoreAnimation of restoreAnimations) {
         restoreAnimation();

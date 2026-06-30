@@ -45,11 +45,7 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
       <li class="article-summary">
         <Link class={scopeId} href={`/blog/${path}/`} prefetch>
           <div class="article-summary-cover-image">
-            <GlyphRaster
-              layout="fill"
-              source={{ type: "image", url: coverImagePublicPath }}
-              opacity={1}
-            />
+            <GlyphRaster source={{ type: "image", url: coverImagePublicPath }} />
 
             <div dangerouslySetInnerHTML={coverImageWithScopeId}></div>
           </div>
