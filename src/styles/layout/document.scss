@@ -1,4 +1,6 @@
 :root {
+  --font-family-global: Charter, "Bitstream Charter", "Sitka Text", Cambria, serif;
+
   transition: all 0.3s ease;
 }
 
@@ -8,6 +10,13 @@ body {
   width: 100%;
   display: flex;
   overscroll-behavior: none;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
 }
 
 html {
@@ -33,7 +42,7 @@ html {
     flex-direction: column;
     align-items: center;
 
-    font-family: Charter, "Bitstream Charter", "Sitka Text", Cambria, serif;
+    font-family: var(--font-family-global);
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4' viewBox='0 0 4 4'%3E%3Cpath fill='%23666' opacity='0.4' d='M1 3h1v1H1V3zm2-2h1v1H3V1z'%3E%3C/path%3E%3C/svg%3E");
 
     @media print {

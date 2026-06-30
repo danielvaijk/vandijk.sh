@@ -33,11 +33,9 @@
     height: 2.6rem; // Prevents the ti cursor addition causing layout shifting.
     margin: 0;
 
-    --ti-cursor-font-family:
-      Superclarendon, "Bookman Old Style", "URW Bookman", "URW Bookman L", "Georgia Pro", Georgia,
-      serif;
+    --ti-cursor-font-family: var(--font-family-global);
     --ti-cursor-font-size: 1.4rem;
-    --ti-cursor-font-weight: 900;
+    --ti-cursor-font-weight: 400;
     --ti-cursor-color: currentColor;
   }
 }

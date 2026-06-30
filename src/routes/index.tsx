@@ -10,8 +10,7 @@ import styles from "src/routes/index.scss?inline";
 const SPLASH_CHARS =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%&*+=-~.:;|/\\<>";
 const SPLASH_COLORS = ["#2e2e2e", "#585858", "#8a8a8a", "#d0d0d0", "#f4f4f4"];
-const SPLASH_FONT_FAMILY =
-  'ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", monospace';
+const SPLASH_FONT_FAMILY = 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif';
 const SPLASH_HORIZONTAL_SCALE = 1.09;
 
 export default component$((): QwikJSX.Element => {
