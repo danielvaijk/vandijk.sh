@@ -1,89 +1,18 @@
 import type { QwikJSX } from "@builder.io/qwik";
-import { $, component$, useOnDocument, useOnWindow, useSignal } from "@builder.io/qwik";
+import { component$ } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
-function isClickOutsideRect(clickEvent: MouseEvent, rect: DOMRect): boolean {
-  const { x, y } = clickEvent;
-
-  const isHorizontallyOutside = x < rect.left || x > rect.right;
-  const isVerticallyOutside = y < rect.top || y > rect.bottom;
-
-  return isHorizontallyOutside || isVerticallyOutside;
-}
-
 export const NavigationHeaderItems = component$((): QwikJSX.Element => {
-  const isOpen = useSignal(false);
-  const listRef = useSignal<HTMLElement>();
-  const hamburgerRef = useSignal<HTMLElement>();
-
-  useOnDocument(
-    "click",
-    $((clickEvent: MouseEvent): void => {
-      const listRefValue = listRef.value;
-      const hamburgerRefValue = hamburgerRef.value;
-
-      if (typeof listRefValue === "undefined") {
-        return;
-      }
-
-      if (typeof hamburgerRefValue === "undefined") {
-        return;
-      }
-
-      if (!isClickOutsideRect(clickEvent, hamburgerRefValue.getBoundingClientRect())) {
-        return;
-      }
-
-      if (isClickOutsideRect(clickEvent, listRefValue.getBoundingClientRect())) {
-        isOpen.value = false;
-      }
-    }),
-  );
-
-  useOnWindow(
-    "resize",
-    $((): void => {
-      if (isOpen.value) {
-        isOpen.value = false;
-      }
-    }),
-  );
-
   return (
     <nav>
-      <div
-        ref={hamburgerRef}
-        class="hamburger clickable"
-        onClick$={(): void => {
-          isOpen.value = !isOpen.value;
-        }}
-      >
-        <div></div>
-        <div></div>
-        <div></div>
-      </div>
-
-      <ul ref={listRef} class={isOpen.value ? "is-open" : null}>
+      <ul>
         <li>
-          <Link
-            href="/blog/"
-            onClick$={(): void => {
-              isOpen.value = !isOpen.value;
-            }}
-            prefetch
-          >
+          <Link href="/blog/" prefetch>
             Articles
           </Link>
         </li>
         <li>
-          <Link
-            target="_blank"
-            rel="noopener noreferrer"
-            href="https://github.com/danielvaijk"
-            onClick$={(): void => {
-              isOpen.value = !isOpen.value;
-            }}
-          >
+          <Link target="_blank" rel="noopener noreferrer" href="https://github.com/danielvaijk">
             GitHub
           </Link>
         </li>
@@ -92,9 +21,6 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
             target="_blank"
             rel="noopener noreferrer"
             href="https://www.linkedin.com/in/danielvaijk/"
-            onClick$={(): void => {
-              isOpen.value = !isOpen.value;
-            }}
           >
             LinkedIn
           </Link>

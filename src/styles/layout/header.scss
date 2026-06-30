@@ -3,38 +3,20 @@
 header {
   width: 100%;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  justify-content: flex-start;
   align-items: center;
-  margin-bottom: 0.8rem;
+  margin: 1.6rem 0;
   user-select: none;
-
-  &::before {
-    content: "";
-    order: 2;
-    flex: 1;
-    height: 1px;
-    margin: 0 0.8rem;
-    background-color: var(--text-color);
-  }
 
   @media print {
     display: none;
   }
 
   > #header-name {
-    order: 1;
     display: flex;
     align-items: center;
     color: inherit;
-
-    > img {
-      @include mixins.responsive(width, 40px, 60px);
-
-      & {
-        margin-right: 0.4rem;
-        height: auto;
-      }
-    }
 
     > h2 {
       @include mixins.responsive(font-size, 1.6rem, 2rem);
@@ -42,80 +24,31 @@ header {
       & {
         margin: 0;
       }
-
-      &::before {
-        content: "D";
-        display: inline-block;
-        padding: 0.7128rem 1.097rem; // These are set to bring the box as close to 60x60px as possible on desktop.
-        border: 1px solid var(--text-color);
-        border-radius: var(--page-pane-corner-radius);
-        margin-right: 0.4rem;
-        background-color: var(--background-color);
-      }
     }
   }
 
   > nav {
     position: relative;
-    order: 3;
-    margin: 0;
+    margin: 0.6rem 0 0;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
+    align-items: center;
 
     > ul {
-      @include mixins.responsive(text-align, center, right);
-      @include mixins.responsive(display, none, flex);
-      @include mixins.responsive(flex-direction, column, row);
-
-      @include mixins.mobile-only(position, absolute);
-      @include mixins.mobile-only(top, 2rem);
-      @include mixins.mobile-only(background-color, var(--background-color));
-      @include mixins.mobile-only(box-shadow, 4px 4px 0 0 rgba(0, 0, 0, 0.15));
-      @include mixins.mobile-only(border, 1px solid var(--text-color));
-
-      & {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-      }
-
-      &.is-open {
-        display: flex;
-        z-index: 1;
-      }
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 0.4rem 0.8rem;
+      text-align: center;
+      list-style: none;
+      margin: 0;
+      padding: 0;
 
       > li {
-        @include mixins.desktop-only(height, 1.8rem);
-
-        &:not(:last-child) {
-          @include mixins.mobile-only(margin-bottom, 0.8rem);
-          @include mixins.desktop-only(margin-right, 0.8rem);
-        }
-
         a {
           color: inherit;
           font-size: 1.2rem;
           font-weight: 500;
-        }
-      }
-    }
-
-    > .hamburger {
-      @include mixins.responsive(display, flex, none);
-
-      & {
-        padding: 0.6rem;
-      }
-
-      > div {
-        width: 0.4rem;
-        height: 0.4rem;
-        border-radius: 100%;
-        background-color: var(--text-color);
-
-        &:not(:last-child) {
-          margin-right: 0.4rem;
         }
       }
     }
