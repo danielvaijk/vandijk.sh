@@ -2,8 +2,6 @@ import type { QwikJSX } from "@builder.io/qwik";
 import { $, component$, useOnDocument, useOnWindow, useSignal } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
-import { NavigationHeaderThemeToggle } from "src/components/navigation/navigation-header-theme-toggle";
-
 function isClickOutsideRect(clickEvent: MouseEvent, rect: DOMRect): boolean {
   const { x, y } = clickEvent;
 
@@ -100,9 +98,6 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
           >
             LinkedIn
           </Link>
-        </li>
-        <li class="theme-toggle js-only">
-          <NavigationHeaderThemeToggle />
         </li>
       </ul>
     </nav>

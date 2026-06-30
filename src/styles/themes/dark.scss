@@ -1,4 +1,6 @@
-@mixin dark-theme-variables {
+:root {
+  color-scheme: dark;
+
   --text-color: #ffffff;
   --link-color: #619fff;
   --inline-code-text-color: #ff6b6b;
@@ -6,32 +8,6 @@
   --inline-code-background-color: #191919;
   --code-background-color: #191919;
   --background-color: #000000;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root:not(.light) {
-    @include dark-theme-variables;
-
-    .theme-toggle {
-      svg {
-        fill: var(--text-color);
-      }
-    }
-
-    .light-only {
-      display: none;
-    }
-  }
-}
-
-.dark {
-  @include dark-theme-variables;
-
-  .theme-toggle {
-    svg {
-      fill: var(--text-color);
-    }
-  }
 
   .light-only {
     display: none;
