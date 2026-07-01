@@ -111,7 +111,7 @@ type GlyphFieldModifierRegion = {
 const GLYPH_CHARS =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%&*+=-~.:;|/\\<>";
 const GLYPH_COLORS = ["#2e2e2e", "#585858", "#8a8a8a", "#d0d0d0", "#f4f4f4"];
-const NOISE_COLORS = ["#131313", "#1e1e1e", "#343434", "#6f6f6f", "#ffffff"];
+const NOISE_COLORS = ["#070707", "#151515", "#303030", "#747474", "#ffffff"];
 const GLYPH_FONT_FAMILY = 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif';
 const GLYPH_HORIZONTAL_SCALE = 1.09;
 const NOISE_CELL_WIDTH = 8;
@@ -380,8 +380,11 @@ const solarSurfaceBrightness = (col: number, row: number, time: number, seed: nu
   const filaments = smoothstep(0.5, 0.9, (filamentNoise + 1) * 0.5);
   const pulse =
     0.5 + Math.sin(seconds * 0.7 + convection * 3.2 + shear * 2.4) * 0.06 + burst * 0.12;
+  const softCells = smoothstep(0.16, 0.82, (plumeNoise + 1) * 0.5);
+  const coreCells = cells * cells;
+  const depth = softCells * 0.28 + coreCells * 0.42 + filaments * 0.24 + burst * 0.18;
 
-  return clamp(0.22 + (cells * 0.5 + filaments * 0.28 + (convection + 1) * 0.11) * pulse, 0, 1);
+  return clamp(0.12 + (depth + (convection + 1) * 0.07) * pulse, 0, 1);
 };
 
 const resolveSource = (source: GlyphRasterSource | undefined): GlyphRasterSource => {
@@ -874,8 +877,11 @@ float glyphSolarBrightness(vec2 cell, float time, float seed) {
   float cells = smoothstep(0.34, 0.78, (plumeNoise + 1.0) * 0.5);
   float filaments = smoothstep(0.5, 0.9, (filamentNoise + 1.0) * 0.5);
   float pulse = 0.5 + sin(seconds * 0.7 + convection * 3.2 + shear * 2.4) * 0.06 + burst * 0.12;
+  float softCells = smoothstep(0.16, 0.82, (plumeNoise + 1.0) * 0.5);
+  float coreCells = cells * cells;
+  float depth = softCells * 0.28 + coreCells * 0.42 + filaments * 0.24 + burst * 0.18;
 
-  return clamp(0.22 + (cells * 0.5 + filaments * 0.28 + (convection + 1.0) * 0.11) * pulse, 0.0, 1.0);
+  return clamp(0.12 + (depth + (convection + 1.0) * 0.07) * pulse, 0.0, 1.0);
 }
 `;
 
