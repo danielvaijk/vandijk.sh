@@ -143,8 +143,10 @@ const MIN_GLYPH_CELL_SCALE = 1;
 const MAX_GLYPH_CELL_SCALE = 8;
 const MAX_GLYPH_GRID_CELLS = 18000;
 const MAX_GLYPH_ATLAS_CACHE_SIZE = 8;
+const MAX_GLYPH_DRAW_METRICS_CACHE_SIZE = 512;
 const MAX_FRAME_BRIGHTNESS_CACHE_SIZE = 8;
 const MAX_PARSED_COLOR_CACHE_SIZE = 32;
+const GLYPH_CELL_PADDING_RATIO = 0.08;
 const DIAGONAL_GRADIENT = Math.SQRT1_2;
 const FRACTAL_NOISE_RANGE = 0.52 + 0.26 + 0.13 + 0.065;
 const GLYPH_QUAD_CORNERS = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
@@ -156,6 +158,14 @@ const glyphAtlasCache = new Map<
   }
 >();
 const frameBrightnessCache = new Map<string, Uint8Array>();
+const glyphDrawMetricsCache = new Map<
+  string,
+  {
+    offsetX: number;
+    offsetY: number;
+    scale: number;
+  }
+>();
 const parsedColorCache = new Map<string, [number, number, number, number]>();
 const activeGlyphRasters = new Set<ActiveGlyphRaster>();
 const glyphFieldModifierRegions = new Map<string, GlyphFieldModifierRegion>();
@@ -704,6 +714,67 @@ const createProgram = (
   return program;
 };
 
+const getGlyphDrawMetrics = (
+  context: CanvasRenderingContext2D,
+  glyph: string,
+  cellWidth: number,
+  cellHeight: number,
+  fontSize: number,
+): {
+  offsetX: number;
+  offsetY: number;
+  scale: number;
+} => {
+  const cacheKey = [glyph, cellWidth, cellHeight, fontSize].join(":");
+  const cachedMetrics = getCachedValue(glyphDrawMetricsCache, cacheKey);
+  if (cachedMetrics) return cachedMetrics;
+
+  const metrics = context.measureText(glyph);
+  const left = metrics.actualBoundingBoxLeft || 0;
+  const right = metrics.actualBoundingBoxRight || metrics.width;
+  const ascent = metrics.actualBoundingBoxAscent || fontSize;
+  const descent = metrics.actualBoundingBoxDescent || 0;
+  const glyphWidth = Math.max(1, left + right);
+  const glyphHeight = Math.max(1, ascent + descent);
+  const paddingX = Math.max(0.5, cellWidth * GLYPH_CELL_PADDING_RATIO);
+  const paddingY = Math.max(0.5, cellHeight * GLYPH_CELL_PADDING_RATIO);
+  const scale = Math.min(
+    1,
+    Math.max(1, cellWidth - paddingX * 2) / glyphWidth,
+    Math.max(1, cellHeight - paddingY * 2) / glyphHeight,
+  );
+  const offsetX = (cellWidth - glyphWidth * scale) / 2 + left * scale;
+  const offsetY = (cellHeight - glyphHeight * scale) / 2 + ascent * scale;
+  const resolvedMetrics = { offsetX, offsetY, scale };
+
+  setCachedValue(
+    glyphDrawMetricsCache,
+    cacheKey,
+    resolvedMetrics,
+    MAX_GLYPH_DRAW_METRICS_CACHE_SIZE,
+  );
+
+  return resolvedMetrics;
+};
+
+const drawGlyphInCell = (
+  context: CanvasRenderingContext2D,
+  glyph: string,
+  x: number,
+  y: number,
+  cellWidth: number,
+  cellHeight: number,
+  fontSize: number,
+): void => {
+  const metrics = getGlyphDrawMetrics(context, glyph, cellWidth, cellHeight, fontSize);
+
+  context.save();
+  context.translate(x + metrics.offsetX, y + metrics.offsetY);
+  context.scale(metrics.scale, metrics.scale);
+  context.fillText(glyph, 0, 0);
+  context.restore();
+};
+
 const createGlyphAtlas = ({
   cellHeight,
   cellWidth,
@@ -740,7 +811,7 @@ const createGlyphAtlas = ({
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = "#ffffff";
   context.font = `${fontSize * pixelRatio}px ${GLYPH_FONT_FAMILY}`;
-  context.textBaseline = "top";
+  context.textBaseline = "alphabetic";
 
   for (let index = 0; index < characters.length; index += 1) {
     const glyph = characters[index];
@@ -750,7 +821,7 @@ const createGlyphAtlas = ({
     const y = row * atlasCellHeight;
     const uvIndex = index * 4;
 
-    context.fillText(glyph, x, y);
+    drawGlyphInCell(context, glyph, x, y, atlasCellWidth, atlasCellHeight, fontSize * pixelRatio);
     glyphUvs[uvIndex] = x / canvas.width;
     glyphUvs[uvIndex + 1] = y / canvas.height;
     glyphUvs[uvIndex + 2] = atlasCellWidth / canvas.width;
@@ -787,7 +858,7 @@ const createCanvasGlyphRenderer = (
       context.fillStyle = backgroundColor;
       context.fillRect(0, 0, canvas.clientWidth, canvas.clientHeight);
       context.font = `${fontSize}px ${GLYPH_FONT_FAMILY}`;
-      context.textBaseline = "top";
+      context.textBaseline = "alphabetic";
 
       let currentColor = backgroundColor;
 
@@ -804,10 +875,14 @@ const createCanvasGlyphRenderer = (
             currentColor = color;
           }
 
-          context.fillText(
+          drawGlyphInCell(
+            context,
             glyphCharacters[glyphIndices[index]],
             offsetX + col * cellWidth,
             offsetY + row * cellHeight,
+            cellWidth,
+            cellHeight,
+            fontSize,
           );
         }
       }
