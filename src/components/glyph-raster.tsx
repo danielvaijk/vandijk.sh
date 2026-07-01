@@ -1040,15 +1040,19 @@ const createWebGlGlyphRenderer = ({
       vec2 cell = floor(a_brightness_uv * u_brightness_size);
       vec2 world = u_viewport_scroll + u_grid_offset + (cell + vec2(0.5)) * u_cell_size;
       vec2 world_cell = floor(world / u_cell_size);
+      vec2 modifier_world = (world_cell + vec2(0.5)) * u_cell_size;
       float color_brightness = clamp(
-        glyphApplyFieldModifiers(glyphSolarBrightness(world_cell, u_source_time, u_noise_seed), world),
+        glyphApplyFieldModifiers(
+          glyphSolarBrightness(world_cell, u_source_time, u_noise_seed),
+          modifier_world
+        ),
         0.0,
         1.0
       );
       float entropy_brightness = glyphProceduralEntropyBrightness(clamp(
         glyphApplyFieldModifiers(
           glyphSolarBrightness(world_cell, u_entropy_sample_time, u_noise_seed),
-          world
+          modifier_world
         ),
         0.0,
         1.0
@@ -1872,6 +1876,10 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
             const viewportY = offsetY + (row + 0.5) * preset.cellHeight;
             const worldX = viewportX + window.scrollX;
             const worldY = viewportY + window.scrollY;
+            const worldCellCenterX =
+              (Math.floor(worldX / preset.cellWidth) + 0.5) * preset.cellWidth;
+            const worldCellCenterY =
+              (Math.floor(worldY / preset.cellHeight) + 0.5) * preset.cellHeight;
             const sampledBrightness = shouldUpdateBrightness
               ? adapter.getBrightness(
                   resolvedSource.type === "procedural-noise"
@@ -1889,7 +1897,11 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
             const brightness =
               shouldUpdateBrightness && resolvedSource.type === "procedural-noise"
                 ? clamp(
-                    applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY),
+                    applyGlyphFieldModifierBrightness(
+                      sampledBrightness,
+                      worldCellCenterX,
+                      worldCellCenterY,
+                    ),
                     0,
                     1,
                   )
