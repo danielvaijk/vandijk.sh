@@ -292,10 +292,25 @@ const applyGlyphFieldModifierBrightness = (
 
       const u = clamp((worldX - region.documentLeft) / region.width, 0, 0.999999);
       const v = clamp((worldY - region.documentTop) / region.height, 0, 0.999999);
-      const sampleX = Math.floor(u * FIELD_MODIFIER_SAMPLE_SIZE);
-      const sampleY = Math.floor(v * FIELD_MODIFIER_SAMPLE_SIZE);
-      const regionBrightness =
-        region.brightnessGrid[sampleY * FIELD_MODIFIER_SAMPLE_SIZE + sampleX] / 255;
+      const sampleX = u * (FIELD_MODIFIER_SAMPLE_SIZE - 1);
+      const sampleY = v * (FIELD_MODIFIER_SAMPLE_SIZE - 1);
+      const left = Math.floor(sampleX);
+      const top = Math.floor(sampleY);
+      const right = Math.min(FIELD_MODIFIER_SAMPLE_SIZE - 1, left + 1);
+      const bottom = Math.min(FIELD_MODIFIER_SAMPLE_SIZE - 1, top + 1);
+      const amountX = sampleX - left;
+      const amountY = sampleY - top;
+      const topBrightness = lerp(
+        region.brightnessGrid[top * FIELD_MODIFIER_SAMPLE_SIZE + left] / 255,
+        region.brightnessGrid[top * FIELD_MODIFIER_SAMPLE_SIZE + right] / 255,
+        amountX,
+      );
+      const bottomBrightness = lerp(
+        region.brightnessGrid[bottom * FIELD_MODIFIER_SAMPLE_SIZE + left] / 255,
+        region.brightnessGrid[bottom * FIELD_MODIFIER_SAMPLE_SIZE + right] / 255,
+        amountX,
+      );
+      const regionBrightness = lerp(topBrightness, bottomBrightness, amountY);
       const mappedRegionBrightness = smoothstep(
         0,
         FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT,
@@ -1011,11 +1026,16 @@ const createWebGlGlyphRenderer = ({
         }
 
         vec2 modifier_uv = clamp((world - rect.xy) / rect.zw, vec2(0.0), vec2(0.999999));
-        ivec2 sample_cell = ivec2(floor(modifier_uv * float(${FIELD_MODIFIER_SAMPLE_SIZE})));
-        float sampled_brightness = texelFetch(
+        float sample_x =
+          (modifier_uv.x * float(${FIELD_MODIFIER_SAMPLE_SIZE - 1}) + 0.5) /
+          float(${FIELD_MODIFIER_SAMPLE_SIZE});
+        float sample_y =
+          (float(index * ${FIELD_MODIFIER_SAMPLE_SIZE}) +
+          modifier_uv.y * float(${FIELD_MODIFIER_SAMPLE_SIZE - 1}) + 0.5) /
+          float(${FIELD_MODIFIER_SAMPLE_SIZE * MAX_FIELD_MODIFIER_REGIONS});
+        float sampled_brightness = texture(
           u_field_modifier_brightness,
-          ivec2(sample_cell.x, sample_cell.y + index * ${FIELD_MODIFIER_SAMPLE_SIZE}),
-          0
+          vec2(sample_x, sample_y)
         ).r;
         float mapped_brightness = smoothstep(
           0.0,
@@ -1037,11 +1057,12 @@ const createWebGlGlyphRenderer = ({
     }
     void main() {
       vec2 cell = floor(a_brightness_uv * u_brightness_size);
-      vec2 world_cell = floor((u_viewport_scroll + a_position + vec2(0.5) * u_cell_size) / u_cell_size);
-      vec2 modifier_world = (world_cell + vec2(0.5)) * u_cell_size;
+      vec2 world = u_viewport_scroll + a_position + vec2(0.5) * u_cell_size;
+      vec2 modifier_world = (floor(world / u_cell_size) + vec2(0.5)) * u_cell_size;
+      vec2 field_point = world / u_cell_size;
       float color_brightness = clamp(
         glyphApplyFieldModifiers(
-          glyphSolarBrightness(world_cell, u_source_time, u_noise_seed),
+          glyphSolarBrightness(field_point, u_source_time, u_noise_seed),
           modifier_world
         ),
         0.0,
@@ -1049,7 +1070,7 @@ const createWebGlGlyphRenderer = ({
       );
       float entropy_brightness = glyphProceduralEntropyBrightness(clamp(
         glyphApplyFieldModifiers(
-          glyphSolarBrightness(world_cell, u_entropy_sample_time, u_noise_seed),
+          glyphSolarBrightness(field_point, u_entropy_sample_time, u_noise_seed),
           modifier_world
         ),
         0.0,
@@ -1397,8 +1418,8 @@ const createWebGlGlyphRenderer = ({
 
     gl.activeTexture(gl.TEXTURE3);
     gl.bindTexture(gl.TEXTURE_2D, fieldModifierBrightnessTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(
@@ -1468,17 +1489,7 @@ const createWebGlGlyphRenderer = ({
         uploadPalette(colors);
       }
 
-      const shouldAnchorToWorld = usesGpuNoise;
-      const positionKey = shouldAnchorToWorld
-        ? [
-            cols,
-            rows,
-            cellWidth,
-            cellHeight,
-            Math.floor(viewportScrollX / cellWidth),
-            Math.floor(viewportScrollY / cellHeight),
-          ].join(":")
-        : [cols, rows, offsetX, offsetY, cellWidth, cellHeight].join(":");
+      const positionKey = [cols, rows, offsetX, offsetY, cellWidth, cellHeight].join(":");
       const shouldUploadPositions = positionKey !== lastPositionKey;
       const shouldUploadBrightness = didResize || shouldUpdateBrightness;
       if (shouldUploadPositions) {
@@ -1490,17 +1501,11 @@ const createWebGlGlyphRenderer = ({
           for (let col = 0; col < cols; col += 1) {
             const index = row * cols + col;
             const positionIndex = index * 2;
-            const worldCol = Math.floor(viewportScrollX / cellWidth) + col - 1;
-            const worldRow = Math.floor(viewportScrollY / cellHeight) + row - 1;
 
             brightnessUvs[positionIndex] = (col + 0.5) / cols;
             brightnessUvs[positionIndex + 1] = (row + 0.5) / rows;
-            positions[positionIndex] = shouldAnchorToWorld
-              ? worldCol * cellWidth - viewportScrollX
-              : offsetX + col * cellWidth;
-            positions[positionIndex + 1] = shouldAnchorToWorld
-              ? worldRow * cellHeight - viewportScrollY
-              : offsetY + row * cellHeight;
+            positions[positionIndex] = offsetX + col * cellWidth;
+            positions[positionIndex + 1] = offsetY + row * cellHeight;
           }
         }
       }
@@ -1814,10 +1819,8 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
 
       renderer.resize({ cssHeight, cssWidth, pixelRatio });
 
-      const overscanCells =
-        resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined ? 2 : 0;
-      cols = Math.max(1, Math.ceil(cssWidth / preset.cellWidth) + overscanCells);
-      rows = Math.max(1, Math.ceil(cssHeight / preset.cellHeight) + overscanCells);
+      cols = Math.max(1, Math.ceil(cssWidth / preset.cellWidth));
+      rows = Math.max(1, Math.ceil(cssHeight / preset.cellHeight));
       changedGlyphCount = 0;
       changedGlyphIndices = new Uint32Array(cols * rows);
       brightnessValues = new Float32Array(cols * rows);
@@ -1881,29 +1884,22 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
         lastBrightnessSampleAt = time;
       }
 
-      const shouldAnchorToWorld =
-        resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined;
-      const firstWorldCol = Math.floor(window.scrollX / preset.cellWidth) - 1;
-      const firstWorldRow = Math.floor(window.scrollY / preset.cellHeight) - 1;
-
       if (entropyMode === "cpu" || shouldUpdateBrightness || !usesGpuGlyphSelection) {
         for (let row = 0; row < rows; row += 1) {
           for (let col = 0; col < cols; col += 1) {
             const index = row * cols + col;
-            const worldCol = shouldAnchorToWorld ? firstWorldCol + col : col;
-            const worldRow = shouldAnchorToWorld ? firstWorldRow + row : row;
             const viewportX = offsetX + (col + 0.5) * preset.cellWidth;
             const viewportY = offsetY + (row + 0.5) * preset.cellHeight;
-            const worldX = shouldAnchorToWorld
-              ? (worldCol + 0.5) * preset.cellWidth
-              : viewportX + window.scrollX;
-            const worldY = shouldAnchorToWorld
-              ? (worldRow + 0.5) * preset.cellHeight
-              : viewportY + window.scrollY;
+            const worldX = viewportX + window.scrollX;
+            const worldY = viewportY + window.scrollY;
             const sampledBrightness = shouldUpdateBrightness
               ? adapter.getBrightness(
-                  resolvedSource.type === "procedural-noise" ? worldCol : col,
-                  resolvedSource.type === "procedural-noise" ? worldRow : row,
+                  resolvedSource.type === "procedural-noise"
+                    ? Math.floor(worldX / preset.cellWidth)
+                    : col,
+                  resolvedSource.type === "procedural-noise"
+                    ? Math.floor(worldY / preset.cellHeight)
+                    : row,
                   cols,
                   rows,
                   sourceTime,
