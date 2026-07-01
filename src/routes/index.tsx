@@ -1,5 +1,5 @@
 import type { QwikJSX } from "@builder.io/qwik";
-import { component$, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
+import { component$, useSignal, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
 import type { DocumentHeadValue } from "@builder.io/qwik-city";
 import { type DocumentHead } from "@builder.io/qwik-city";
 import TypeIt from "typeit";
@@ -9,19 +9,24 @@ import { createPageMetaTags } from "src/helpers/meta";
 import styles from "src/routes/index.scss?inline";
 
 export default component$((): QwikJSX.Element => {
+  const continuePrompt = useSignal("press any key to continue");
+
   useStylesScoped$(styles);
 
   useVisibleTask$(({ cleanup }): void => {
-    const continueToHome = (event: KeyboardEvent): void => {
-      if (event.key !== "Enter" && event.code !== "Enter") return;
+    const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+    continuePrompt.value = hasTouch ? "tap to continue" : "press any key to continue";
 
-      window.location.assign("/home/");
+    const continueToBlog = (): void => {
+      window.location.assign("/blog/");
     };
 
-    window.addEventListener("keydown", continueToHome, { capture: true });
+    window.addEventListener("keydown", continueToBlog, { capture: true });
+    window.addEventListener("touchstart", continueToBlog, { capture: true });
 
     cleanup(() => {
-      window.removeEventListener("keydown", continueToHome, { capture: true });
+      window.removeEventListener("keydown", continueToBlog, { capture: true });
+      window.removeEventListener("touchstart", continueToBlog, { capture: true });
     });
   });
 
@@ -64,7 +69,7 @@ export default component$((): QwikJSX.Element => {
     <section class="homepage-splash-stage">
       <GlyphRaster blend={0.4} source={{ type: "frames", url: "/terminal-splash.frames" }} />
       <h2 id="homepage-title">Hey there, I'm Daniel.</h2>
-      <strong>press enter to continue</strong>
+      <strong>{continuePrompt.value}</strong>
     </section>
   );
 });
