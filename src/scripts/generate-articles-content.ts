@@ -360,7 +360,7 @@ for (const { content, data, filePath } of articles) {
     width: coverImageData.metadata.width,
   };
 
-  const articleMarkup = generateMdxArticlePage({
+  const articleMarkup = await generateMdxArticlePage({
     anchorLinks: getAnchorLinks(articleContent),
     articleContent,
     coverImage,

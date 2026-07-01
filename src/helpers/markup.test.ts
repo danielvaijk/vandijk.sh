@@ -13,7 +13,7 @@ const markdownWithCodeBlock = [
 ].join("\n");
 
 assert.equal(
-  wrapMarkdownCodeBlocks(markdownWithCodeBlock),
+  await wrapMarkdownCodeBlocks(markdownWithCodeBlock),
   [
     "Before.",
     "",
@@ -33,7 +33,7 @@ assert.equal(
 const markdownWithPlainCodeBlock = ["~~~~", "plain text", "~~~~"].join("\n");
 
 assert.equal(
-  wrapMarkdownCodeBlocks(markdownWithPlainCodeBlock),
+  await wrapMarkdownCodeBlocks(markdownWithPlainCodeBlock),
   [
     '<details class="article-code-drawer">',
     "<summary>Code</summary>",
@@ -41,6 +41,35 @@ assert.equal(
     "~~~~",
     "plain text",
     "~~~~",
+    "",
+    "</details>",
+  ].join("\n"),
+);
+
+const markdownWithUnformattedCodeBlock = [
+  "```ts",
+  "const value = someFunction(alpha, beta, gamma, delta, epsilon, zeta, eta, theta);",
+  "```",
+].join("\n");
+
+assert.equal(
+  await wrapMarkdownCodeBlocks(markdownWithUnformattedCodeBlock),
+  [
+    '<details class="article-code-drawer">',
+    "<summary>TS</summary>",
+    "",
+    "```ts",
+    "const value = someFunction(",
+    "  alpha,",
+    "  beta,",
+    "  gamma,",
+    "  delta,",
+    "  epsilon,",
+    "  zeta,",
+    "  eta,",
+    "  theta,",
+    ");",
+    "```",
     "",
     "</details>",
   ].join("\n"),

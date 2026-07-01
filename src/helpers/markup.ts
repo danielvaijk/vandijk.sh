@@ -1,3 +1,5 @@
+import { format } from "oxfmt";
+
 import {
   ImageFormat,
   createImageVariants,
@@ -20,6 +22,28 @@ interface GenerateImagesWithMarkupOptions {
   isPriority?: boolean;
   publicPath?: string;
 }
+
+const CODE_BLOCK_PRINT_WIDTH = 80;
+const CODE_BLOCK_LANGUAGE_FILE_EXTENSIONS: Record<string, string> = {
+  css: "css",
+  html: "html",
+  javascript: "js",
+  js: "js",
+  json: "json",
+  json5: "json5",
+  jsonc: "jsonc",
+  jsx: "jsx",
+  markdown: "md",
+  md: "md",
+  mdx: "mdx",
+  mjs: "mjs",
+  scss: "scss",
+  ts: "ts",
+  tsx: "tsx",
+  typescript: "ts",
+  yaml: "yaml",
+  yml: "yaml",
+};
 
 function extractCaptionValues(captionRaw: string): ImageCaption {
   const caption: ImageCaption = {
@@ -132,34 +156,78 @@ function getCodeDrawerSummary(info: string): string {
   return "Code";
 }
 
-function wrapMarkdownCodeBlocks(content: string): string {
-  return content.replace(
-    /(^|\n)(?<indent>[ \t]*)(?<fence>`{3,}|~{3,})(?<info>[^\n]*)\n(?<code>[\s\S]*?)\n[ \t]*\k<fence>[ \t]*(?=\n|$)/gu,
-    (match, prefix: string, ...args: Array<unknown>): string => {
-      const groups = args.at(-1) as
-        | {
-            code: string;
-            fence: string;
-            indent: string;
-            info: string;
-          }
-        | undefined;
+function getCodeBlockFileName(info: string): string | null {
+  const language = info.trim().split(/\s+/u)[0]?.toLowerCase();
 
-      if (typeof groups === "undefined") {
-        return match;
-      }
+  if (typeof language !== "string" || language.length === 0) {
+    return null;
+  }
 
-      const summary = escapeHtmlText(getCodeDrawerSummary(groups.info));
-      const codeBlock = `${groups.indent}${groups.fence}${groups.info}\n${groups.code}\n${groups.indent}${groups.fence}`;
+  const extension = CODE_BLOCK_LANGUAGE_FILE_EXTENSIONS[language];
 
-      return `${prefix}<details class="article-code-drawer">
+  if (typeof extension !== "string") {
+    return null;
+  }
+
+  return `article-code-block.${extension}`;
+}
+
+async function formatMarkdownCodeBlock(code: string, info: string): Promise<string> {
+  const fileName = getCodeBlockFileName(info);
+
+  if (fileName === null) {
+    return code;
+  }
+
+  const result = await format(fileName, `${code}\n`, {
+    printWidth: CODE_BLOCK_PRINT_WIDTH,
+  });
+
+  if (result.errors.length > 0) {
+    return code;
+  }
+
+  return result.code.replace(/\n$/u, "");
+}
+
+async function wrapMarkdownCodeBlocks(content: string): Promise<string> {
+  const codeBlockRegex =
+    /(^|\n)(?<indent>[ \t]*)(?<fence>`{3,}|~{3,})(?<info>[^\n]*)\n(?<code>[\s\S]*?)\n[ \t]*\k<fence>[ \t]*(?=\n|$)/gu;
+  let result = "";
+  let lastIndex = 0;
+
+  for (const match of content.matchAll(codeBlockRegex)) {
+    const groups = match.groups as
+      | {
+          code: string;
+          fence: string;
+          indent: string;
+          info: string;
+        }
+      | undefined;
+
+    if (typeof groups === "undefined" || typeof match.index !== "number") {
+      continue;
+    }
+
+    const prefix = match[1] ?? "";
+    const summary = escapeHtmlText(getCodeDrawerSummary(groups.info));
+    const code = await formatMarkdownCodeBlock(groups.code, groups.info);
+    const codeBlock = `${groups.indent}${groups.fence}${groups.info}\n${code}\n${groups.indent}${groups.fence}`;
+
+    result += content.slice(lastIndex, match.index);
+    result += `${prefix}<details class="article-code-drawer">
 <summary>${summary}</summary>
 
 ${codeBlock}
 
 </details>`;
-    },
-  );
+    lastIndex = match.index + match[0].length;
+  }
+
+  result += content.slice(lastIndex);
+
+  return result;
 }
 
 async function generateImagesWithMarkup({
@@ -193,7 +261,7 @@ async function generateImagesWithMarkup({
   });
 }
 
-function generateMdxArticlePage({
+async function generateMdxArticlePage({
   anchorLinks,
   articleContent,
   coverImage,
@@ -222,8 +290,8 @@ function generateMdxArticlePage({
   readTime: number;
   title: string;
   topic: string;
-}): string {
-  const articleBody = wrapMarkdownCodeBlocks(articleContent);
+}): Promise<string> {
+  const articleBody = await wrapMarkdownCodeBlocks(articleContent);
 
   return `---
 title: ${JSON.stringify(title)}
