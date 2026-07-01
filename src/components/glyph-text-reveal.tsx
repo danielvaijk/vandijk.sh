@@ -16,14 +16,12 @@ const REVEAL_CONTAINER_SELECTOR = [
   "section > *",
   "ul > li",
 ].join(",");
-const EXCLUDED_SELECTOR = [
+const HEADER_REVEAL_CONTAINER_SELECTOR = ["header > #header-name", "header nav li"].join(",");
+const TEXT_EXCLUDED_SELECTOR = [
   "canvas",
   "code",
-  "footer",
-  "header",
   "input",
   "kbd",
-  "nav",
   "noscript",
   "option",
   "pre",
@@ -34,6 +32,12 @@ const EXCLUDED_SELECTOR = [
   "svg",
   "textarea",
   "[data-glyph-text-reveal]",
+].join(",");
+const CONTENT_CONTAINER_EXCLUDED_SELECTOR = [
+  TEXT_EXCLUDED_SELECTOR,
+  "footer",
+  "header",
+  "nav",
 ].join(",");
 const revealedElements = new WeakSet<Element>();
 const scannedContainers = new WeakSet<Element>();
@@ -66,6 +70,10 @@ type WrappedTextNode = {
   wrapper: HTMLSpanElement;
 };
 
+type AnimateTextNodesOptions = {
+  restoreCompleted?: boolean;
+};
+
 const activeReveals = new Set<ActiveGlyphReveal>();
 let sharedAnimationFrame = 0;
 let randomSeed = Math.floor(Math.random() * 0xffffffff) || 1;
@@ -80,10 +88,10 @@ const randomUnit = (): number => {
 
 const randomGlyph = (): string => GLYPH_CHARS[Math.floor(randomUnit() * GLYPH_CHARS.length)];
 
-const shouldAnimateTextNode = (node: Text): boolean => {
+const shouldAnimateTextNode = (node: Text, excludedSelector = TEXT_EXCLUDED_SELECTOR): boolean => {
   const parent = node.parentElement;
 
-  if (!parent || parent.closest(EXCLUDED_SELECTOR)) return false;
+  if (!parent || parent.closest(excludedSelector)) return false;
 
   return node.data.trim().length > 0;
 };
@@ -148,11 +156,16 @@ const createGlyphToken = (
   };
 };
 
-const createRevealTargets = (root: Element): GlyphTextRevealTarget[] => {
+const createRevealTargets = (
+  root: Element,
+  excludedSelector = TEXT_EXCLUDED_SELECTOR,
+): GlyphTextRevealTarget[] => {
   const textNodesByElement = new Map<Element, Text[]>();
   const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
     acceptNode: (node): number =>
-      shouldAnimateTextNode(node as Text) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT,
+      shouldAnimateTextNode(node as Text, excludedSelector)
+        ? NodeFilter.FILTER_ACCEPT
+        : NodeFilter.FILTER_REJECT,
   });
 
   let currentNode = walker.nextNode();
@@ -176,9 +189,13 @@ const createRevealTargets = (root: Element): GlyphTextRevealTarget[] => {
   return Array.from(textNodesByElement, ([element, textNodes]) => ({ element, textNodes }));
 };
 
-const createRevealContainers = (root: HTMLElement): Element[] => {
-  const containers = Array.from(root.querySelectorAll(REVEAL_CONTAINER_SELECTOR)).filter(
-    (element): boolean => !element.closest(EXCLUDED_SELECTOR),
+const createRevealContainers = (
+  root: HTMLElement,
+  selector: string,
+  excludedSelector: string,
+): Element[] => {
+  const containers = Array.from(root.querySelectorAll(selector)).filter(
+    (element): boolean => !element.closest(excludedSelector),
   );
 
   return containers.length > 0 ? containers : [root];
@@ -208,7 +225,10 @@ const renderActiveReveals = (time: number): void => {
   scheduleSharedAnimation();
 };
 
-const animateTextNodes = (textNodes: Text[]): (() => void) => {
+const animateTextNodes = (
+  textNodes: Text[],
+  { restoreCompleted = true }: AnimateTextNodesOptions = {},
+): (() => void) => {
   const tokens: AnimatedGlyphToken[] = [];
   const wrappedTextNodes: WrappedTextNode[] = [];
 
@@ -259,6 +279,10 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
       originalElement.style.color = "";
       overlay.remove();
     }
+
+    if (!restoreCompleted) {
+      isCleanedUp = true;
+    }
   };
 
   const reveal: ActiveGlyphReveal = {
@@ -308,7 +332,7 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
     if (!root || prefersReducedMotion) return;
 
     const restoreAnimations = new Set<() => void>();
-    const targetsByElement = new Map<Element, Text[]>();
+    const targetsByElement = new Map<Element, { restoreCompleted: boolean; textNodes: Text[] }>();
     const observedRevealTargets = new WeakSet<Element>();
     const targetObserver = new IntersectionObserver(
       (entries): void => {
@@ -316,28 +340,38 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
           if (!entry.isIntersecting) continue;
 
           const target = entry.target as Element;
-          const textNodes = targetsByElement.get(target);
-          if (!textNodes) continue;
+          const targetData = targetsByElement.get(target);
+          if (!targetData) continue;
 
           targetObserver.unobserve(target);
           targetsByElement.delete(target);
           revealedElements.add(target);
 
-          const restoreAnimation = animateTextNodes(textNodes);
+          const restoreAnimation = animateTextNodes(targetData.textNodes, {
+            restoreCompleted: targetData.restoreCompleted,
+          });
           restoreAnimations.add(restoreAnimation);
         }
       },
       { threshold: 0.01 },
     );
-    const observeContainerTargets = (container: Element): void => {
+    const observeContainerTargets = ({
+      container,
+      excludedSelector = TEXT_EXCLUDED_SELECTOR,
+      restoreCompleted = true,
+    }: {
+      container: Element;
+      excludedSelector?: string;
+      restoreCompleted?: boolean;
+    }): void => {
       if (scannedContainers.has(container)) return;
       scannedContainers.add(container);
 
-      for (const { element, textNodes } of createRevealTargets(container)) {
+      for (const { element, textNodes } of createRevealTargets(container, excludedSelector)) {
         if (observedRevealTargets.has(element) || revealedElements.has(element)) continue;
 
         observedRevealTargets.add(element);
-        targetsByElement.set(element, textNodes);
+        targetsByElement.set(element, { restoreCompleted, textNodes });
         targetObserver.observe(element);
       }
     };
@@ -348,15 +382,26 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
 
           const container = entry.target;
           containerObserver.unobserve(container);
-          observeContainerTargets(container);
+          observeContainerTargets({
+            container,
+            excludedSelector: CONTENT_CONTAINER_EXCLUDED_SELECTOR,
+          });
         }
       },
       { rootMargin: "200px 0px", threshold: 0.01 },
     );
-    const containers = createRevealContainers(root);
+    const containers = createRevealContainers(
+      root,
+      REVEAL_CONTAINER_SELECTOR,
+      CONTENT_CONTAINER_EXCLUDED_SELECTOR,
+    );
 
     for (const container of containers) {
       containerObserver.observe(container);
+    }
+
+    for (const container of root.querySelectorAll(HEADER_REVEAL_CONTAINER_SELECTOR)) {
+      observeContainerTargets({ container, restoreCompleted: false });
     }
 
     cleanup(() => {
