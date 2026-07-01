@@ -14,9 +14,7 @@ export type GlyphRasterNoiseSource = {
   type: "procedural-noise";
 };
 
-export type GlyphRasterSource =
-  | GlyphRasterFrameSource
-  | GlyphRasterNoiseSource;
+export type GlyphRasterSource = GlyphRasterFrameSource | GlyphRasterNoiseSource;
 
 export type GlyphRasterProps = {
   blend?: number;
@@ -141,6 +139,9 @@ const FIELD_MODIFIER_SAMPLE_SIZE = 64;
 const FIELD_MODIFIER_BRIGHTNESS_BOOST = 1.2;
 const FIELD_MODIFIER_BRIGHTNESS_FLOOR = 0.08;
 const FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT = 0.5;
+const MIN_GLYPH_CELL_SCALE = 1;
+const MAX_GLYPH_CELL_SCALE = 8;
+const MAX_GLYPH_GRID_CELLS = 18000;
 const MAX_GLYPH_ATLAS_CACHE_SIZE = 8;
 const MAX_FRAME_BRIGHTNESS_CACHE_SIZE = 8;
 const MAX_PARSED_COLOR_CACHE_SIZE = 32;
@@ -163,6 +164,41 @@ let glyphFieldModifierRegionsVersion = 0;
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
+
+const resolveGlyphGrid = ({
+  cellHeight,
+  cellWidth,
+  cssHeight,
+  cssWidth,
+}: {
+  cellHeight: number;
+  cellWidth: number;
+  cssHeight: number;
+  cssWidth: number;
+}): {
+  cellHeight: number;
+  cellWidth: number;
+  cols: number;
+  rows: number;
+} => {
+  const baseCols = Math.max(1, Math.ceil(cssWidth / cellWidth));
+  const baseRows = Math.max(1, Math.ceil(cssHeight / cellHeight));
+  const baseCellCount = baseCols * baseRows;
+  const cellScale = clamp(
+    Math.sqrt(baseCellCount / MAX_GLYPH_GRID_CELLS),
+    MIN_GLYPH_CELL_SCALE,
+    MAX_GLYPH_CELL_SCALE,
+  );
+  const resolvedCellWidth = cellWidth * cellScale;
+  const resolvedCellHeight = cellHeight * cellScale;
+
+  return {
+    cellHeight: resolvedCellHeight,
+    cellWidth: resolvedCellWidth,
+    cols: Math.max(1, Math.ceil(cssWidth / resolvedCellWidth)),
+    rows: Math.max(1, Math.ceil(cssHeight / resolvedCellHeight)),
+  };
+};
 
 function getCachedValue<Value>(cache: Map<string, Value>, key: string): Value | undefined {
   const value = cache.get(key);
@@ -1498,6 +1534,7 @@ const createWebGlGlyphRenderer = ({
       gl.useProgram(program);
       gl.bindVertexArray(vertexArray);
       gl.uniform2f(brightnessSizeLocation, cols, rows);
+      gl.uniform2f(cellSizeLocation, cellWidth, cellHeight);
 
       if (
         usesGpuNoise &&
@@ -1646,125 +1683,394 @@ export const GlyphRaster = component$(
     useStylesScoped$(styles);
 
     useVisibleTask$(async ({ cleanup }): Promise<void> => {
-    let isDocumentVisible = document.visibilityState === "visible";
-    let isCleanedUp = false;
-    let isRasterVisible = preset.layout === "fixed";
-    let activeRaster: ActiveGlyphRaster | null = null;
-    let removeResize = (): void => {};
-    let removeVisibilityListener = (): void => {};
-    let removeVisibilityObserver = (): void => {};
+      let isDocumentVisible = document.visibilityState === "visible";
+      let isCleanedUp = false;
+      let isRasterVisible = preset.layout === "fixed";
+      let activeRaster: ActiveGlyphRaster | null = null;
+      let removeResize = (): void => {};
+      let removeVisibilityListener = (): void => {};
+      let removeVisibilityObserver = (): void => {};
 
-    cleanup(() => {
-      isCleanedUp = true;
-      if (activeRaster) {
-        activeGlyphRasters.delete(activeRaster);
-      }
-      removeResize();
-      removeVisibilityListener();
-      removeVisibilityObserver();
-    });
+      cleanup(() => {
+        isCleanedUp = true;
+        if (activeRaster) {
+          activeGlyphRasters.delete(activeRaster);
+        }
+        removeResize();
+        removeVisibilityListener();
+        removeVisibilityObserver();
+      });
 
-    if (resolvedSource.type === "frames") {
-      const element = document.getElementById(rasterId);
-      if (!element) return;
+      if (resolvedSource.type === "frames") {
+        const element = document.getElementById(rasterId);
+        if (!element) return;
 
-      const region: GlyphFieldModifierRegion = {
-        blend: modifierBlend,
-        documentLeft: 0,
-        documentTop: 0,
-        element,
-        height: 0,
-        width: 0,
-      };
-      const onRegionChanged = (): void => {
-        updateGlyphFieldModifierRegionBounds(region);
-        scheduleActiveGlyphRasters();
-      };
-      const resizeObserver = new ResizeObserver(onRegionChanged);
-      const onWindowChanged = (): void => onRegionChanged();
-      const onNextFrame = (): void => {
-        animationFrame = 0;
-        onRegionChanged();
-      };
-      let animationFrame = 0;
-
-      glyphFieldModifierRegions.set(rasterId, region);
-      onRegionChanged();
-      createFrameModifierBrightnessGrids(resolvedSource)
-        .then(({ aspectRatio, defaultFps, frameCount, grids }) => {
-          if (isCleanedUp) return;
-
-          element.style.setProperty("--glyph-raster-frame-aspect", String(aspectRatio));
+        const region: GlyphFieldModifierRegion = {
+          blend: modifierBlend,
+          documentLeft: 0,
+          documentTop: 0,
+          element,
+          height: 0,
+          width: 0,
+        };
+        const onRegionChanged = (): void => {
+          updateGlyphFieldModifierRegionBounds(region);
+          scheduleActiveGlyphRasters();
+        };
+        const resizeObserver = new ResizeObserver(onRegionChanged);
+        const onWindowChanged = (): void => onRegionChanged();
+        const onNextFrame = (): void => {
+          animationFrame = 0;
           onRegionChanged();
+        };
+        let animationFrame = 0;
 
-          const frameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
-          const frameRate = clamp(defaultFps, MIN_FRAME_RATE, MAX_FRAME_RATE);
-          region.brightnessGrid = grids.subarray(0, frameSize);
+        glyphFieldModifierRegions.set(rasterId, region);
+        onRegionChanged();
+        createFrameModifierBrightnessGrids(resolvedSource)
+          .then(({ aspectRatio, defaultFps, frameCount, grids }) => {
+            if (isCleanedUp) return;
+
+            element.style.setProperty("--glyph-raster-frame-aspect", String(aspectRatio));
+            onRegionChanged();
+
+            const frameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
+            const frameRate = clamp(defaultFps, MIN_FRAME_RATE, MAX_FRAME_RATE);
+            region.brightnessGrid = grids.subarray(0, frameSize);
+            markGlyphFieldModifierRegionsChanged();
+            scheduleActiveGlyphRasters();
+
+            if (frameCount <= 1) {
+              return;
+            }
+
+            let framePosition = 0;
+            let lastFrameAt = 0;
+
+            activeRaster = {
+              canRender: () => isDocumentVisible && isRasterVisible,
+              render: (time: number): void => {
+                if (lastFrameAt !== 0 && time - lastFrameAt < 1000 / frameRate) return;
+
+                const elapsedMilliseconds =
+                  lastFrameAt === 0 ? 1000 / frameRate : time - lastFrameAt;
+                const elapsedFrames = (elapsedMilliseconds / 1000) * frameRate;
+                const currentFrame = Math.floor(framePosition) % frameCount;
+                const frameOffset = currentFrame * frameSize;
+
+                region.brightnessGrid = grids.subarray(frameOffset, frameOffset + frameSize);
+                markGlyphFieldModifierRegionsChanged();
+                framePosition = (framePosition + elapsedFrames) % frameCount;
+                lastFrameAt = time;
+              },
+            };
+            activeGlyphRasters.add(activeRaster);
+            scheduleActiveGlyphRasters();
+          })
+          .catch(() => {});
+        animationFrame = requestAnimationFrame(onNextFrame);
+        resizeObserver.observe(element);
+        window.addEventListener("load", onWindowChanged);
+        window.addEventListener("resize", onWindowChanged);
+
+        removeResize = () => {
+          if (animationFrame !== 0) {
+            cancelAnimationFrame(animationFrame);
+          }
+          resizeObserver.disconnect();
+          window.removeEventListener("load", onWindowChanged);
+          window.removeEventListener("resize", onWindowChanged);
+          glyphFieldModifierRegions.delete(rasterId);
           markGlyphFieldModifierRegionsChanged();
           scheduleActiveGlyphRasters();
+        };
 
-          if (frameCount <= 1) {
-            return;
-          }
-
-          let framePosition = 0;
-          let lastFrameAt = 0;
-
-          activeRaster = {
-            canRender: () => isDocumentVisible && isRasterVisible,
-            render: (time: number): void => {
-              if (lastFrameAt !== 0 && time - lastFrameAt < 1000 / frameRate) return;
-
-              const elapsedMilliseconds =
-                lastFrameAt === 0 ? 1000 / frameRate : time - lastFrameAt;
-              const elapsedFrames = (elapsedMilliseconds / 1000) * frameRate;
-              const currentFrame = Math.floor(framePosition) % frameCount;
-              const frameOffset = currentFrame * frameSize;
-
-              region.brightnessGrid = grids.subarray(frameOffset, frameOffset + frameSize);
-              markGlyphFieldModifierRegionsChanged();
-              framePosition = (framePosition + elapsedFrames) % frameCount;
-              lastFrameAt = time;
+        if (preset.layout === "fill") {
+          const observer = new IntersectionObserver(
+            ([entry]): void => {
+              isRasterVisible = Boolean(entry?.isIntersecting);
+              if (isRasterVisible) {
+                scheduleActiveGlyphRasters();
+              }
             },
-          };
-          activeGlyphRasters.add(activeRaster);
-          scheduleActiveGlyphRasters();
-        })
-        .catch(() => {});
-      animationFrame = requestAnimationFrame(onNextFrame);
-      resizeObserver.observe(element);
-      window.addEventListener("load", onWindowChanged);
-      window.addEventListener("resize", onWindowChanged);
-
-      removeResize = () => {
-        if (animationFrame !== 0) {
-          cancelAnimationFrame(animationFrame);
+            { threshold: 0.01 },
+          );
+          observer.observe(element);
+          removeVisibilityObserver = () => observer.disconnect();
         }
-        resizeObserver.disconnect();
-        window.removeEventListener("load", onWindowChanged);
-        window.removeEventListener("resize", onWindowChanged);
-        glyphFieldModifierRegions.delete(rasterId);
-        markGlyphFieldModifierRegionsChanged();
+
+        const onVisibilityChange = (): void => {
+          isDocumentVisible = document.visibilityState === "visible";
+          if (isDocumentVisible) {
+            scheduleActiveGlyphRasters();
+          }
+        };
+        document.addEventListener("visibilitychange", onVisibilityChange);
+        removeVisibilityListener = () =>
+          document.removeEventListener("visibilitychange", onVisibilityChange);
+
+        return;
+      }
+
+      const canvas = document.getElementById(rasterId) as HTMLCanvasElement | null;
+      if (!canvas) return;
+
+      canvas.style.position = "";
+      canvas.style.top = "";
+      canvas.style.right = "";
+      canvas.style.bottom = "";
+      canvas.style.left = "";
+      canvas.style.width = "";
+      canvas.style.height = "";
+      canvas.style.transform = "";
+
+      const adapter = createNoiseAdapter();
+      const gpuNoiseSeed = adapter.gpuNoiseSeed;
+      const renderer =
+        (gpuNoiseSeed === undefined
+          ? null
+          : createGpuNoiseGlyphRenderer({
+              canvas,
+              cellHeight: preset.cellHeight,
+              cellWidth: preset.cellWidth,
+              characters: resolvedCharacters,
+              fontSize: preset.fontSize,
+              gpuNoiseSeed,
+            })) ??
+        createWebGlGlyphRenderer({
+          canvas,
+          cellHeight: preset.cellHeight,
+          cellWidth: preset.cellWidth,
+          characters: resolvedCharacters,
+          fontSize: preset.fontSize,
+        }) ??
+        createCanvasGlyphRenderer(canvas, preset.fontSize);
+      if (!renderer) return;
+
+      const usesGpuGlyphSelection = renderer.usesGpuGlyphSelection === true;
+      let cols = 0;
+      let rows = 0;
+      let changedGlyphCount = 0;
+      let changedGlyphIndices = new Uint32Array();
+      let brightnessValues = new Float32Array();
+      let cellHeight = preset.cellHeight;
+      let cellWidth = preset.cellWidth;
+      let glyphEntropyPositions = new Float32Array();
+      let glyphEntropyScales = new Float32Array();
+      let glyphIndices = new Uint16Array();
+      let framePosition = 0;
+      let lastFrameAt = 0;
+      let lastBrightnessSampleAt = 0;
+      let lastEntropySampleSourceTime = 0;
+      let sourceTime = 0;
+      let lastCssHeight = 0;
+      let lastCssWidth = 0;
+      let lastPixelRatio = 0;
+
+      const randomGlyphIndex = (): number => Math.floor(Math.random() * resolvedCharacters.length);
+      const randomGlyphIndexExcept = (currentIndex: number): number => {
+        if (resolvedCharacters.length < 2) return currentIndex;
+
+        const nextIndex = Math.floor(Math.random() * (resolvedCharacters.length - 1));
+
+        return nextIndex >= currentIndex ? nextIndex + 1 : nextIndex;
+      };
+
+      const canRender = (): boolean => isDocumentVisible && isRasterVisible;
+
+      const resize = (): void => {
+        const pixelRatio = window.devicePixelRatio || 1;
+        const cssWidth = canvas.clientWidth;
+        const cssHeight = canvas.clientHeight;
+
+        if (
+          cssHeight === lastCssHeight &&
+          cssWidth === lastCssWidth &&
+          pixelRatio === lastPixelRatio
+        ) {
+          scheduleActiveGlyphRasters();
+          return;
+        }
+
+        lastCssHeight = cssHeight;
+        lastCssWidth = cssWidth;
+        lastPixelRatio = pixelRatio;
+
+        renderer.resize({ cssHeight, cssWidth, pixelRatio });
+
+        const grid = resolveGlyphGrid({
+          cellHeight: preset.cellHeight,
+          cellWidth: preset.cellWidth,
+          cssHeight,
+          cssWidth,
+        });
+
+        cellHeight = grid.cellHeight;
+        cellWidth = grid.cellWidth;
+        cols = grid.cols;
+        rows = grid.rows;
+        changedGlyphCount = 0;
+        changedGlyphIndices = new Uint32Array(cols * rows);
+        brightnessValues = new Float32Array(cols * rows);
+        glyphEntropyPositions = new Float32Array(cols * rows);
+        glyphEntropyScales = new Float32Array(cols * rows);
+        glyphIndices = new Uint16Array(cols * rows);
+        for (let index = 0; index < glyphIndices.length; index += 1) {
+          glyphIndices[index] = randomGlyphIndex();
+          glyphEntropyScales[index] = 0.82 + Math.random() * 0.36;
+        }
+        lastBrightnessSampleAt = 0;
+        lastEntropySampleSourceTime = 0;
+        adapter.resize?.(cols, rows);
         scheduleActiveGlyphRasters();
       };
 
-      if (preset.layout === "fill") {
-        const observer = new IntersectionObserver(
-          ([entry]): void => {
-            isRasterVisible = Boolean(entry?.isIntersecting);
-            if (isRasterVisible) {
-              scheduleActiveGlyphRasters();
-            }
-          },
-          { threshold: 0.01 },
+      const render = (time: number): void => {
+        if (!canRender()) return;
+
+        const frameRate = clamp(
+          adapter.defaultFps ?? DEFAULT_FRAME_RATE,
+          MIN_FRAME_RATE,
+          MAX_FRAME_RATE,
         );
-        observer.observe(element);
-        removeVisibilityObserver = () => observer.disconnect();
-      }
+        const renderFrameRate =
+          resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined
+            ? MAX_FRAME_RATE
+            : frameRate;
+
+        if (time - lastFrameAt < 1000 / renderFrameRate) {
+          return;
+        }
+
+        const elapsedMilliseconds = lastFrameAt === 0 ? 1000 / frameRate : time - lastFrameAt;
+        const elapsedFrames = (elapsedMilliseconds / 1000) * frameRate;
+        const currentFrame = adapter.frameCount
+          ? Math.floor(framePosition) % adapter.frameCount
+          : 0;
+        const offsetX = (canvas.clientWidth - cols * cellWidth) / 2;
+        const offsetY = (canvas.clientHeight - rows * cellHeight) / 2;
+        const entropyMode: GlyphEntropyMode =
+          renderer.supportsShaderEntropy === true && resolvedSource.type === "procedural-noise"
+            ? "shader"
+            : "cpu";
+        const shouldThrottleBrightnessSamples =
+          entropyMode === "shader" &&
+          resolvedSource.type === "procedural-noise" &&
+          gpuNoiseSeed !== undefined;
+        const shouldSampleBrightness =
+          !shouldThrottleBrightnessSamples ||
+          lastBrightnessSampleAt === 0 ||
+          time - lastBrightnessSampleAt >= 1000 / PROCEDURAL_ENTROPY_SAMPLE_RATE;
+        const shouldUpdateBrightness = shouldSampleBrightness;
+
+        changedGlyphCount = 0;
+        lastFrameAt = time;
+        sourceTime += elapsedMilliseconds;
+        const entropySampleFrames =
+          lastEntropySampleSourceTime === 0
+            ? elapsedFrames
+            : ((sourceTime - lastEntropySampleSourceTime) / 1000) * frameRate;
+        if (shouldUpdateBrightness) {
+          lastBrightnessSampleAt = time;
+        }
+
+        if (entropyMode === "cpu" || shouldUpdateBrightness || !usesGpuGlyphSelection) {
+          for (let row = 0; row < rows; row += 1) {
+            for (let col = 0; col < cols; col += 1) {
+              const index = row * cols + col;
+              const viewportX = offsetX + (col + 0.5) * cellWidth;
+              const viewportY = offsetY + (row + 0.5) * cellHeight;
+              const worldX = viewportX + window.scrollX;
+              const worldY = viewportY + window.scrollY;
+              const sampledBrightness = shouldUpdateBrightness
+                ? adapter.getBrightness(
+                    Math.floor(worldX / cellWidth),
+                    Math.floor(worldY / cellHeight),
+                    cols,
+                    rows,
+                    sourceTime,
+                    currentFrame,
+                  )
+                : brightnessValues[index];
+              const brightness = shouldUpdateBrightness
+                ? clamp(applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY), 0, 1)
+                : sampledBrightness;
+
+              if (shouldUpdateBrightness) {
+                brightnessValues[index] = brightness;
+              }
+
+              const entropyBrightness = proceduralEntropyBrightness(brightness);
+
+              if (entropyMode === "cpu") {
+                glyphEntropyPositions[index] +=
+                  elapsedFrames * brightnessEntropy(entropyBrightness) * glyphEntropyScales[index];
+              } else if (shouldUpdateBrightness) {
+                glyphEntropyPositions[index] +=
+                  entropySampleFrames *
+                  brightnessEntropy(entropyBrightness) *
+                  glyphEntropyScales[index];
+              }
+
+              if (!usesGpuGlyphSelection && shouldRefreshCharacter(entropyBrightness)) {
+                glyphIndices[index] = randomGlyphIndexExcept(glyphIndices[index]);
+                changedGlyphIndices[changedGlyphCount] = index;
+                changedGlyphCount += 1;
+              }
+            }
+          }
+        }
+
+        if (entropyMode === "shader" && shouldUpdateBrightness) {
+          lastEntropySampleSourceTime = sourceTime;
+        }
+
+        const renderSourceTime =
+          resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined
+            ? quantizeTime(sourceTime, PROCEDURAL_VISUAL_SAMPLE_RATE)
+            : sourceTime;
+
+        renderer.draw({
+          backgroundColor: preset.backgroundColor,
+          brightnessValues,
+          cellHeight,
+          cellWidth,
+          changedGlyphCount,
+          changedGlyphIndices,
+          colors: preset.colors,
+          cols,
+          entropySampleTime: lastEntropySampleSourceTime,
+          gpuNoiseSeed,
+          glyphCharacters: resolvedCharacters,
+          glyphEntropyPositions,
+          glyphEntropyScales,
+          glyphIndices,
+          glyphFrameRate: frameRate,
+          offsetX,
+          offsetY,
+          rows,
+          entropyMode,
+          shouldUpdateBrightness,
+          sourceTime: renderSourceTime,
+          viewportScrollX: window.scrollX,
+          viewportScrollY: window.scrollY,
+        });
+
+        if (adapter.frameCount) {
+          framePosition = (framePosition + elapsedFrames) % adapter.frameCount;
+        }
+      };
+
+      activeRaster = { canRender, render };
+      activeGlyphRasters.add(activeRaster);
+      resize();
+      window.addEventListener("resize", resize);
+      removeResize = () => window.removeEventListener("resize", resize);
 
       const onVisibilityChange = (): void => {
         isDocumentVisible = document.visibilityState === "visible";
         if (isDocumentVisible) {
+          lastFrameAt = 0;
           scheduleActiveGlyphRasters();
         }
       };
@@ -1772,300 +2078,45 @@ export const GlyphRaster = component$(
       removeVisibilityListener = () =>
         document.removeEventListener("visibilitychange", onVisibilityChange);
 
-      return;
-    }
-
-    const canvas = document.getElementById(rasterId) as HTMLCanvasElement | null;
-    if (!canvas) return;
-
-    canvas.style.position = "";
-    canvas.style.top = "";
-    canvas.style.right = "";
-    canvas.style.bottom = "";
-    canvas.style.left = "";
-    canvas.style.width = "";
-    canvas.style.height = "";
-    canvas.style.transform = "";
-
-    const adapter = createNoiseAdapter();
-    const gpuNoiseSeed = adapter.gpuNoiseSeed;
-    const renderer =
-      (gpuNoiseSeed === undefined
-        ? null
-        : createGpuNoiseGlyphRenderer({
-            canvas,
-            cellHeight: preset.cellHeight,
-            cellWidth: preset.cellWidth,
-            characters: resolvedCharacters,
-            fontSize: preset.fontSize,
-            gpuNoiseSeed,
-          })) ??
-      createWebGlGlyphRenderer({
-        canvas,
-        cellHeight: preset.cellHeight,
-        cellWidth: preset.cellWidth,
-        characters: resolvedCharacters,
-        fontSize: preset.fontSize,
-      }) ??
-      createCanvasGlyphRenderer(canvas, preset.fontSize);
-    if (!renderer) return;
-
-    const usesGpuGlyphSelection = renderer.usesGpuGlyphSelection === true;
-    let cols = 0;
-    let rows = 0;
-    let changedGlyphCount = 0;
-    let changedGlyphIndices = new Uint32Array();
-    let brightnessValues = new Float32Array();
-    let glyphEntropyPositions = new Float32Array();
-    let glyphEntropyScales = new Float32Array();
-    let glyphIndices = new Uint16Array();
-    let framePosition = 0;
-    let lastFrameAt = 0;
-    let lastBrightnessSampleAt = 0;
-    let lastEntropySampleSourceTime = 0;
-    let sourceTime = 0;
-    let lastCssHeight = 0;
-    let lastCssWidth = 0;
-    let lastPixelRatio = 0;
-
-    const randomGlyphIndex = (): number => Math.floor(Math.random() * resolvedCharacters.length);
-    const randomGlyphIndexExcept = (currentIndex: number): number => {
-      if (resolvedCharacters.length < 2) return currentIndex;
-
-      const nextIndex = Math.floor(Math.random() * (resolvedCharacters.length - 1));
-
-      return nextIndex >= currentIndex ? nextIndex + 1 : nextIndex;
-    };
-
-    const canRender = (): boolean => isDocumentVisible && isRasterVisible;
-
-    const resize = (): void => {
-      const pixelRatio = window.devicePixelRatio || 1;
-      const cssWidth = canvas.clientWidth;
-      const cssHeight = canvas.clientHeight;
-
-      if (
-        cssHeight === lastCssHeight &&
-        cssWidth === lastCssWidth &&
-        pixelRatio === lastPixelRatio
-      ) {
-        scheduleActiveGlyphRasters();
-        return;
+      if (preset.layout === "fill") {
+        const observer = new IntersectionObserver(
+          ([entry]): void => {
+            isRasterVisible = Boolean(entry?.isIntersecting);
+            if (isRasterVisible) {
+              lastFrameAt = 0;
+              scheduleActiveGlyphRasters();
+            }
+          },
+          { threshold: 0.01 },
+        );
+        observer.observe(canvas);
+        removeVisibilityObserver = () => observer.disconnect();
       }
+    });
 
-      lastCssHeight = cssHeight;
-      lastCssWidth = cssWidth;
-      lastPixelRatio = pixelRatio;
+    if (resolvedSource.type === "frames") {
+      const regionStyle =
+        preset.layout === "fixed"
+          ? "position: fixed; left: 50%; top: 50%; width: min(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))); height: min(100vh, calc(100vw / var(--glyph-raster-frame-aspect, 1))); transform: translate(-50%, -50%); display: block; pointer-events: none;"
+          : "position: absolute; inset: 0; display: block; pointer-events: none;";
 
-      renderer.resize({ cssHeight, cssWidth, pixelRatio });
-
-      cols = Math.max(1, Math.ceil(cssWidth / preset.cellWidth));
-      rows = Math.max(1, Math.ceil(cssHeight / preset.cellHeight));
-      changedGlyphCount = 0;
-      changedGlyphIndices = new Uint32Array(cols * rows);
-      brightnessValues = new Float32Array(cols * rows);
-      glyphEntropyPositions = new Float32Array(cols * rows);
-      glyphEntropyScales = new Float32Array(cols * rows);
-      glyphIndices = new Uint16Array(cols * rows);
-      for (let index = 0; index < glyphIndices.length; index += 1) {
-        glyphIndices[index] = randomGlyphIndex();
-        glyphEntropyScales[index] = 0.82 + Math.random() * 0.36;
-      }
-      lastBrightnessSampleAt = 0;
-      lastEntropySampleSourceTime = 0;
-      adapter.resize?.(cols, rows);
-      scheduleActiveGlyphRasters();
-    };
-
-    const render = (time: number): void => {
-      if (!canRender()) return;
-
-      const frameRate = clamp(
-        adapter.defaultFps ?? DEFAULT_FRAME_RATE,
-        MIN_FRAME_RATE,
-        MAX_FRAME_RATE,
+      return (
+        <span
+          id={rasterId}
+          class={`glyph-raster-region glyph-raster-region--${preset.layout} glyph-raster-region--${resolvedSource.type}`}
+          style={regionStyle}
+          aria-hidden="true"
+        />
       );
-      const renderFrameRate =
-        resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined
-          ? MAX_FRAME_RATE
-          : frameRate;
-
-      if (time - lastFrameAt < 1000 / renderFrameRate) {
-        return;
-      }
-
-      const elapsedMilliseconds = lastFrameAt === 0 ? 1000 / frameRate : time - lastFrameAt;
-      const elapsedFrames = (elapsedMilliseconds / 1000) * frameRate;
-      const currentFrame = adapter.frameCount ? Math.floor(framePosition) % adapter.frameCount : 0;
-      const offsetX = (canvas.clientWidth - cols * preset.cellWidth) / 2;
-      const offsetY = (canvas.clientHeight - rows * preset.cellHeight) / 2;
-      const entropyMode: GlyphEntropyMode =
-        renderer.supportsShaderEntropy === true && resolvedSource.type === "procedural-noise"
-          ? "shader"
-          : "cpu";
-      const shouldThrottleBrightnessSamples =
-        entropyMode === "shader" &&
-        resolvedSource.type === "procedural-noise" &&
-        gpuNoiseSeed !== undefined;
-      const shouldSampleBrightness =
-        !shouldThrottleBrightnessSamples ||
-        lastBrightnessSampleAt === 0 ||
-        time - lastBrightnessSampleAt >= 1000 / PROCEDURAL_ENTROPY_SAMPLE_RATE;
-      const shouldUpdateBrightness = shouldSampleBrightness;
-
-      changedGlyphCount = 0;
-      lastFrameAt = time;
-      sourceTime += elapsedMilliseconds;
-      const entropySampleFrames =
-        lastEntropySampleSourceTime === 0
-          ? elapsedFrames
-          : ((sourceTime - lastEntropySampleSourceTime) / 1000) * frameRate;
-      if (shouldUpdateBrightness) {
-        lastBrightnessSampleAt = time;
-      }
-
-      if (entropyMode === "cpu" || shouldUpdateBrightness || !usesGpuGlyphSelection) {
-        for (let row = 0; row < rows; row += 1) {
-          for (let col = 0; col < cols; col += 1) {
-            const index = row * cols + col;
-            const viewportX = offsetX + (col + 0.5) * preset.cellWidth;
-            const viewportY = offsetY + (row + 0.5) * preset.cellHeight;
-            const worldX = viewportX + window.scrollX;
-            const worldY = viewportY + window.scrollY;
-            const sampledBrightness = shouldUpdateBrightness
-              ? adapter.getBrightness(
-                  Math.floor(worldX / preset.cellWidth),
-                  Math.floor(worldY / preset.cellHeight),
-                  cols,
-                  rows,
-                  sourceTime,
-                  currentFrame,
-                )
-              : brightnessValues[index];
-            const brightness = shouldUpdateBrightness
-              ? clamp(applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY), 0, 1)
-              : sampledBrightness;
-
-            if (shouldUpdateBrightness) {
-              brightnessValues[index] = brightness;
-            }
-
-            const entropyBrightness = proceduralEntropyBrightness(brightness);
-
-            if (entropyMode === "cpu") {
-              glyphEntropyPositions[index] +=
-                elapsedFrames * brightnessEntropy(entropyBrightness) * glyphEntropyScales[index];
-            } else if (shouldUpdateBrightness) {
-              glyphEntropyPositions[index] +=
-                entropySampleFrames *
-                brightnessEntropy(entropyBrightness) *
-                glyphEntropyScales[index];
-            }
-
-            if (!usesGpuGlyphSelection && shouldRefreshCharacter(entropyBrightness)) {
-              glyphIndices[index] = randomGlyphIndexExcept(glyphIndices[index]);
-              changedGlyphIndices[changedGlyphCount] = index;
-              changedGlyphCount += 1;
-            }
-          }
-        }
-      }
-
-      if (entropyMode === "shader" && shouldUpdateBrightness) {
-        lastEntropySampleSourceTime = sourceTime;
-      }
-
-      const renderSourceTime =
-        resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined
-          ? quantizeTime(sourceTime, PROCEDURAL_VISUAL_SAMPLE_RATE)
-          : sourceTime;
-
-      renderer.draw({
-        backgroundColor: preset.backgroundColor,
-        brightnessValues,
-        cellHeight: preset.cellHeight,
-        cellWidth: preset.cellWidth,
-        changedGlyphCount,
-        changedGlyphIndices,
-        colors: preset.colors,
-        cols,
-        entropySampleTime: lastEntropySampleSourceTime,
-        gpuNoiseSeed,
-        glyphCharacters: resolvedCharacters,
-        glyphEntropyPositions,
-        glyphEntropyScales,
-        glyphIndices,
-        glyphFrameRate: frameRate,
-        offsetX,
-        offsetY,
-        rows,
-        entropyMode,
-        shouldUpdateBrightness,
-        sourceTime: renderSourceTime,
-        viewportScrollX: window.scrollX,
-        viewportScrollY: window.scrollY,
-      });
-
-      if (adapter.frameCount) {
-        framePosition = (framePosition + elapsedFrames) % adapter.frameCount;
-      }
-    };
-
-    activeRaster = { canRender, render };
-    activeGlyphRasters.add(activeRaster);
-    resize();
-    window.addEventListener("resize", resize);
-    removeResize = () => window.removeEventListener("resize", resize);
-
-    const onVisibilityChange = (): void => {
-      isDocumentVisible = document.visibilityState === "visible";
-      if (isDocumentVisible) {
-        lastFrameAt = 0;
-        scheduleActiveGlyphRasters();
-      }
-    };
-    document.addEventListener("visibilitychange", onVisibilityChange);
-    removeVisibilityListener = () =>
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-
-    if (preset.layout === "fill") {
-      const observer = new IntersectionObserver(
-        ([entry]): void => {
-          isRasterVisible = Boolean(entry?.isIntersecting);
-          if (isRasterVisible) {
-            lastFrameAt = 0;
-            scheduleActiveGlyphRasters();
-          }
-        },
-        { threshold: 0.01 },
-      );
-      observer.observe(canvas);
-      removeVisibilityObserver = () => observer.disconnect();
     }
-  });
-
-  if (resolvedSource.type === "frames") {
-    const regionStyle =
-      preset.layout === "fixed"
-        ? "position: fixed; left: 50%; top: 50%; width: min(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))); height: min(100vh, calc(100vw / var(--glyph-raster-frame-aspect, 1))); transform: translate(-50%, -50%); display: block; pointer-events: none;"
-        : "position: absolute; inset: 0; display: block; pointer-events: none;";
 
     return (
-      <span
+      <canvas
         id={rasterId}
-        class={`glyph-raster-region glyph-raster-region--${preset.layout} glyph-raster-region--${resolvedSource.type}`}
-        style={regionStyle}
+        class={`glyph-raster glyph-raster--${preset.layout} glyph-raster--${resolvedSource.type}`}
+        style={style}
         aria-hidden="true"
       />
     );
-  }
-
-  return (
-    <canvas
-      id={rasterId}
-      class={`glyph-raster glyph-raster--${preset.layout} glyph-raster--${resolvedSource.type}`}
-      style={style}
-      aria-hidden="true"
-    />
-  );
-});
+  },
+);
