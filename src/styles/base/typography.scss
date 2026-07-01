@@ -51,6 +51,16 @@ p {
   margin-inline-end: 0;
 }
 
+ul,
+ol {
+  padding-inline-start: 1.25em;
+}
+
+li > ul,
+li > ol {
+  padding-inline-start: 0.75em;
+}
+
 ol {
   li::marker {
     font-weight: bold;
