@@ -46,6 +46,7 @@ interface Article {
 }
 
 const ARTICLES_DIRECTORY = "./src/routes/blog";
+const ASSETS_DIRECTORY = "./public/assets";
 const WIKI_DOWNLOAD_DIRECTORY = "./tmp/wiki";
 const WIKI_ARTICLES_DIRECTORY = "./tmp/wiki/articles";
 const WIKI_REPOSITORY = process.env.WIKI_REPOSITORY ?? "danielvaijk/wiki";
@@ -280,6 +281,28 @@ function cleanGeneratedArticles(): void {
   }
 }
 
+function cleanGeneratedArticleCodeBlocks(): void {
+  if (!existsSync(ASSETS_DIRECTORY)) {
+    return;
+  }
+
+  for (const entry of readdirSync(ASSETS_DIRECTORY, { withFileTypes: true })) {
+    if (entry.isFile() && entry.name.endsWith(".code.html")) {
+      rmSync(join(ASSETS_DIRECTORY, entry.name), { force: true });
+    }
+  }
+}
+
+function saveArticleCodeBlock(html: string): string {
+  const contentHash = createHash("sha256").update(html).digest("hex");
+  const fileName = `${contentHash}.code.html`;
+
+  mkdirSync(ASSETS_DIRECTORY, { recursive: true });
+  writeFileSync(join(ASSETS_DIRECTORY, fileName), html);
+
+  return `/assets/${fileName}`;
+}
+
 async function processArticleCover(cover: string): Promise<ProcessedImage> {
   try {
     if (/^https?:\/\//u.test(cover)) {
@@ -311,6 +334,7 @@ async function saveArticleCoverGlyphFrames(coverImage: ProcessedImage): Promise<
 
 await downloadWikiArticles();
 cleanGeneratedArticles();
+cleanGeneratedArticleCodeBlocks();
 
 const articleSourceDirectory = WIKI_ARTICLES_DIRECTORY;
 
@@ -370,6 +394,9 @@ for (const { content, data, filePath } of articles) {
     readTime,
     title,
     topic,
+    wrapCodeBlocksOptions: {
+      saveCodeBlockContent: async ({ html }): Promise<string> => saveArticleCodeBlock(html),
+    },
   });
 
   const articleMetadata = `${JSON.stringify(

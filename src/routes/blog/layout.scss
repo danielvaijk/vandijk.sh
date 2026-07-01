@@ -174,7 +174,8 @@ article {
       }
     }
 
-    > pre {
+    > pre,
+    > .article-code-drawer-content > pre {
       width: 100%;
       overflow-x: scroll;
       padding: 0.8rem;

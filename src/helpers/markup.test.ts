@@ -14,36 +14,14 @@ const markdownWithCodeBlock = [
 
 assert.equal(
   await wrapMarkdownCodeBlocks(markdownWithCodeBlock),
-  [
-    "Before.",
-    "",
-    '<details class="article-code-drawer">',
-    "<summary>TSX</summary>",
-    "",
-    "```tsx",
-    "const value = true;",
-    "```",
-    "",
-    "</details>",
-    "",
-    "After.",
-  ].join("\n"),
+  ["Before.", "", '<ArticleCodeDrawer label={"TSX"} src={""} />', "", "After."].join("\n"),
 );
 
 const markdownWithPlainCodeBlock = ["~~~~", "plain text", "~~~~"].join("\n");
 
 assert.equal(
   await wrapMarkdownCodeBlocks(markdownWithPlainCodeBlock),
-  [
-    '<details class="article-code-drawer">',
-    "<summary>Code</summary>",
-    "",
-    "~~~~",
-    "plain text",
-    "~~~~",
-    "",
-    "</details>",
-  ].join("\n"),
+  '<ArticleCodeDrawer label={"Code"} src={""} />',
 );
 
 const markdownWithUnformattedCodeBlock = [
@@ -54,23 +32,31 @@ const markdownWithUnformattedCodeBlock = [
 
 assert.equal(
   await wrapMarkdownCodeBlocks(markdownWithUnformattedCodeBlock),
-  [
-    '<details class="article-code-drawer">',
-    "<summary>TS</summary>",
-    "",
-    "```ts",
-    "const value = someFunction(",
-    "  alpha,",
-    "  beta,",
-    "  gamma,",
-    "  delta,",
-    "  epsilon,",
-    "  zeta,",
-    "  eta,",
-    "  theta,",
-    ");",
-    "```",
-    "",
-    "</details>",
-  ].join("\n"),
+  '<ArticleCodeDrawer label={"TS"} src={""} />',
 );
+
+const savedCodeBlocks = new Array<string>();
+
+assert.equal(
+  await wrapMarkdownCodeBlocks(markdownWithUnformattedCodeBlock, {
+    saveCodeBlockContent: async ({ html }): Promise<string> => {
+      savedCodeBlocks.push(html);
+      return "/assets/example.code.html";
+    },
+  }),
+  '<ArticleCodeDrawer label={"TS"} src={"/assets/example.code.html"} />',
+);
+assert.deepEqual(savedCodeBlocks, [
+  [
+    '<pre><code class="language-ts"><span class="token keyword">const</span> value <span class="token operator">=</span> <span class="token function">someFunction</span><span class="token punctuation">(</span>',
+    '  alpha<span class="token punctuation">,</span>',
+    '  beta<span class="token punctuation">,</span>',
+    '  gamma<span class="token punctuation">,</span>',
+    '  delta<span class="token punctuation">,</span>',
+    '  epsilon<span class="token punctuation">,</span>',
+    '  zeta<span class="token punctuation">,</span>',
+    '  eta<span class="token punctuation">,</span>',
+    '  theta<span class="token punctuation">,</span>',
+    '<span class="token punctuation">)</span><span class="token punctuation">;</span></code></pre>',
+  ].join("\n"),
+]);

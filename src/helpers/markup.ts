@@ -1,4 +1,7 @@
 import { format } from "oxfmt";
+import { refractor } from "refractor";
+import tsx from "refractor/tsx";
+import { toHtml } from "hast-util-to-html";
 
 import {
   ImageFormat,
@@ -23,6 +26,15 @@ interface GenerateImagesWithMarkupOptions {
   publicPath?: string;
 }
 
+interface CodeBlockContent {
+  html: string;
+  info: string;
+}
+
+interface WrapMarkdownCodeBlocksOptions {
+  saveCodeBlockContent?: (content: CodeBlockContent) => Promise<string>;
+}
+
 const CODE_BLOCK_PRINT_WIDTH = 80;
 const CODE_BLOCK_LANGUAGE_FILE_EXTENSIONS: Record<string, string> = {
   css: "css",
@@ -44,6 +56,8 @@ const CODE_BLOCK_LANGUAGE_FILE_EXTENSIONS: Record<string, string> = {
   yaml: "yaml",
   yml: "yaml",
 };
+
+refractor.register(tsx);
 
 function extractCaptionValues(captionRaw: string): ImageCaption {
   const caption: ImageCaption = {
@@ -146,6 +160,10 @@ function escapeHtmlText(value: string): string {
     .replace(/"/gu, "&quot;");
 }
 
+function escapeJsString(value: string): string {
+  return JSON.stringify(value);
+}
+
 function getCodeDrawerSummary(info: string): string {
   const language = info.trim().split(/\s+/u)[0];
 
@@ -156,10 +174,20 @@ function getCodeDrawerSummary(info: string): string {
   return "Code";
 }
 
-function getCodeBlockFileName(info: string): string | null {
+function getCodeBlockLanguage(info: string): string | null {
   const language = info.trim().split(/\s+/u)[0]?.toLowerCase();
 
   if (typeof language !== "string" || language.length === 0) {
+    return null;
+  }
+
+  return language;
+}
+
+function getCodeBlockFileName(info: string): string | null {
+  const language = getCodeBlockLanguage(info);
+
+  if (language === null) {
     return null;
   }
 
@@ -190,7 +218,22 @@ async function formatMarkdownCodeBlock(code: string, info: string): Promise<stri
   return result.code.replace(/\n$/u, "");
 }
 
-async function wrapMarkdownCodeBlocks(content: string): Promise<string> {
+function renderCodeBlockHtml(code: string, info: string): string {
+  const language = getCodeBlockLanguage(info);
+  const languageClass = language === null ? "" : ` class="language-${escapeHtmlText(language)}"`;
+  let codeHtml = escapeHtmlText(code);
+
+  if (language !== null && refractor.registered(language)) {
+    codeHtml = toHtml(refractor.highlight(code, language));
+  }
+
+  return `<pre><code${languageClass}>${codeHtml}</code></pre>`;
+}
+
+async function wrapMarkdownCodeBlocks(
+  content: string,
+  options: WrapMarkdownCodeBlocksOptions = {},
+): Promise<string> {
   const codeBlockRegex =
     /(^|\n)(?<indent>[ \t]*)(?<fence>`{3,}|~{3,})(?<info>[^\n]*)\n(?<code>[\s\S]*?)\n[ \t]*\k<fence>[ \t]*(?=\n|$)/gu;
   let result = "";
@@ -211,17 +254,17 @@ async function wrapMarkdownCodeBlocks(content: string): Promise<string> {
     }
 
     const prefix = match[1] ?? "";
-    const summary = escapeHtmlText(getCodeDrawerSummary(groups.info));
+    const summary = getCodeDrawerSummary(groups.info);
     const code = await formatMarkdownCodeBlock(groups.code, groups.info);
-    const codeBlock = `${groups.indent}${groups.fence}${groups.info}\n${code}\n${groups.indent}${groups.fence}`;
+    const codeBlockHtml = renderCodeBlockHtml(code, groups.info);
+    const codeBlockSource =
+      (await options.saveCodeBlockContent?.({
+        html: codeBlockHtml,
+        info: groups.info,
+      })) ?? "";
 
     result += content.slice(lastIndex, match.index);
-    result += `${prefix}<details class="article-code-drawer">
-<summary>${summary}</summary>
-
-${codeBlock}
-
-</details>`;
+    result += `${prefix}<ArticleCodeDrawer label={${escapeJsString(summary)}} src={${escapeJsString(codeBlockSource)}} />`;
     lastIndex = match.index + match[0].length;
   }
 
@@ -271,6 +314,7 @@ async function generateMdxArticlePage({
   readTime,
   title,
   topic,
+  wrapCodeBlocksOptions,
 }: {
   anchorLinks: string;
   articleContent: string;
@@ -290,8 +334,9 @@ async function generateMdxArticlePage({
   readTime: number;
   title: string;
   topic: string;
+  wrapCodeBlocksOptions?: WrapMarkdownCodeBlocksOptions;
 }): Promise<string> {
-  const articleBody = await wrapMarkdownCodeBlocks(articleContent);
+  const articleBody = await wrapMarkdownCodeBlocks(articleContent, wrapCodeBlocksOptions);
 
   return `---
 title: ${JSON.stringify(title)}
@@ -315,6 +360,7 @@ opengraph:
 ---
 
 import { GlyphRaster } from "src/components/glyph-raster";
+import { ArticleCodeDrawer } from "src/components/articles/article-code-drawer";
 
 export default function Layout({ children: content }) {
   return <article>{content}</article>;
