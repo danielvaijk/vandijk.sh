@@ -82,6 +82,7 @@ type GlyphRenderState = {
   gpuNoiseSeed?: number;
   glyphCharacters: string[];
   glyphEntropyPositions: Float32Array;
+  glyphEntropyRates: Float32Array;
   glyphEntropyScales: Float32Array;
   glyphIndices: Uint16Array;
   glyphFrameRate: number;
@@ -139,6 +140,7 @@ const FIELD_MODIFIER_SAMPLE_SIZE = 64;
 const FIELD_MODIFIER_BRIGHTNESS_BOOST = 1.2;
 const FIELD_MODIFIER_BRIGHTNESS_FLOOR = 0.08;
 const FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT = 0.5;
+const GLYPH_ENTROPY_RATE_EASE_SECONDS = 0.35;
 const MIN_GLYPH_CELL_SCALE = 1;
 const MAX_GLYPH_CELL_SCALE = 8;
 const MAX_GLYPH_GRID_CELLS = 18000;
@@ -610,8 +612,20 @@ const brightnessEntropy = (brightness: number): number =>
 const proceduralEntropyBrightness = (brightness: number): number =>
   smoothstep(0.22, 0.78, brightness);
 
-const shouldRefreshCharacter = (brightness: number): boolean =>
-  Math.random() < brightnessEntropy(brightness);
+const entropyRateForBrightness = (brightness: number): number =>
+  brightnessEntropy(proceduralEntropyBrightness(brightness));
+
+const easeEntropyRate = (
+  currentRate: number,
+  targetRate: number,
+  elapsedMilliseconds: number,
+): number => {
+  const amount = 1 - Math.exp(-(elapsedMilliseconds / 1000) / GLYPH_ENTROPY_RATE_EASE_SECONDS);
+
+  return lerp(currentRate, targetRate, amount);
+};
+
+const shouldRefreshCharacter = (entropyRate: number): boolean => Math.random() < entropyRate;
 
 const parseColor = (color: string): [number, number, number, number] => {
   const cachedColor = getCachedValue(parsedColorCache, color);
@@ -1061,6 +1075,7 @@ const createWebGlGlyphRenderer = ({
     in vec2 a_position;
     in vec2 a_brightness_uv;
     in float a_entropy_position;
+    in float a_entropy_rate;
     in float a_entropy_scale;
     uniform float u_entropy_seed;
     uniform float u_glyph_count;
@@ -1152,19 +1167,11 @@ const createWebGlGlyphRenderer = ({
         0.0,
         1.0
       );
-      float entropy_brightness = glyphProceduralEntropyBrightness(clamp(
-        glyphApplyFieldModifiers(
-          glyphSolarBrightness(field_point, u_entropy_sample_time, u_noise_seed),
-          modifier_world
-        ),
-        0.0,
-        1.0
-      ));
       float entropy_position =
         a_entropy_position +
         max(u_source_time - u_entropy_sample_time, 0.0) * 0.001 *
         u_glyph_frame_rate *
-        glyphBrightnessEntropy(entropy_brightness) *
+        a_entropy_rate *
         a_entropy_scale;
       float phase = hash(vec3(cell, u_entropy_seed));
       float epoch = floor(entropy_position + phase);
@@ -1182,6 +1189,7 @@ const createWebGlGlyphRenderer = ({
     in vec2 a_position;
     in vec2 a_brightness_uv;
     in float a_entropy_position;
+    in float a_entropy_rate;
     in float a_entropy_scale;
     uniform float u_entropy_seed;
     uniform float u_glyph_count;
@@ -1209,7 +1217,7 @@ const createWebGlGlyphRenderer = ({
       float shader_entropy_position =
         u_source_time * 0.001 *
         u_glyph_frame_rate *
-        glyphBrightnessEntropy(brightness) *
+        a_entropy_rate *
         a_entropy_scale;
       float entropy_position = mix(a_entropy_position, shader_entropy_position, u_shader_entropy);
       float phase = hash(vec3(cell, u_entropy_seed));
@@ -1231,6 +1239,7 @@ const createWebGlGlyphRenderer = ({
   const positionBuffer = gl.createBuffer();
   const brightnessUvBuffer = gl.createBuffer();
   const entropyPositionBuffer = gl.createBuffer();
+  const entropyRateBuffer = gl.createBuffer();
   const entropyScaleBuffer = gl.createBuffer();
   const atlasTexture = gl.createTexture();
   const brightnessTexture = gl.createTexture();
@@ -1240,6 +1249,7 @@ const createWebGlGlyphRenderer = ({
   const positionLocation = gl.getAttribLocation(program, "a_position");
   const brightnessUvLocation = gl.getAttribLocation(program, "a_brightness_uv");
   const entropyPositionLocation = gl.getAttribLocation(program, "a_entropy_position");
+  const entropyRateLocation = gl.getAttribLocation(program, "a_entropy_rate");
   const entropyScaleLocation = gl.getAttribLocation(program, "a_entropy_scale");
   const atlasGridLocation = gl.getUniformLocation(program, "u_atlas_grid");
   const brightnessSizeLocation = gl.getUniformLocation(program, "u_brightness_size");
@@ -1282,6 +1292,7 @@ const createWebGlGlyphRenderer = ({
     !positionBuffer ||
     !brightnessUvBuffer ||
     !entropyPositionBuffer ||
+    !entropyRateBuffer ||
     !entropyScaleBuffer ||
     !atlasTexture ||
     !brightnessTexture ||
@@ -1291,6 +1302,7 @@ const createWebGlGlyphRenderer = ({
     positionLocation < 0 ||
     brightnessUvLocation < 0 ||
     entropyPositionLocation < 0 ||
+    entropyRateLocation < 0 ||
     entropyScaleLocation < 0 ||
     !atlasGridLocation ||
     !brightnessSizeLocation ||
@@ -1357,6 +1369,11 @@ const createWebGlGlyphRenderer = ({
   gl.enableVertexAttribArray(entropyPositionLocation);
   gl.vertexAttribPointer(entropyPositionLocation, 1, gl.FLOAT, false, 0, 0);
   gl.vertexAttribDivisor(entropyPositionLocation, 1);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, entropyRateBuffer);
+  gl.enableVertexAttribArray(entropyRateLocation);
+  gl.vertexAttribPointer(entropyRateLocation, 1, gl.FLOAT, false, 0, 0);
+  gl.vertexAttribDivisor(entropyRateLocation, 1);
 
   gl.bindBuffer(gl.ARRAY_BUFFER, entropyScaleBuffer);
   gl.enableVertexAttribArray(entropyScaleLocation);
@@ -1540,6 +1557,11 @@ const createWebGlGlyphRenderer = ({
     gl.bufferSubData(gl.ARRAY_BUFFER, 0, entropyValues);
   };
 
+  const uploadEntropyRates = (entropyRates: Float32Array): void => {
+    gl.bindBuffer(gl.ARRAY_BUFFER, entropyRateBuffer);
+    gl.bufferData(gl.ARRAY_BUFFER, entropyRates, gl.DYNAMIC_DRAW);
+  };
+
   const uploadEntropyScales = (entropyScales: Float32Array): void => {
     gl.bindBuffer(gl.ARRAY_BUFFER, entropyScaleBuffer);
     gl.bufferData(gl.ARRAY_BUFFER, entropyScales, gl.STATIC_DRAW);
@@ -1558,6 +1580,7 @@ const createWebGlGlyphRenderer = ({
       offsetX,
       offsetY,
       glyphEntropyPositions,
+      glyphEntropyRates,
       glyphEntropyScales,
       glyphFrameRate,
       rows,
@@ -1637,6 +1660,10 @@ const createWebGlGlyphRenderer = ({
 
       if (shouldUploadPositions) {
         uploadEntropyScales(glyphEntropyScales);
+      }
+
+      if (shouldUploadPositions || shouldUpdateBrightness) {
+        uploadEntropyRates(glyphEntropyRates);
       }
 
       if (usesGpuNoise) {
@@ -1931,6 +1958,7 @@ export const GlyphRaster = component$(
       let cellHeight = preset.cellHeight;
       let cellWidth = preset.cellWidth;
       let glyphEntropyPositions = new Float32Array();
+      let glyphEntropyRates = new Float32Array();
       let glyphEntropyScales = new Float32Array();
       let glyphIndices = new Uint16Array();
       let framePosition = 0;
@@ -1988,6 +2016,7 @@ export const GlyphRaster = component$(
         changedGlyphIndices = new Uint32Array(cols * rows);
         brightnessValues = new Float32Array(cols * rows);
         glyphEntropyPositions = new Float32Array(cols * rows);
+        glyphEntropyRates = new Float32Array(cols * rows);
         glyphEntropyScales = new Float32Array(cols * rows);
         glyphIndices = new Uint16Array(cols * rows);
         for (let index = 0; index < glyphIndices.length; index += 1) {
@@ -2037,6 +2066,7 @@ export const GlyphRaster = component$(
           lastBrightnessSampleAt === 0 ||
           time - lastBrightnessSampleAt >= 1000 / PROCEDURAL_ENTROPY_SAMPLE_RATE;
         const shouldUpdateBrightness = shouldSampleBrightness;
+        const isInitialBrightnessSample = lastBrightnessSampleAt === 0;
 
         changedGlyphCount = 0;
         lastFrameAt = time;
@@ -2045,6 +2075,10 @@ export const GlyphRaster = component$(
           lastEntropySampleSourceTime === 0
             ? elapsedFrames
             : ((sourceTime - lastEntropySampleSourceTime) / 1000) * frameRate;
+        const entropyRateElapsedMilliseconds =
+          entropyMode === "shader" && lastEntropySampleSourceTime !== 0
+            ? sourceTime - lastEntropySampleSourceTime
+            : elapsedMilliseconds;
         if (shouldUpdateBrightness) {
           lastBrightnessSampleAt = time;
         }
@@ -2075,19 +2109,27 @@ export const GlyphRaster = component$(
                 brightnessValues[index] = brightness;
               }
 
-              const entropyBrightness = proceduralEntropyBrightness(brightness);
+              if (shouldUpdateBrightness) {
+                const targetEntropyRate = entropyRateForBrightness(brightness);
+
+                glyphEntropyRates[index] = isInitialBrightnessSample
+                  ? targetEntropyRate
+                  : easeEntropyRate(
+                      glyphEntropyRates[index],
+                      targetEntropyRate,
+                      entropyRateElapsedMilliseconds,
+                    );
+              }
 
               if (entropyMode === "cpu") {
                 glyphEntropyPositions[index] +=
-                  elapsedFrames * brightnessEntropy(entropyBrightness) * glyphEntropyScales[index];
+                  elapsedFrames * glyphEntropyRates[index] * glyphEntropyScales[index];
               } else if (shouldUpdateBrightness) {
                 glyphEntropyPositions[index] +=
-                  entropySampleFrames *
-                  brightnessEntropy(entropyBrightness) *
-                  glyphEntropyScales[index];
+                  entropySampleFrames * glyphEntropyRates[index] * glyphEntropyScales[index];
               }
 
-              if (!usesGpuGlyphSelection && shouldRefreshCharacter(entropyBrightness)) {
+              if (!usesGpuGlyphSelection && shouldRefreshCharacter(glyphEntropyRates[index])) {
                 glyphIndices[index] = randomGlyphIndexExcept(glyphIndices[index]);
                 changedGlyphIndices[changedGlyphCount] = index;
                 changedGlyphCount += 1;
@@ -2118,6 +2160,7 @@ export const GlyphRaster = component$(
           gpuNoiseSeed,
           glyphCharacters: resolvedCharacters,
           glyphEntropyPositions,
+          glyphEntropyRates,
           glyphEntropyScales,
           glyphIndices,
           glyphFrameRate: frameRate,
