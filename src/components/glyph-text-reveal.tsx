@@ -12,18 +12,18 @@ const REVEAL_STAGGER_MS = 260;
 const REVEAL_FRAME_RATE = 1000 / 24;
 const REVEAL_CONTAINER_SELECTOR = [
   "article > *",
-  "footer",
-  "header",
   "main > :not(article):not(section)",
-  "nav",
   "section > *",
   "ul > li",
 ].join(",");
 const EXCLUDED_SELECTOR = [
   "canvas",
   "code",
+  "footer",
+  "header",
   "input",
   "kbd",
+  "nav",
   "noscript",
   "option",
   "pre",
@@ -241,11 +241,11 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
 
   if (tokens.length === 0) return (): void => {};
 
-  let isRestored = false;
+  let isCleanedUp = false;
 
-  const cancelReveal = (): void => {
-    if (isRestored) return;
-    isRestored = true;
+  const restoreTextNodes = (): void => {
+    if (isCleanedUp) return;
+    isCleanedUp = true;
 
     for (const { original, wrapper } of wrappedTextNodes) {
       wrapper.replaceWith(document.createTextNode(original));
@@ -253,8 +253,7 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
   };
 
   const completeReveal = (): void => {
-    if (isRestored) return;
-    isRestored = true;
+    if (isCleanedUp) return;
 
     for (const { originalElement, overlay } of tokens) {
       originalElement.style.color = "";
@@ -263,7 +262,7 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
   };
 
   const reveal: ActiveGlyphReveal = {
-    cancel: cancelReveal,
+    cancel: restoreTextNodes,
     complete: completeReveal,
     lastFrameAt: 0,
     render: (time: number): boolean => {
@@ -296,7 +295,7 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
 
   return (): void => {
     activeReveals.delete(reveal);
-    cancelReveal();
+    restoreTextNodes();
   };
 };
 

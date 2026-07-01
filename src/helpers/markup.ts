@@ -203,7 +203,6 @@ export default function Layout({ children: content }) {
 }
 
 <div class="article-cover-glyph-raster">
-  <link rel="preload" href=${JSON.stringify(coverImage.framesPath)} as="fetch" />
   <GlyphRaster layout="fill" source={{ type: "frames", url: ${JSON.stringify(coverImage.framesPath)} }} />
 
 ${coverImage.markup}

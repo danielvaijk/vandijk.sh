@@ -1,7 +1,7 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useSignal, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
 import type { DocumentHeadValue } from "@builder.io/qwik-city";
-import { type DocumentHead } from "@builder.io/qwik-city";
+import { type DocumentHead, useNavigate } from "@builder.io/qwik-city";
 import TypeIt from "typeit";
 
 import { GlyphRaster } from "src/components/glyph-raster";
@@ -63,6 +63,7 @@ const glyphInElement = (element: HTMLElement): (() => void) => {
 
 export default component$((): QwikJSX.Element => {
   const continuePrompt = useSignal("press any key to continue");
+  const navigate = useNavigate();
 
   useStylesScoped$(styles);
 
@@ -71,7 +72,7 @@ export default component$((): QwikJSX.Element => {
     continuePrompt.value = hasTouch ? "tap to continue" : "press any key to continue";
 
     const continueToBlog = (): void => {
-      window.location.assign("/blog/");
+      void navigate("/blog/");
     };
 
     window.addEventListener("keydown", continueToBlog, { capture: true });
@@ -148,7 +149,6 @@ export const head: DocumentHead = (): DocumentHeadValue => {
   const description = "Full-stack Software Engineer, Game Developer, and Writer.";
 
   return {
-    links: [{ as: "fetch", href: "/terminal-splash.frames", rel: "preload" }],
     meta: createPageMetaTags({ description, title }),
     title,
   };
