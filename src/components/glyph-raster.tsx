@@ -977,7 +977,6 @@ const createWebGlGlyphRenderer = ({
     uniform vec2 u_brightness_size;
     uniform vec2 u_canvas_size;
     uniform vec2 u_cell_size;
-    uniform vec2 u_grid_offset;
     uniform vec2 u_viewport_scroll;
     uniform vec4 u_field_modifier_rects[${MAX_FIELD_MODIFIER_REGIONS}];
     out float v_brightness;
@@ -1038,8 +1037,7 @@ const createWebGlGlyphRenderer = ({
     }
     void main() {
       vec2 cell = floor(a_brightness_uv * u_brightness_size);
-      vec2 world = u_viewport_scroll + u_grid_offset + (cell + vec2(0.5)) * u_cell_size;
-      vec2 world_cell = floor(world / u_cell_size);
+      vec2 world_cell = floor((u_viewport_scroll + a_position + vec2(0.5) * u_cell_size) / u_cell_size);
       vec2 modifier_world = (world_cell + vec2(0.5)) * u_cell_size;
       float color_brightness = clamp(
         glyphApplyFieldModifiers(
@@ -1142,7 +1140,6 @@ const createWebGlGlyphRenderer = ({
   const brightnessSizeLocation = gl.getUniformLocation(program, "u_brightness_size");
   const canvasSizeLocation = gl.getUniformLocation(program, "u_canvas_size");
   const cellSizeLocation = gl.getUniformLocation(program, "u_cell_size");
-  const gridOffsetLocation = usesGpuNoise ? gl.getUniformLocation(program, "u_grid_offset") : null;
   const viewportScrollLocation = usesGpuNoise
     ? gl.getUniformLocation(program, "u_viewport_scroll")
     : null;
@@ -1197,7 +1194,6 @@ const createWebGlGlyphRenderer = ({
       (!fieldModifierBrightnessLocation ||
         !fieldModifierCountLocation ||
         !fieldModifierRectsLocation ||
-        !gridOffsetLocation ||
         !viewportScrollLocation)) ||
     !paletteLocation ||
     !colorCountLocation ||
@@ -1472,7 +1468,17 @@ const createWebGlGlyphRenderer = ({
         uploadPalette(colors);
       }
 
-      const positionKey = [cols, rows, offsetX, offsetY, cellWidth, cellHeight].join(":");
+      const shouldAnchorToWorld = usesGpuNoise;
+      const positionKey = shouldAnchorToWorld
+        ? [
+            cols,
+            rows,
+            cellWidth,
+            cellHeight,
+            Math.floor(viewportScrollX / cellWidth),
+            Math.floor(viewportScrollY / cellHeight),
+          ].join(":")
+        : [cols, rows, offsetX, offsetY, cellWidth, cellHeight].join(":");
       const shouldUploadPositions = positionKey !== lastPositionKey;
       const shouldUploadBrightness = didResize || shouldUpdateBrightness;
       if (shouldUploadPositions) {
@@ -1484,11 +1490,17 @@ const createWebGlGlyphRenderer = ({
           for (let col = 0; col < cols; col += 1) {
             const index = row * cols + col;
             const positionIndex = index * 2;
+            const worldCol = Math.floor(viewportScrollX / cellWidth) + col - 1;
+            const worldRow = Math.floor(viewportScrollY / cellHeight) + row - 1;
 
             brightnessUvs[positionIndex] = (col + 0.5) / cols;
             brightnessUvs[positionIndex + 1] = (row + 0.5) / rows;
-            positions[positionIndex] = offsetX + col * cellWidth;
-            positions[positionIndex + 1] = offsetY + row * cellHeight;
+            positions[positionIndex] = shouldAnchorToWorld
+              ? worldCol * cellWidth - viewportScrollX
+              : offsetX + col * cellWidth;
+            positions[positionIndex + 1] = shouldAnchorToWorld
+              ? worldRow * cellHeight - viewportScrollY
+              : offsetY + row * cellHeight;
           }
         }
       }
@@ -1511,7 +1523,6 @@ const createWebGlGlyphRenderer = ({
         gl.uniform1f(sourceTimeLocation, sourceTime);
         gl.uniform1f(entropySampleTimeLocation, entropySampleTime);
         gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
-        gl.uniform2f(gridOffsetLocation, offsetX, offsetY);
         gl.uniform2f(viewportScrollLocation, viewportScrollX, viewportScrollY);
         uploadFieldModifiers();
       } else if (
@@ -1803,8 +1814,10 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
 
       renderer.resize({ cssHeight, cssWidth, pixelRatio });
 
-      cols = Math.max(1, Math.ceil(cssWidth / preset.cellWidth));
-      rows = Math.max(1, Math.ceil(cssHeight / preset.cellHeight));
+      const overscanCells =
+        resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined ? 2 : 0;
+      cols = Math.max(1, Math.ceil(cssWidth / preset.cellWidth) + overscanCells);
+      rows = Math.max(1, Math.ceil(cssHeight / preset.cellHeight) + overscanCells);
       changedGlyphCount = 0;
       changedGlyphIndices = new Uint32Array(cols * rows);
       brightnessValues = new Float32Array(cols * rows);
@@ -1868,26 +1881,29 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
         lastBrightnessSampleAt = time;
       }
 
+      const shouldAnchorToWorld =
+        resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined;
+      const firstWorldCol = Math.floor(window.scrollX / preset.cellWidth) - 1;
+      const firstWorldRow = Math.floor(window.scrollY / preset.cellHeight) - 1;
+
       if (entropyMode === "cpu" || shouldUpdateBrightness || !usesGpuGlyphSelection) {
         for (let row = 0; row < rows; row += 1) {
           for (let col = 0; col < cols; col += 1) {
             const index = row * cols + col;
+            const worldCol = shouldAnchorToWorld ? firstWorldCol + col : col;
+            const worldRow = shouldAnchorToWorld ? firstWorldRow + row : row;
             const viewportX = offsetX + (col + 0.5) * preset.cellWidth;
             const viewportY = offsetY + (row + 0.5) * preset.cellHeight;
-            const worldX = viewportX + window.scrollX;
-            const worldY = viewportY + window.scrollY;
-            const worldCellCenterX =
-              (Math.floor(worldX / preset.cellWidth) + 0.5) * preset.cellWidth;
-            const worldCellCenterY =
-              (Math.floor(worldY / preset.cellHeight) + 0.5) * preset.cellHeight;
+            const worldX = shouldAnchorToWorld
+              ? (worldCol + 0.5) * preset.cellWidth
+              : viewportX + window.scrollX;
+            const worldY = shouldAnchorToWorld
+              ? (worldRow + 0.5) * preset.cellHeight
+              : viewportY + window.scrollY;
             const sampledBrightness = shouldUpdateBrightness
               ? adapter.getBrightness(
-                  resolvedSource.type === "procedural-noise"
-                    ? Math.floor(worldX / preset.cellWidth)
-                    : col,
-                  resolvedSource.type === "procedural-noise"
-                    ? Math.floor(worldY / preset.cellHeight)
-                    : row,
+                  resolvedSource.type === "procedural-noise" ? worldCol : col,
+                  resolvedSource.type === "procedural-noise" ? worldRow : row,
                   cols,
                   rows,
                   sourceTime,
@@ -1897,11 +1913,7 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
             const brightness =
               shouldUpdateBrightness && resolvedSource.type === "procedural-noise"
                 ? clamp(
-                    applyGlyphFieldModifierBrightness(
-                      sampledBrightness,
-                      worldCellCenterX,
-                      worldCellCenterY,
-                    ),
+                    applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY),
                     0,
                     1,
                   )
