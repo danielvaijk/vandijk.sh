@@ -114,6 +114,54 @@ function renderImageMarkup({
     .join("\n");
 }
 
+function escapeHtmlText(value: string): string {
+  return value
+    .replace(/&/gu, "&amp;")
+    .replace(/</gu, "&lt;")
+    .replace(/>/gu, "&gt;")
+    .replace(/"/gu, "&quot;");
+}
+
+function getCodeDrawerSummary(info: string): string {
+  const language = info.trim().split(/\s+/u)[0];
+
+  if (typeof language === "string" && language.length > 0) {
+    return language.toUpperCase();
+  }
+
+  return "Code";
+}
+
+function wrapMarkdownCodeBlocks(content: string): string {
+  return content.replace(
+    /(^|\n)(?<indent>[ \t]*)(?<fence>`{3,}|~{3,})(?<info>[^\n]*)\n(?<code>[\s\S]*?)\n[ \t]*\k<fence>[ \t]*(?=\n|$)/gu,
+    (match, prefix: string, ...args: Array<unknown>): string => {
+      const groups = args.at(-1) as
+        | {
+            code: string;
+            fence: string;
+            indent: string;
+            info: string;
+          }
+        | undefined;
+
+      if (typeof groups === "undefined") {
+        return match;
+      }
+
+      const summary = escapeHtmlText(getCodeDrawerSummary(groups.info));
+      const codeBlock = `${groups.indent}${groups.fence}${groups.info}\n${groups.code}\n${groups.indent}${groups.fence}`;
+
+      return `${prefix}<details class="article-code-drawer">
+<summary>${summary}</summary>
+
+${codeBlock}
+
+</details>`;
+    },
+  );
+}
+
 async function generateImagesWithMarkup({
   caption,
   image,
@@ -175,6 +223,8 @@ function generateMdxArticlePage({
   title: string;
   topic: string;
 }): string {
+  const articleBody = wrapMarkdownCodeBlocks(articleContent);
+
   return `---
 title: ${JSON.stringify(title)}
 description: ${JSON.stringify(description)}
@@ -224,8 +274,13 @@ ${anchorLinks}
 
 ---
 
-${articleContent}
+${articleBody}
 `;
 }
 
-export { extractCaptionValues, generateMdxArticlePage, generateImagesWithMarkup };
+export {
+  extractCaptionValues,
+  generateMdxArticlePage,
+  generateImagesWithMarkup,
+  wrapMarkdownCodeBlocks,
+};

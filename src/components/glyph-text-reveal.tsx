@@ -39,6 +39,20 @@ const CONTENT_CONTAINER_EXCLUDED_SELECTOR = [
   "header",
   "nav",
 ].join(",");
+const CODE_BLOCK_TEXT_EXCLUDED_SELECTOR = [
+  "canvas",
+  "input",
+  "kbd",
+  "noscript",
+  "option",
+  "samp",
+  "script",
+  "select",
+  "style",
+  "svg",
+  "textarea",
+  "[data-glyph-text-reveal]",
+].join(",");
 const revealedElements = new WeakSet<Element>();
 const scannedContainers = new WeakSet<Element>();
 
@@ -71,6 +85,7 @@ type WrappedTextNode = {
 };
 
 type AnimateTextNodesOptions = {
+  excludedSelector?: string;
   restoreCompleted?: boolean;
 };
 
@@ -227,13 +242,16 @@ const renderActiveReveals = (time: number): void => {
 
 const animateTextNodes = (
   textNodes: Text[],
-  { restoreCompleted = true }: AnimateTextNodesOptions = {},
+  {
+    excludedSelector = TEXT_EXCLUDED_SELECTOR,
+    restoreCompleted = true,
+  }: AnimateTextNodesOptions = {},
 ): (() => void) => {
   const tokens: AnimatedGlyphToken[] = [];
   const wrappedTextNodes: WrappedTextNode[] = [];
 
   for (const textNode of textNodes) {
-    if (!textNode.isConnected || !shouldAnimateTextNode(textNode)) continue;
+    if (!textNode.isConnected || !shouldAnimateTextNode(textNode, excludedSelector)) continue;
 
     const original = textNode.data;
     const wrapper = document.createElement("span");
@@ -375,6 +393,35 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
         targetObserver.observe(element);
       }
     };
+    const drawerCodeRevealCleanups = new Map<HTMLDetailsElement, () => void>();
+    const revealedCodeDrawers = new WeakSet<HTMLDetailsElement>();
+    const drawerToggleCleanups = new Set<() => void>();
+    const revealDrawerCode = (drawer: HTMLDetailsElement): void => {
+      if (!drawer.open || revealedCodeDrawers.has(drawer)) return;
+
+      revealedCodeDrawers.add(drawer);
+
+      const textNodes = Array.from(drawer.querySelectorAll("pre")).flatMap((codeBlock) =>
+        createRevealTargets(codeBlock, CODE_BLOCK_TEXT_EXCLUDED_SELECTOR).flatMap(
+          (target): Text[] => target.textNodes,
+        ),
+      );
+      const cleanupReveal = animateTextNodes(textNodes, {
+        excludedSelector: CODE_BLOCK_TEXT_EXCLUDED_SELECTOR,
+      });
+
+      drawerCodeRevealCleanups.set(drawer, cleanupReveal);
+    };
+    const codeDrawers = Array.from(
+      root.querySelectorAll<HTMLDetailsElement>(".article-code-drawer"),
+    );
+
+    for (const drawer of codeDrawers) {
+      const handleToggle = (): void => revealDrawerCode(drawer);
+
+      drawer.addEventListener("toggle", handleToggle);
+      drawerToggleCleanups.add((): void => drawer.removeEventListener("toggle", handleToggle));
+    }
     const containerObserver = new IntersectionObserver(
       (entries): void => {
         for (const entry of entries) {
@@ -410,6 +457,14 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
 
       for (const restoreAnimation of restoreAnimations) {
         restoreAnimation();
+      }
+
+      for (const cleanupDrawerReveal of drawerCodeRevealCleanups.values()) {
+        cleanupDrawerReveal();
+      }
+
+      for (const cleanupDrawerToggle of drawerToggleCleanups) {
+        cleanupDrawerToggle();
       }
     });
   });
