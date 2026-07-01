@@ -99,7 +99,8 @@ type GlyphRasterPreset = {
   opacity: number;
 };
 
-type ImageOverrideRegion = {
+type GlyphFieldModifierRegion = {
+  brightnessGrid?: Uint8Array;
   documentLeft: number;
   documentTop: number;
   element: HTMLElement;
@@ -110,7 +111,7 @@ type ImageOverrideRegion = {
 const GLYPH_CHARS =
   "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%&*+=-~.:;|/\\<>";
 const GLYPH_COLORS = ["#2e2e2e", "#585858", "#8a8a8a", "#d0d0d0", "#f4f4f4"];
-const NOISE_COLORS = ["#3a3a3a", "#565656", "#737373", "#9a9a9a", "#c8c8c8"];
+const NOISE_COLORS = ["#131313", "#1e1e1e", "#343434", "#6f6f6f", "#ffffff"];
 const GLYPH_FONT_FAMILY = 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif';
 const GLYPH_HORIZONTAL_SCALE = 1.09;
 const NOISE_CELL_WIDTH = 8;
@@ -121,10 +122,14 @@ const MIN_FRAME_RATE = 1;
 const MAX_FRAME_RATE = 60;
 const PROCEDURAL_ENTROPY_SAMPLE_RATE = 9;
 const PROCEDURAL_VISUAL_SAMPLE_RATE = 30;
-const MAX_IMAGE_OVERRIDE_REGIONS = 8;
+const MAX_FIELD_MODIFIER_REGIONS = 8;
+const FIELD_MODIFIER_SAMPLE_SIZE = 64;
+const FIELD_MODIFIER_BRIGHTNESS_BOOST = 1.2;
+const FIELD_MODIFIER_BRIGHTNESS_FLOOR = 0.08;
+const FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT = 0.5;
+const MAX_FIELD_MODIFIER_BRIGHTNESS_CACHE_SIZE = 16;
 const MAX_GLYPH_ATLAS_CACHE_SIZE = 8;
 const MAX_FRAME_BRIGHTNESS_CACHE_SIZE = 8;
-const MAX_IMAGE_BRIGHTNESS_CACHE_SIZE = 16;
 const MAX_PARSED_COLOR_CACHE_SIZE = 32;
 const DIAGONAL_GRADIENT = Math.SQRT1_2;
 const FRACTAL_NOISE_RANGE = 0.52 + 0.26 + 0.13 + 0.065;
@@ -137,12 +142,12 @@ const glyphAtlasCache = new Map<
   }
 >();
 const frameBrightnessCache = new Map<string, Uint8Array>();
-const imageBrightnessCache = new Map<string, Float32Array>();
+const fieldModifierBrightnessCache = new Map<string, Uint8Array>();
 const parsedColorCache = new Map<string, [number, number, number, number]>();
 const activeGlyphRasters = new Set<ActiveGlyphRaster>();
-const imageOverrideRegions = new Map<string, ImageOverrideRegion>();
+const glyphFieldModifierRegions = new Map<string, GlyphFieldModifierRegion>();
 let activeGlyphRasterFrame = 0;
-let imageOverrideRegionsVersion = 0;
+let glyphFieldModifierRegionsVersion = 0;
 
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
@@ -245,12 +250,12 @@ const smoothstep = (edgeStart: number, edgeEnd: number, value: number): number =
   return amount * amount * (3 - 2 * amount);
 };
 
-const markImageOverrideRegionsChanged = (): void => {
-  imageOverrideRegionsVersion += 1;
+const markGlyphFieldModifierRegionsChanged = (): void => {
+  glyphFieldModifierRegionsVersion += 1;
 };
 
-const updateImageOverrideRegionBounds = (
-  region: ImageOverrideRegion,
+const updateGlyphFieldModifierRegionBounds = (
+  region: GlyphFieldModifierRegion,
   shouldMarkChanged = true,
 ): void => {
   const rect = region.element.getBoundingClientRect();
@@ -260,12 +265,18 @@ const updateImageOverrideRegionBounds = (
   region.width = rect.width;
   region.height = rect.height;
   if (shouldMarkChanged) {
-    markImageOverrideRegionsChanged();
+    markGlyphFieldModifierRegionsChanged();
   }
 };
 
-const getCoverRectBoost = (worldX: number, worldY: number): number => {
-  for (const region of imageOverrideRegions.values()) {
+const applyGlyphFieldModifierBrightness = (
+  brightness: number,
+  worldX: number,
+  worldY: number,
+): number => {
+  let modifierBrightness = 0;
+
+  for (const region of glyphFieldModifierRegions.values()) {
     if (
       region.width > 0 &&
       region.height > 0 &&
@@ -274,11 +285,31 @@ const getCoverRectBoost = (worldX: number, worldY: number): number => {
       worldY >= region.documentTop &&
       worldY < region.documentTop + region.height
     ) {
-      return 0.5;
+      if (!region.brightnessGrid) {
+        modifierBrightness = Math.max(modifierBrightness, FIELD_MODIFIER_BRIGHTNESS_FLOOR);
+        continue;
+      }
+
+      const u = clamp((worldX - region.documentLeft) / region.width, 0, 0.999999);
+      const v = clamp((worldY - region.documentTop) / region.height, 0, 0.999999);
+      const sampleX = Math.floor(u * FIELD_MODIFIER_SAMPLE_SIZE);
+      const sampleY = Math.floor(v * FIELD_MODIFIER_SAMPLE_SIZE);
+      const regionBrightness =
+        region.brightnessGrid[sampleY * FIELD_MODIFIER_SAMPLE_SIZE + sampleX] / 255;
+      const mappedRegionBrightness = smoothstep(
+        0,
+        FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT,
+        regionBrightness,
+      );
+      const liftedRegionBrightness =
+        FIELD_MODIFIER_BRIGHTNESS_FLOOR +
+        mappedRegionBrightness * (1 - FIELD_MODIFIER_BRIGHTNESS_FLOOR);
+
+      modifierBrightness = Math.max(modifierBrightness, liftedRegionBrightness);
     }
   }
 
-  return 0;
+  return brightness + Math.min(1, modifierBrightness * FIELD_MODIFIER_BRIGHTNESS_BOOST) * (1 - brightness);
 };
 
 const hasActiveGlyphRaster = (): boolean => {
@@ -366,7 +397,7 @@ const resolvePreset = (source: GlyphRasterSource): GlyphRasterPreset => ({
   colors: source.type === "procedural-noise" ? NOISE_COLORS : GLYPH_COLORS,
   fontSize: NOISE_FONT_SIZE,
   layout: source.type === "image" ? "fill" : "fixed",
-  opacity: source.type === "image" ? 1 : source.type === "frames" ? 0.22 : 0.32,
+  opacity: source.type === "frames" ? 0.22 : 1,
 });
 
 const createNoiseAdapter = (): SourceAdapter => {
@@ -488,77 +519,52 @@ const loadImage = async (url: string): Promise<HTMLImageElement> =>
     image.src = url;
   });
 
-const createImageAdapter = async (source: GlyphRasterImageSource): Promise<SourceAdapter> => {
-  const image = await loadImage(source.url);
+const createFieldModifierBrightnessGrid = async (url: string): Promise<Uint8Array> => {
+  const cachedGrid = getCachedValue(fieldModifierBrightnessCache, url);
+  if (cachedGrid) return cachedGrid;
+
+  const image = await loadImage(url);
   const imageCanvas = document.createElement("canvas");
   const imageContext = imageCanvas.getContext("2d", { willReadFrequently: true });
-  let brightnessGrid = new Float32Array();
 
   if (!imageContext) {
-    throw new Error(`Unable to read character animation image ${source.url}.`);
+    throw new Error(`Unable to read glyph field modifier image ${url}.`);
   }
 
-  imageCanvas.width = image.naturalWidth;
-  imageCanvas.height = image.naturalHeight;
-  imageContext.drawImage(image, 0, 0);
+  imageCanvas.width = FIELD_MODIFIER_SAMPLE_SIZE;
+  imageCanvas.height = FIELD_MODIFIER_SAMPLE_SIZE;
+  imageContext.drawImage(image, 0, 0, imageCanvas.width, imageCanvas.height);
 
   const imageData = imageContext.getImageData(0, 0, imageCanvas.width, imageCanvas.height).data;
+  const brightnessGrid = new Uint8Array(FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE);
 
-  return {
-    getBrightness: (col, row, cols) => brightnessGrid[row * cols + col] ?? 0,
-    resize: (cols, rows) => {
-      const cacheKey = [source.url, imageCanvas.width, imageCanvas.height, cols, rows].join(":");
-      const cachedBrightnessGrid = getCachedValue(imageBrightnessCache, cacheKey);
-      if (cachedBrightnessGrid) {
-        brightnessGrid = cachedBrightnessGrid;
-        return;
-      }
+  for (let index = 0; index < brightnessGrid.length; index += 1) {
+    const pixelIndex = index * 4;
+    const alpha = imageData[pixelIndex + 3] / 255;
+    const brightness =
+      ((imageData[pixelIndex] * 0.2126 +
+        imageData[pixelIndex + 1] * 0.7152 +
+        imageData[pixelIndex + 2] * 0.0722) /
+        255) *
+      alpha;
 
-      const sourceAspect = imageCanvas.width / imageCanvas.height;
-      const targetAspect = cols / rows;
-      const shouldMatchTargetWidth = sourceAspect < targetAspect;
-      const drawWidth = shouldMatchTargetWidth ? cols : rows * sourceAspect;
-      const drawHeight = drawWidth / sourceAspect;
-      const drawX = (cols - drawWidth) / 2;
-      const drawY = (rows - drawHeight) / 2;
+    brightnessGrid[index] = Math.round(brightness * 255);
+  }
 
-      brightnessGrid = new Float32Array(cols * rows);
+  setCachedValue(
+    fieldModifierBrightnessCache,
+    url,
+    brightnessGrid,
+    MAX_FIELD_MODIFIER_BRIGHTNESS_CACHE_SIZE,
+  );
 
-      for (let row = 0; row < rows; row += 1) {
-        for (let col = 0; col < cols; col += 1) {
-          const u = (col + 0.5 - drawX) / drawWidth;
-          const v = (row + 0.5 - drawY) / drawHeight;
-
-          if (u < 0 || u > 1 || v < 0 || v > 1) continue;
-
-          const sourceX = clamp(Math.floor(u * imageCanvas.width), 0, imageCanvas.width - 1);
-          const sourceY = clamp(Math.floor(v * imageCanvas.height), 0, imageCanvas.height - 1);
-          const index = (sourceY * imageCanvas.width + sourceX) * 4;
-          const alpha = imageData[index + 3] / 255;
-          const brightness =
-            ((imageData[index] * 0.2126 +
-              imageData[index + 1] * 0.7152 +
-              imageData[index + 2] * 0.0722) /
-              255) *
-            alpha;
-
-          brightnessGrid[row * cols + col] = brightness;
-        }
-      }
-
-      setCachedValue(
-        imageBrightnessCache,
-        cacheKey,
-        brightnessGrid,
-        MAX_IMAGE_BRIGHTNESS_CACHE_SIZE,
-      );
-    },
-  };
+  return brightnessGrid;
 };
 
-const createSourceAdapter = async (source: GlyphRasterSource): Promise<SourceAdapter> => {
+const createSourceAdapter = async (
+  source: GlyphRasterFrameSource | GlyphRasterNoiseSource,
+): Promise<SourceAdapter> => {
   if (source.type === "frames") return createFramesAdapter(source);
-  if (source.type === "image") return createImageAdapter(source);
 
   return createNoiseAdapter();
 };
@@ -943,14 +949,15 @@ const createWebGlGlyphRenderer = ({
     uniform float u_source_time;
     uniform float u_entropy_sample_time;
     uniform float u_glyph_frame_rate;
-    uniform int u_image_override_count;
+    uniform sampler2D u_field_modifier_brightness;
+    uniform int u_field_modifier_count;
     uniform vec2 u_atlas_grid;
     uniform vec2 u_brightness_size;
     uniform vec2 u_canvas_size;
     uniform vec2 u_cell_size;
     uniform vec2 u_grid_offset;
     uniform vec2 u_viewport_scroll;
-    uniform vec4 u_image_override_rects[${MAX_IMAGE_OVERRIDE_REGIONS}];
+    uniform vec4 u_field_modifier_rects[${MAX_FIELD_MODIFIER_REGIONS}];
     out float v_brightness;
     out vec2 v_uv;
     out vec2 v_brightness_uv;
@@ -966,11 +973,13 @@ const createWebGlGlyphRenderer = ({
     float glyphProceduralEntropyBrightness(float brightness) {
       return smoothstep(0.22, 0.78, brightness);
     }
-    float glyphCoverRectBoost(vec2 world) {
-      for (int index = 0; index < ${MAX_IMAGE_OVERRIDE_REGIONS}; index += 1) {
-        if (index >= u_image_override_count) break;
+    float glyphFieldModifierBrightness(vec2 world) {
+      float modifier_brightness = 0.0;
 
-        vec4 rect = u_image_override_rects[index];
+      for (int index = 0; index < ${MAX_FIELD_MODIFIER_REGIONS}; index += 1) {
+        if (index >= u_field_modifier_count) break;
+
+        vec4 rect = u_field_modifier_rects[index];
         if (
           world.x < rect.x ||
           world.x >= rect.x + rect.z ||
@@ -980,23 +989,45 @@ const createWebGlGlyphRenderer = ({
           continue;
         }
 
-        return 0.5;
+        vec2 modifier_uv = clamp((world - rect.xy) / rect.zw, vec2(0.0), vec2(0.999999));
+        ivec2 sample_cell = ivec2(floor(modifier_uv * float(${FIELD_MODIFIER_SAMPLE_SIZE})));
+        float sampled_brightness = texelFetch(
+          u_field_modifier_brightness,
+          ivec2(sample_cell.x, sample_cell.y + index * ${FIELD_MODIFIER_SAMPLE_SIZE}),
+          0
+        ).r;
+        float mapped_brightness = smoothstep(
+          0.0,
+          ${FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT.toFixed(2)},
+          sampled_brightness
+        );
+        float lifted_brightness =
+          ${FIELD_MODIFIER_BRIGHTNESS_FLOOR.toFixed(2)} +
+          mapped_brightness * ${Number(1 - FIELD_MODIFIER_BRIGHTNESS_FLOOR).toFixed(2)};
+        modifier_brightness = max(modifier_brightness, lifted_brightness);
       }
 
-      return 0.0;
+      return modifier_brightness;
+    }
+    float glyphApplyFieldModifiers(float brightness, vec2 world) {
+      float modifier_brightness = glyphFieldModifierBrightness(world);
+
+      return brightness + min(1.0, modifier_brightness * ${FIELD_MODIFIER_BRIGHTNESS_BOOST.toFixed(1)}) * (1.0 - brightness);
     }
     void main() {
       vec2 cell = floor(a_brightness_uv * u_brightness_size);
       vec2 world = u_viewport_scroll + u_grid_offset + (cell + vec2(0.5)) * u_cell_size;
       vec2 world_cell = floor(world / u_cell_size);
-      float brightness_scale = 1.0 + glyphCoverRectBoost(world);
       float color_brightness = clamp(
-        glyphSolarBrightness(world_cell, u_source_time, u_noise_seed) * brightness_scale,
+        glyphApplyFieldModifiers(glyphSolarBrightness(world_cell, u_source_time, u_noise_seed), world),
         0.0,
         1.0
       );
       float entropy_brightness = glyphProceduralEntropyBrightness(clamp(
-        glyphSolarBrightness(world_cell, u_entropy_sample_time, u_noise_seed) * brightness_scale,
+        glyphApplyFieldModifiers(
+          glyphSolarBrightness(world_cell, u_entropy_sample_time, u_noise_seed),
+          world
+        ),
         0.0,
         1.0
       ));
@@ -1074,6 +1105,7 @@ const createWebGlGlyphRenderer = ({
   const entropyScaleBuffer = gl.createBuffer();
   const atlasTexture = gl.createTexture();
   const brightnessTexture = gl.createTexture();
+  const fieldModifierBrightnessTexture = gl.createTexture();
   const paletteTexture = gl.createTexture();
   const cornerLocation = gl.getAttribLocation(program, "a_corner");
   const positionLocation = gl.getAttribLocation(program, "a_position");
@@ -1090,11 +1122,14 @@ const createWebGlGlyphRenderer = ({
     : null;
   const atlasLocation = gl.getUniformLocation(program, "u_atlas");
   const brightnessLocation = gl.getUniformLocation(program, "u_brightness");
-  const imageOverrideCountLocation = usesGpuNoise
-    ? gl.getUniformLocation(program, "u_image_override_count")
+  const fieldModifierBrightnessLocation = usesGpuNoise
+    ? gl.getUniformLocation(program, "u_field_modifier_brightness")
     : null;
-  const imageOverrideRectsLocation = usesGpuNoise
-    ? gl.getUniformLocation(program, "u_image_override_rects[0]")
+  const fieldModifierCountLocation = usesGpuNoise
+    ? gl.getUniformLocation(program, "u_field_modifier_count")
+    : null;
+  const fieldModifierRectsLocation = usesGpuNoise
+    ? gl.getUniformLocation(program, "u_field_modifier_rects[0]")
     : null;
   const paletteLocation = gl.getUniformLocation(program, "u_palette");
   const colorCountLocation = gl.getUniformLocation(program, "u_color_count");
@@ -1119,6 +1154,7 @@ const createWebGlGlyphRenderer = ({
     !entropyScaleBuffer ||
     !atlasTexture ||
     !brightnessTexture ||
+    !fieldModifierBrightnessTexture ||
     !paletteTexture ||
     cornerLocation < 0 ||
     positionLocation < 0 ||
@@ -1132,8 +1168,9 @@ const createWebGlGlyphRenderer = ({
     !atlasLocation ||
     (!usesGpuNoise && !brightnessLocation) ||
     (usesGpuNoise &&
-      (!imageOverrideCountLocation ||
-        !imageOverrideRectsLocation ||
+      (!fieldModifierBrightnessLocation ||
+        !fieldModifierCountLocation ||
+        !fieldModifierRectsLocation ||
         !gridOffsetLocation ||
         !viewportScrollLocation)) ||
     !paletteLocation ||
@@ -1156,9 +1193,12 @@ const createWebGlGlyphRenderer = ({
   let positions = new Float32Array();
   let lastPixelRatio = 0;
   let lastColorsKey = "";
-  let lastImageOverrideVersion = -1;
+  let lastFieldModifierVersion = -1;
   let lastPositionKey = "";
-  const imageOverrideRects = new Float32Array(MAX_IMAGE_OVERRIDE_REGIONS * 4);
+  const fieldModifierBrightnessBytes = new Uint8Array(
+    FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE * MAX_FIELD_MODIFIER_REGIONS,
+  );
+  const fieldModifierRects = new Float32Array(MAX_FIELD_MODIFIER_REGIONS * 4);
   const atlasCols = Math.ceil(Math.sqrt(characters.length));
   const atlasRows = Math.ceil(characters.length / atlasCols);
   const entropySeed = Math.random() * 100000;
@@ -1194,6 +1234,9 @@ const createWebGlGlyphRenderer = ({
   gl.uniform1i(atlasLocation, 0);
   if (brightnessLocation) {
     gl.uniform1i(brightnessLocation, 2);
+  }
+  if (fieldModifierBrightnessLocation) {
+    gl.uniform1i(fieldModifierBrightnessLocation, 3);
   }
   gl.uniform1i(paletteLocation, 1);
   gl.uniform1f(entropySeedLocation, entropySeed);
@@ -1288,37 +1331,65 @@ const createWebGlGlyphRenderer = ({
     gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, rows, gl.RED, gl.UNSIGNED_BYTE, brightnessBytes);
   };
 
-  const uploadImageOverrides = (): void => {
-    if (!usesGpuNoise || !imageOverrideCountLocation || !imageOverrideRectsLocation) {
+  const uploadFieldModifiers = (): void => {
+    if (
+      !usesGpuNoise ||
+      !fieldModifierCountLocation ||
+      !fieldModifierRectsLocation ||
+      !fieldModifierBrightnessTexture
+    ) {
       return;
     }
 
-    if (lastImageOverrideVersion === imageOverrideRegionsVersion) {
+    if (lastFieldModifierVersion === glyphFieldModifierRegionsVersion) {
       return;
     }
 
-    lastImageOverrideVersion = imageOverrideRegionsVersion;
+    lastFieldModifierVersion = glyphFieldModifierRegionsVersion;
 
-    const regions = Array.from(imageOverrideRegions.values())
-      .filter((region) => region.width > 0 && region.height > 0)
-      .slice(0, MAX_IMAGE_OVERRIDE_REGIONS);
+    const regions = Array.from(glyphFieldModifierRegions.values())
+      .filter((region) => region.width > 0 && region.height > 0 && region.brightnessGrid)
+      .slice(0, MAX_FIELD_MODIFIER_REGIONS);
 
     let regionCount = 0;
 
-    imageOverrideRects.fill(0);
+    fieldModifierBrightnessBytes.fill(0);
+    fieldModifierRects.fill(0);
 
     for (const region of regions) {
       const valueIndex = regionCount * 4;
-      imageOverrideRects[valueIndex] = region.documentLeft;
-      imageOverrideRects[valueIndex + 1] = region.documentTop;
-      imageOverrideRects[valueIndex + 2] = region.width;
-      imageOverrideRects[valueIndex + 3] = region.height;
+      const brightnessOffset =
+        regionCount * FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
+
+      fieldModifierRects[valueIndex] = region.documentLeft;
+      fieldModifierRects[valueIndex + 1] = region.documentTop;
+      fieldModifierRects[valueIndex + 2] = region.width;
+      fieldModifierRects[valueIndex + 3] = region.height;
+      fieldModifierBrightnessBytes.set(region.brightnessGrid ?? [], brightnessOffset);
       regionCount += 1;
     }
 
     gl.useProgram(program);
-    gl.uniform1i(imageOverrideCountLocation, regionCount);
-    gl.uniform4fv(imageOverrideRectsLocation, imageOverrideRects);
+    gl.uniform1i(fieldModifierCountLocation, regionCount);
+    gl.uniform4fv(fieldModifierRectsLocation, fieldModifierRects);
+
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, fieldModifierBrightnessTexture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texImage2D(
+      gl.TEXTURE_2D,
+      0,
+      gl.R8,
+      FIELD_MODIFIER_SAMPLE_SIZE,
+      FIELD_MODIFIER_SAMPLE_SIZE * MAX_FIELD_MODIFIER_REGIONS,
+      0,
+      gl.RED,
+      gl.UNSIGNED_BYTE,
+      fieldModifierBrightnessBytes,
+    );
   };
 
   const uploadEntropyPositions = (entropyValues: Float32Array, usage: number): void => {
@@ -1416,7 +1487,7 @@ const createWebGlGlyphRenderer = ({
         gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
         gl.uniform2f(gridOffsetLocation, offsetX, offsetY);
         gl.uniform2f(viewportScrollLocation, viewportScrollX, viewportScrollY);
-        uploadImageOverrides();
+        uploadFieldModifiers();
       } else if (
         !usesGpuNoise &&
         sourceTimeLocation &&
@@ -1571,7 +1642,7 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
       const element = document.getElementById(rasterId);
       if (!element) return;
 
-      const region: ImageOverrideRegion = {
+      const region: GlyphFieldModifierRegion = {
         documentLeft: 0,
         documentTop: 0,
         element,
@@ -1579,7 +1650,7 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
         width: 0,
       };
       const onRegionChanged = (): void => {
-        updateImageOverrideRegionBounds(region);
+        updateGlyphFieldModifierRegionBounds(region);
         scheduleActiveGlyphRasters();
       };
       const resizeObserver = new ResizeObserver(onRegionChanged);
@@ -1590,8 +1661,17 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
       };
       let animationFrame = 0;
 
-      imageOverrideRegions.set(rasterId, region);
+      glyphFieldModifierRegions.set(rasterId, region);
       onRegionChanged();
+      createFieldModifierBrightnessGrid(resolvedSource.url)
+        .then((brightnessGrid) => {
+          if (isCleanedUp) return;
+
+          region.brightnessGrid = brightnessGrid;
+          markGlyphFieldModifierRegionsChanged();
+          scheduleActiveGlyphRasters();
+        })
+        .catch(() => {});
       animationFrame = requestAnimationFrame(onNextFrame);
       resizeObserver.observe(element);
       window.addEventListener("load", onWindowChanged);
@@ -1604,8 +1684,8 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
         resizeObserver.disconnect();
         window.removeEventListener("load", onWindowChanged);
         window.removeEventListener("resize", onWindowChanged);
-        imageOverrideRegions.delete(rasterId);
-        markImageOverrideRegionsChanged();
+        glyphFieldModifierRegions.delete(rasterId);
+        markGlyphFieldModifierRegionsChanged();
         scheduleActiveGlyphRasters();
       };
 
@@ -1786,7 +1866,11 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
               : brightnessValues[index];
             const brightness =
               shouldUpdateBrightness && resolvedSource.type === "procedural-noise"
-                ? clamp(sampledBrightness * (1 + getCoverRectBoost(worldX, worldY)), 0, 1)
+                ? clamp(
+                    applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY),
+                    0,
+                    1,
+                  )
                 : sampledBrightness;
 
             if (shouldUpdateBrightness) {
