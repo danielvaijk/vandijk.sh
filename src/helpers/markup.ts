@@ -160,6 +160,7 @@ function generateMdxArticlePage({
   articleContent: string;
   coverImage: {
     alt: string;
+    framesPath: string;
     height: number;
     markup: string;
     publicPath: string;
@@ -202,7 +203,8 @@ export default function Layout({ children: content }) {
 }
 
 <div class="article-cover-glyph-raster">
-  <GlyphRaster source={{ type: "image", url: ${JSON.stringify(coverImage.publicPath)} }} />
+  <link rel="preload" href=${JSON.stringify(coverImage.framesPath)} as="fetch" />
+  <GlyphRaster layout="fill" source={{ type: "frames", url: ${JSON.stringify(coverImage.framesPath)} }} />
 
 ${coverImage.markup}
 </div>

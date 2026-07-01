@@ -15,6 +15,7 @@ node_modules
 # Generated
 public/assets/*
 !public/assets/.gitkeep
+public/*.frames
 
 src/media/articles.json
 src/routes/blog/*/index.mdx

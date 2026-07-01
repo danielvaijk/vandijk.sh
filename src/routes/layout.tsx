@@ -15,7 +15,7 @@ export default component$((): QwikJSX.Element => {
 
   return (
     <>
-      {!isHomepage && <GlyphRaster source={{ type: "procedural-noise" }} />}
+      <GlyphRaster source={{ type: "procedural-noise" }} />
 
       <div class={isHomepage ? undefined : "page-pane"}>
         {!isHomepage && <NavigationHeader />}

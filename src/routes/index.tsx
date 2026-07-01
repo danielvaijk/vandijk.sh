@@ -62,7 +62,7 @@ export default component$((): QwikJSX.Element => {
 
   return (
     <section class="homepage-splash-stage">
-      <GlyphRaster source={{ type: "frames", url: "/terminal-splash.frames" }} />
+      <GlyphRaster blend={0.4} source={{ type: "frames", url: "/terminal-splash.frames" }} />
       <h2 id="homepage-title">Hey there, I'm Daniel.</h2>
       <strong>press enter to continue</strong>
     </section>
@@ -73,5 +73,9 @@ export const head: DocumentHead = (): DocumentHeadValue => {
   const title = "Daniel van Dijk";
   const description = "Full-stack Software Engineer, Game Developer, and Writer.";
 
-  return { meta: createPageMetaTags({ description, title }), title };
+  return {
+    links: [{ as: "fetch", href: "/terminal-splash.frames", rel: "preload" }],
+    meta: createPageMetaTags({ description, title }),
+    title,
+  };
 };

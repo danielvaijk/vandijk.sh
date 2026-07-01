@@ -1,4 +1,5 @@
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import {
   cpSync,
   existsSync,
@@ -18,6 +19,7 @@ import {
   ImagePurpose,
   type ProcessedImage,
 } from "src/helpers/image";
+import { createImageGlyphFrames } from "src/helpers/glyph-frames";
 import {
   extractCaptionValues,
   generateMdxArticlePage,
@@ -49,6 +51,8 @@ const WIKI_ARTICLES_DIRECTORY = "./tmp/wiki/articles";
 const WIKI_REPOSITORY = process.env.WIKI_REPOSITORY ?? "danielvaijk/wiki";
 const WIKI_ARTICLES_PATH = "data/technical/blog/posts";
 const WIKI_LOCAL_ARTICLES_PATH = join(homedir(), "wiki", WIKI_ARTICLES_PATH);
+const ARTICLE_COVER_GLYPH_FRAME_RATE = 1;
+const ARTICLE_COVER_GLYPH_FRAME_ROWS = 64;
 
 interface GitHubContentItem {
   content?: string;
@@ -291,6 +295,20 @@ async function processArticleCover(cover: string): Promise<ProcessedImage> {
   }
 }
 
+async function saveArticleCoverGlyphFrames(coverImage: ProcessedImage): Promise<string> {
+  const frames = await createImageGlyphFrames({
+    fps: ARTICLE_COVER_GLYPH_FRAME_RATE,
+    image: coverImage.image,
+    rows: ARTICLE_COVER_GLYPH_FRAME_ROWS,
+  });
+  const contentHash = createHash("sha256").update(frames).digest("hex");
+  const publicPath = `/assets/${contentHash}.frames`;
+
+  writeFileSync(joinPathNames("./public", publicPath), frames);
+
+  return publicPath;
+}
+
 await downloadWikiArticles();
 cleanGeneratedArticles();
 
@@ -323,6 +341,7 @@ for (const { content, data, filePath } of articles) {
 
   const coverImageData = await processArticleCover(cover);
   const coverImagePublicPath = await saveImage(coverImageData);
+  const coverImageFramesPath = await saveArticleCoverGlyphFrames(coverImageData);
   const coverImageMarkup = await generateImagesWithMarkup({
     caption: extractCaptionValues(coverAlt),
     image: coverImageData,
@@ -334,6 +353,7 @@ for (const { content, data, filePath } of articles) {
     alt: coverAlt,
     height: coverImageData.metadata.height,
     markup: coverImageMarkup,
+    framesPath: coverImageFramesPath,
     publicPath: coverImagePublicPath,
     type: `image/${coverImageData.metadata.format}`,
     url: joinPathNames(originUrl, coverImagePublicPath),
@@ -358,6 +378,7 @@ for (const { content, data, filePath } of articles) {
       path: articleRoute,
       title,
       coverImageMarkup,
+      coverImageFramesPath,
       coverImagePublicPath,
       description,
       readTime,

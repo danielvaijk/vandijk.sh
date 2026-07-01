@@ -10,21 +10,17 @@ export type GlyphRasterFrameSource = {
   url: string;
 };
 
-export type GlyphRasterImageSource = {
-  type: "image";
-  url: string;
-};
-
 export type GlyphRasterNoiseSource = {
   type: "procedural-noise";
 };
 
 export type GlyphRasterSource =
   | GlyphRasterFrameSource
-  | GlyphRasterImageSource
   | GlyphRasterNoiseSource;
 
 export type GlyphRasterProps = {
+  blend?: number;
+  layout?: GlyphRasterLayout;
   source?: GlyphRasterSource;
 };
 
@@ -41,6 +37,23 @@ type SourceAdapter = {
   ) => number;
   gpuNoiseSeed?: number;
   resize?: (cols: number, rows: number) => void;
+};
+
+type ParsedFrameSource = {
+  aspectRatio: number;
+  defaultFps: number;
+  frameCount: number;
+  frameSize: number;
+  frames: Uint8Array;
+  cols: number;
+  rows: number;
+};
+
+type FrameModifierBrightnessGrids = {
+  aspectRatio: number;
+  defaultFps: number;
+  frameCount: number;
+  grids: Uint8Array;
 };
 
 type GlyphEntropyMode = "cpu" | "shader";
@@ -100,6 +113,7 @@ type GlyphRasterPreset = {
 };
 
 type GlyphFieldModifierRegion = {
+  blend: number;
   brightnessGrid?: Uint8Array;
   documentLeft: number;
   documentTop: number;
@@ -127,7 +141,6 @@ const FIELD_MODIFIER_SAMPLE_SIZE = 64;
 const FIELD_MODIFIER_BRIGHTNESS_BOOST = 1.2;
 const FIELD_MODIFIER_BRIGHTNESS_FLOOR = 0.08;
 const FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT = 0.5;
-const MAX_FIELD_MODIFIER_BRIGHTNESS_CACHE_SIZE = 16;
 const MAX_GLYPH_ATLAS_CACHE_SIZE = 8;
 const MAX_FRAME_BRIGHTNESS_CACHE_SIZE = 8;
 const MAX_PARSED_COLOR_CACHE_SIZE = 32;
@@ -142,7 +155,6 @@ const glyphAtlasCache = new Map<
   }
 >();
 const frameBrightnessCache = new Map<string, Uint8Array>();
-const fieldModifierBrightnessCache = new Map<string, Uint8Array>();
 const parsedColorCache = new Map<string, [number, number, number, number]>();
 const activeGlyphRasters = new Set<ActiveGlyphRaster>();
 const glyphFieldModifierRegions = new Map<string, GlyphFieldModifierRegion>();
@@ -286,7 +298,10 @@ const applyGlyphFieldModifierBrightness = (
       worldY < region.documentTop + region.height
     ) {
       if (!region.brightnessGrid) {
-        modifierBrightness = Math.max(modifierBrightness, FIELD_MODIFIER_BRIGHTNESS_FLOOR);
+        modifierBrightness = Math.max(
+          modifierBrightness,
+          FIELD_MODIFIER_BRIGHTNESS_FLOOR * region.blend,
+        );
         continue;
       }
 
@@ -320,11 +335,14 @@ const applyGlyphFieldModifierBrightness = (
         FIELD_MODIFIER_BRIGHTNESS_FLOOR +
         mappedRegionBrightness * (1 - FIELD_MODIFIER_BRIGHTNESS_FLOOR);
 
-      modifierBrightness = Math.max(modifierBrightness, liftedRegionBrightness);
+      modifierBrightness = Math.max(modifierBrightness, liftedRegionBrightness * region.blend);
     }
   }
 
-  return brightness + Math.min(1, modifierBrightness * FIELD_MODIFIER_BRIGHTNESS_BOOST) * (1 - brightness);
+  return (
+    brightness +
+    Math.min(1, modifierBrightness * FIELD_MODIFIER_BRIGHTNESS_BOOST) * (1 - brightness)
+  );
 };
 
 const hasActiveGlyphRaster = (): boolean => {
@@ -408,13 +426,16 @@ const resolveSource = (source: GlyphRasterSource | undefined): GlyphRasterSource
   return { type: "procedural-noise" };
 };
 
-const resolvePreset = (source: GlyphRasterSource): GlyphRasterPreset => ({
+const resolvePreset = (
+  source: GlyphRasterSource,
+  layout: GlyphRasterLayout | undefined,
+): GlyphRasterPreset => ({
   backgroundColor: "#050505",
   cellHeight: NOISE_CELL_HEIGHT,
   cellWidth: NOISE_CELL_WIDTH,
   colors: source.type === "procedural-noise" ? NOISE_COLORS : GLYPH_COLORS,
   fontSize: NOISE_FONT_SIZE,
-  layout: source.type === "image" ? "fill" : "fixed",
+  layout: layout ?? "fixed",
   opacity: source.type === "frames" ? 0.22 : 1,
 });
 
@@ -428,7 +449,7 @@ const createNoiseAdapter = (): SourceAdapter => {
   };
 };
 
-const createFramesAdapter = async (source: GlyphRasterFrameSource): Promise<SourceAdapter> => {
+const loadFrameSource = async (source: GlyphRasterFrameSource): Promise<ParsedFrameSource> => {
   const response = await fetch(source.url);
 
   if (!response.ok) {
@@ -451,140 +472,90 @@ const createFramesAdapter = async (source: GlyphRasterFrameSource): Promise<Sour
   const frames = raw.subarray(headerEnd + 1);
   const frameSize = header.cols * header.rows;
   const horizontalScale = GLYPH_HORIZONTAL_SCALE;
-  const sourceWidth = header.cols / horizontalScale;
-  const sourceStart = (header.cols - sourceWidth) / 2;
-  let sampledFrames = new Uint8Array();
-  let sampledFrameSize = 0;
 
   return {
+    aspectRatio:
+      ((header.cols / horizontalScale) * NOISE_CELL_WIDTH) / (header.rows * NOISE_CELL_HEIGHT),
+    cols: header.cols,
     defaultFps: header.fps ?? DEFAULT_FRAME_RATE,
     frameCount: header.n_frames,
-    getBrightness: (col, row, cols, rows, _time, frame) => {
-      if (sampledFrames.length > 0) {
-        const frameIndex = Math.floor(frame) % header.n_frames;
-
-        return sampledFrames[frameIndex * sampledFrameSize + row * cols + col] / 255;
-      }
-
-      const frameOffset = Math.floor(frame) * frameSize;
-      const sourceRow = Math.min(header.rows - 1, Math.floor(((row + 0.5) * header.rows) / rows));
-      const sourceCol = Math.min(
-        header.cols - 1,
-        Math.max(0, Math.floor(sourceStart + ((col + 0.5) * sourceWidth) / cols)),
-      );
-
-      return frames[frameOffset + sourceRow * header.cols + sourceCol] / 255;
-    },
-    resize: (cols, rows) => {
-      sampledFrameSize = cols * rows;
-
-      const cacheKey = [
-        source.url,
-        header.cols,
-        header.rows,
-        header.n_frames,
-        horizontalScale,
-        cols,
-        rows,
-      ].join(":");
-      const cachedFrames = getCachedValue(frameBrightnessCache, cacheKey);
-      if (cachedFrames) {
-        sampledFrames = cachedFrames;
-        return;
-      }
-
-      sampledFrames = new Uint8Array(header.n_frames * sampledFrameSize);
-
-      for (let frame = 0; frame < header.n_frames; frame += 1) {
-        const sourceFrameOffset = frame * frameSize;
-        const sampledFrameOffset = frame * sampledFrameSize;
-
-        for (let row = 0; row < rows; row += 1) {
-          const sourceRow = Math.min(
-            header.rows - 1,
-            Math.floor(((row + 0.5) * header.rows) / rows),
-          );
-
-          for (let col = 0; col < cols; col += 1) {
-            const sourceCol = Math.min(
-              header.cols - 1,
-              Math.max(0, Math.floor(sourceStart + ((col + 0.5) * sourceWidth) / cols)),
-            );
-
-            sampledFrames[sampledFrameOffset + row * cols + col] =
-              frames[sourceFrameOffset + sourceRow * header.cols + sourceCol];
-          }
-        }
-      }
-
-      setCachedValue(
-        frameBrightnessCache,
-        cacheKey,
-        sampledFrames,
-        MAX_FRAME_BRIGHTNESS_CACHE_SIZE,
-      );
-    },
+    frameSize,
+    frames,
+    rows: header.rows,
   };
 };
 
-const loadImage = async (url: string): Promise<HTMLImageElement> =>
-  new Promise((resolve, reject) => {
-    const image = new Image();
-    image.crossOrigin = "anonymous";
-    image.decoding = "async";
-    image.onload = () => resolve(image);
-    image.onerror = () => reject(new Error(`Unable to load character animation image ${url}.`));
-    image.src = url;
-  });
-
-const createFieldModifierBrightnessGrid = async (url: string): Promise<Uint8Array> => {
-  const cachedGrid = getCachedValue(fieldModifierBrightnessCache, url);
-  if (cachedGrid) return cachedGrid;
-
-  const image = await loadImage(url);
-  const imageCanvas = document.createElement("canvas");
-  const imageContext = imageCanvas.getContext("2d", { willReadFrequently: true });
-
-  if (!imageContext) {
-    throw new Error(`Unable to read glyph field modifier image ${url}.`);
-  }
-
-  imageCanvas.width = FIELD_MODIFIER_SAMPLE_SIZE;
-  imageCanvas.height = FIELD_MODIFIER_SAMPLE_SIZE;
-  imageContext.drawImage(image, 0, 0, imageCanvas.width, imageCanvas.height);
-
-  const imageData = imageContext.getImageData(0, 0, imageCanvas.width, imageCanvas.height).data;
-  const brightnessGrid = new Uint8Array(FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE);
-
-  for (let index = 0; index < brightnessGrid.length; index += 1) {
-    const pixelIndex = index * 4;
-    const alpha = imageData[pixelIndex + 3] / 255;
-    const brightness =
-      ((imageData[pixelIndex] * 0.2126 +
-        imageData[pixelIndex + 1] * 0.7152 +
-        imageData[pixelIndex + 2] * 0.0722) /
-        255) *
-      alpha;
-
-    brightnessGrid[index] = Math.round(brightness * 255);
-  }
-
-  setCachedValue(
-    fieldModifierBrightnessCache,
-    url,
-    brightnessGrid,
-    MAX_FIELD_MODIFIER_BRIGHTNESS_CACHE_SIZE,
+const sampleFrameBrightness = (
+  frameSource: ParsedFrameSource,
+  frame: number,
+  col: number,
+  row: number,
+  cols: number,
+  rows: number,
+): number => {
+  const sourceFrameOffset = frame * frameSource.frameSize;
+  const sourceRow = Math.min(
+    frameSource.rows - 1,
+    Math.floor(((row + 0.5) * frameSource.rows) / rows),
+  );
+  const sourceCol = Math.min(
+    frameSource.cols - 1,
+    Math.floor(((col + 0.5) * frameSource.cols) / cols),
   );
 
-  return brightnessGrid;
+  return frameSource.frames[sourceFrameOffset + sourceRow * frameSource.cols + sourceCol];
 };
 
-const createSourceAdapter = async (
-  source: GlyphRasterFrameSource | GlyphRasterNoiseSource,
-): Promise<SourceAdapter> => {
-  if (source.type === "frames") return createFramesAdapter(source);
+const createFrameModifierBrightnessGrids = async (
+  source: GlyphRasterFrameSource,
+): Promise<FrameModifierBrightnessGrids> => {
+  const frameSource = await loadFrameSource(source);
+  const sampledFrameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
+  const cacheKey = [
+    source.url,
+    "modifier",
+    frameSource.cols,
+    frameSource.rows,
+    frameSource.frameCount,
+    FIELD_MODIFIER_SAMPLE_SIZE,
+  ].join(":");
+  const cachedGrids = getCachedValue(frameBrightnessCache, cacheKey);
+  if (cachedGrids) {
+    return {
+      aspectRatio: frameSource.aspectRatio,
+      defaultFps: frameSource.defaultFps,
+      frameCount: frameSource.frameCount,
+      grids: cachedGrids,
+    };
+  }
 
-  return createNoiseAdapter();
+  const grids = new Uint8Array(frameSource.frameCount * sampledFrameSize);
+
+  for (let frame = 0; frame < frameSource.frameCount; frame += 1) {
+    const sampledFrameOffset = frame * sampledFrameSize;
+
+    for (let row = 0; row < FIELD_MODIFIER_SAMPLE_SIZE; row += 1) {
+      for (let col = 0; col < FIELD_MODIFIER_SAMPLE_SIZE; col += 1) {
+        grids[sampledFrameOffset + row * FIELD_MODIFIER_SAMPLE_SIZE + col] = sampleFrameBrightness(
+          frameSource,
+          frame,
+          col,
+          row,
+          FIELD_MODIFIER_SAMPLE_SIZE,
+          FIELD_MODIFIER_SAMPLE_SIZE,
+        );
+      }
+    }
+  }
+
+  setCachedValue(frameBrightnessCache, cacheKey, grids, MAX_FRAME_BRIGHTNESS_CACHE_SIZE);
+
+  return {
+    aspectRatio: frameSource.aspectRatio,
+    defaultFps: frameSource.defaultFps,
+    frameCount: frameSource.frameCount,
+    grids,
+  };
 };
 
 const brightnessEntropy = (brightness: number): number =>
@@ -994,6 +965,7 @@ const createWebGlGlyphRenderer = ({
     uniform vec2 u_cell_size;
     uniform vec2 u_viewport_scroll;
     uniform vec4 u_field_modifier_rects[${MAX_FIELD_MODIFIER_REGIONS}];
+    uniform float u_field_modifier_blends[${MAX_FIELD_MODIFIER_REGIONS}];
     out float v_brightness;
     out vec2 v_uv;
     out vec2 v_brightness_uv;
@@ -1016,6 +988,7 @@ const createWebGlGlyphRenderer = ({
         if (index >= u_field_modifier_count) break;
 
         vec4 rect = u_field_modifier_rects[index];
+        float blend = u_field_modifier_blends[index];
         if (
           world.x < rect.x ||
           world.x >= rect.x + rect.z ||
@@ -1045,7 +1018,7 @@ const createWebGlGlyphRenderer = ({
         float lifted_brightness =
           ${FIELD_MODIFIER_BRIGHTNESS_FLOOR.toFixed(2)} +
           mapped_brightness * ${Number(1 - FIELD_MODIFIER_BRIGHTNESS_FLOOR).toFixed(2)};
-        modifier_brightness = max(modifier_brightness, lifted_brightness);
+        modifier_brightness = max(modifier_brightness, lifted_brightness * blend);
       }
 
       return modifier_brightness;
@@ -1175,6 +1148,9 @@ const createWebGlGlyphRenderer = ({
   const fieldModifierRectsLocation = usesGpuNoise
     ? gl.getUniformLocation(program, "u_field_modifier_rects[0]")
     : null;
+  const fieldModifierBlendsLocation = usesGpuNoise
+    ? gl.getUniformLocation(program, "u_field_modifier_blends[0]")
+    : null;
   const paletteLocation = gl.getUniformLocation(program, "u_palette");
   const colorCountLocation = gl.getUniformLocation(program, "u_color_count");
   const entropySeedLocation = gl.getUniformLocation(program, "u_entropy_seed");
@@ -1214,6 +1190,7 @@ const createWebGlGlyphRenderer = ({
     (usesGpuNoise &&
       (!fieldModifierBrightnessLocation ||
         !fieldModifierCountLocation ||
+        !fieldModifierBlendsLocation ||
         !fieldModifierRectsLocation ||
         !viewportScrollLocation)) ||
     !paletteLocation ||
@@ -1242,6 +1219,7 @@ const createWebGlGlyphRenderer = ({
     FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE * MAX_FIELD_MODIFIER_REGIONS,
   );
   const fieldModifierRects = new Float32Array(MAX_FIELD_MODIFIER_REGIONS * 4);
+  const fieldModifierBlends = new Float32Array(MAX_FIELD_MODIFIER_REGIONS);
   const atlasCols = Math.ceil(Math.sqrt(characters.length));
   const atlasRows = Math.ceil(characters.length / atlasCols);
   const entropySeed = Math.random() * 100000;
@@ -1378,6 +1356,7 @@ const createWebGlGlyphRenderer = ({
     if (
       !usesGpuNoise ||
       !fieldModifierCountLocation ||
+      !fieldModifierBlendsLocation ||
       !fieldModifierRectsLocation ||
       !fieldModifierBrightnessTexture
     ) {
@@ -1397,6 +1376,7 @@ const createWebGlGlyphRenderer = ({
     let regionCount = 0;
 
     fieldModifierBrightnessBytes.fill(0);
+    fieldModifierBlends.fill(0);
     fieldModifierRects.fill(0);
 
     for (const region of regions) {
@@ -1408,12 +1388,14 @@ const createWebGlGlyphRenderer = ({
       fieldModifierRects[valueIndex + 1] = region.documentTop;
       fieldModifierRects[valueIndex + 2] = region.width;
       fieldModifierRects[valueIndex + 3] = region.height;
+      fieldModifierBlends[regionCount] = region.blend;
       fieldModifierBrightnessBytes.set(region.brightnessGrid ?? [], brightnessOffset);
       regionCount += 1;
     }
 
     gl.useProgram(program);
     gl.uniform1i(fieldModifierCountLocation, regionCount);
+    gl.uniform1fv(fieldModifierBlendsLocation, fieldModifierBlends);
     gl.uniform4fv(fieldModifierRectsLocation, fieldModifierRects);
 
     gl.activeTexture(gl.TEXTURE3);
@@ -1652,16 +1634,18 @@ const createGpuNoiseGlyphRenderer = ({
   };
 };
 
-export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.Element => {
-  const rasterId = useId();
-  const resolvedSource = resolveSource(source);
-  const preset = resolvePreset(resolvedSource);
-  const resolvedCharacters = Array.from(new Set(GLYPH_CHARS));
-  const style = `--glyph-raster-opacity: ${preset.opacity}; --glyph-raster-color: ${preset.backgroundColor};`;
+export const GlyphRaster = component$(
+  ({ blend, layout, source }: GlyphRasterProps): QwikJSX.Element => {
+    const rasterId = useId();
+    const resolvedSource = resolveSource(source);
+    const preset = resolvePreset(resolvedSource, layout);
+    const modifierBlend = clamp(blend ?? 1, 0, 1);
+    const resolvedCharacters = Array.from(new Set(GLYPH_CHARS));
+    const style = `--glyph-raster-opacity: ${preset.opacity}; --glyph-raster-color: ${preset.backgroundColor};`;
 
-  useStylesScoped$(styles);
+    useStylesScoped$(styles);
 
-  useVisibleTask$(async ({ cleanup }): Promise<void> => {
+    useVisibleTask$(async ({ cleanup }): Promise<void> => {
     let isDocumentVisible = document.visibilityState === "visible";
     let isCleanedUp = false;
     let isRasterVisible = preset.layout === "fixed";
@@ -1680,11 +1664,12 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
       removeVisibilityObserver();
     });
 
-    if (resolvedSource.type === "image") {
+    if (resolvedSource.type === "frames") {
       const element = document.getElementById(rasterId);
       if (!element) return;
 
       const region: GlyphFieldModifierRegion = {
+        blend: modifierBlend,
         documentLeft: 0,
         documentTop: 0,
         element,
@@ -1705,12 +1690,44 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
 
       glyphFieldModifierRegions.set(rasterId, region);
       onRegionChanged();
-      createFieldModifierBrightnessGrid(resolvedSource.url)
-        .then((brightnessGrid) => {
+      createFrameModifierBrightnessGrids(resolvedSource)
+        .then(({ aspectRatio, defaultFps, frameCount, grids }) => {
           if (isCleanedUp) return;
 
-          region.brightnessGrid = brightnessGrid;
+          element.style.setProperty("--glyph-raster-frame-aspect", String(aspectRatio));
+          onRegionChanged();
+
+          const frameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
+          const frameRate = clamp(defaultFps, MIN_FRAME_RATE, MAX_FRAME_RATE);
+          region.brightnessGrid = grids.subarray(0, frameSize);
           markGlyphFieldModifierRegionsChanged();
+          scheduleActiveGlyphRasters();
+
+          if (frameCount <= 1) {
+            return;
+          }
+
+          let framePosition = 0;
+          let lastFrameAt = 0;
+
+          activeRaster = {
+            canRender: () => isDocumentVisible && isRasterVisible,
+            render: (time: number): void => {
+              if (lastFrameAt !== 0 && time - lastFrameAt < 1000 / frameRate) return;
+
+              const elapsedMilliseconds =
+                lastFrameAt === 0 ? 1000 / frameRate : time - lastFrameAt;
+              const elapsedFrames = (elapsedMilliseconds / 1000) * frameRate;
+              const currentFrame = Math.floor(framePosition) % frameCount;
+              const frameOffset = currentFrame * frameSize;
+
+              region.brightnessGrid = grids.subarray(frameOffset, frameOffset + frameSize);
+              markGlyphFieldModifierRegionsChanged();
+              framePosition = (framePosition + elapsedFrames) % frameCount;
+              lastFrameAt = time;
+            },
+          };
+          activeGlyphRasters.add(activeRaster);
           scheduleActiveGlyphRasters();
         })
         .catch(() => {});
@@ -1731,6 +1748,30 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
         scheduleActiveGlyphRasters();
       };
 
+      if (preset.layout === "fill") {
+        const observer = new IntersectionObserver(
+          ([entry]): void => {
+            isRasterVisible = Boolean(entry?.isIntersecting);
+            if (isRasterVisible) {
+              scheduleActiveGlyphRasters();
+            }
+          },
+          { threshold: 0.01 },
+        );
+        observer.observe(element);
+        removeVisibilityObserver = () => observer.disconnect();
+      }
+
+      const onVisibilityChange = (): void => {
+        isDocumentVisible = document.visibilityState === "visible";
+        if (isDocumentVisible) {
+          scheduleActiveGlyphRasters();
+        }
+      };
+      document.addEventListener("visibilitychange", onVisibilityChange);
+      removeVisibilityListener = () =>
+        document.removeEventListener("visibilitychange", onVisibilityChange);
+
       return;
     }
 
@@ -1746,8 +1787,7 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
     canvas.style.height = "";
     canvas.style.transform = "";
 
-    const adapter = await createSourceAdapter(resolvedSource);
-    if (isCleanedUp) return;
+    const adapter = createNoiseAdapter();
     const gpuNoiseSeed = adapter.gpuNoiseSeed;
     const renderer =
       (gpuNoiseSeed === undefined
@@ -1894,35 +1934,23 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
             const worldY = viewportY + window.scrollY;
             const sampledBrightness = shouldUpdateBrightness
               ? adapter.getBrightness(
-                  resolvedSource.type === "procedural-noise"
-                    ? Math.floor(worldX / preset.cellWidth)
-                    : col,
-                  resolvedSource.type === "procedural-noise"
-                    ? Math.floor(worldY / preset.cellHeight)
-                    : row,
+                  Math.floor(worldX / preset.cellWidth),
+                  Math.floor(worldY / preset.cellHeight),
                   cols,
                   rows,
                   sourceTime,
                   currentFrame,
                 )
               : brightnessValues[index];
-            const brightness =
-              shouldUpdateBrightness && resolvedSource.type === "procedural-noise"
-                ? clamp(
-                    applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY),
-                    0,
-                    1,
-                  )
-                : sampledBrightness;
+            const brightness = shouldUpdateBrightness
+              ? clamp(applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY), 0, 1)
+              : sampledBrightness;
 
             if (shouldUpdateBrightness) {
               brightnessValues[index] = brightness;
             }
 
-            const entropyBrightness =
-              resolvedSource.type === "procedural-noise"
-                ? proceduralEntropyBrightness(brightness)
-                : brightness;
+            const entropyBrightness = proceduralEntropyBrightness(brightness);
 
             if (entropyMode === "cpu") {
               glyphEntropyPositions[index] +=
@@ -2016,12 +2044,17 @@ export const GlyphRaster = component$(({ source }: GlyphRasterProps): QwikJSX.El
     }
   });
 
-  if (resolvedSource.type === "image") {
+  if (resolvedSource.type === "frames") {
+    const regionStyle =
+      preset.layout === "fixed"
+        ? "position: fixed; left: 50%; top: 50%; width: min(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))); height: min(100vh, calc(100vw / var(--glyph-raster-frame-aspect, 1))); transform: translate(-50%, -50%); display: block; pointer-events: none;"
+        : "position: absolute; inset: 0; display: block; pointer-events: none;";
+
     return (
       <span
         id={rasterId}
         class={`glyph-raster-region glyph-raster-region--${preset.layout} glyph-raster-region--${resolvedSource.type}`}
-        style="position: absolute; inset: 0; display: block; pointer-events: none;"
+        style={regionStyle}
         aria-hidden="true"
       />
     );
