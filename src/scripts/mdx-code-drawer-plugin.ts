@@ -10,7 +10,7 @@ import type { Plugin } from "vite";
 
 const ARTICLE_CODE_DRAWER_IMPORT =
   'import { ArticleCodeDrawer } from "src/components/articles/article-code-drawer";';
-const ASSETS_DIRECTORY = "./public/assets";
+const ARTICLES_PUBLIC_DIRECTORY = "./public/blog";
 const CODE_BLOCK_PRINT_WIDTH = 80;
 const WORDS_PER_MINUTE = 200;
 const CODE_BLOCK_LANGUAGE_FILE_EXTENSIONS: Record<string, string> = {
@@ -59,26 +59,34 @@ function formatDateAsString(date: Date): string {
   }).format(date);
 }
 
-function cleanGeneratedArticleCodeBlocks(): void {
-  if (!existsSync(ASSETS_DIRECTORY)) {
+function cleanGeneratedArticleCodeBlocks(directory = ARTICLES_PUBLIC_DIRECTORY): void {
+  if (!existsSync(directory)) {
     return;
   }
 
-  for (const entry of readdirSync(ASSETS_DIRECTORY, { withFileTypes: true })) {
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = join(directory, entry.name);
+
+    if (entry.isDirectory()) {
+      cleanGeneratedArticleCodeBlocks(entryPath);
+      continue;
+    }
+
     if (entry.isFile() && entry.name.endsWith(".code.html")) {
-      rmSync(join(ASSETS_DIRECTORY, entry.name), { force: true });
+      rmSync(entryPath, { force: true });
     }
   }
 }
 
-function saveArticleCodeBlock(html: string): string {
+function saveArticleCodeBlock(html: string, articlePath: string): string {
   const contentHash = createHash("sha256").update(html).digest("hex");
   const fileName = `${contentHash}.code.html`;
+  const outputDirectory = join(ARTICLES_PUBLIC_DIRECTORY, articlePath);
 
-  mkdirSync(ASSETS_DIRECTORY, { recursive: true });
-  writeFileSync(join(ASSETS_DIRECTORY, fileName), html);
+  mkdirSync(outputDirectory, { recursive: true });
+  writeFileSync(join(outputDirectory, fileName), html);
 
-  return `/assets/${fileName}`;
+  return `/blog/${articlePath}/${fileName}`;
 }
 
 function escapeHtmlText(value: string): string {
@@ -287,7 +295,7 @@ function renderCodeBlockHtml(code: string, info: string): string {
   return `<pre><code${languageClass}>${codeHtml}</code></pre>`;
 }
 
-async function wrapMarkdownCodeBlocks(source: string): Promise<string> {
+async function wrapMarkdownCodeBlocks(source: string, articlePath: string): Promise<string> {
   const codeBlockRegex =
     /(^|\n)(?<indent>[ \t]*)(?<fence>`{3,}|~{3,})(?<info>[^\n]*)\n(?<code>[\s\S]*?)\n[ \t]*\k<fence>[ \t]*(?=\n|$)/gu;
   let result = "";
@@ -311,7 +319,7 @@ async function wrapMarkdownCodeBlocks(source: string): Promise<string> {
     const summary = getCodeDrawerSummary(groups.info);
     const code = await formatMarkdownCodeBlock(groups.code, groups.info);
     const codeBlockHtml = renderCodeBlockHtml(code, groups.info);
-    const codeBlockSource = saveArticleCodeBlock(codeBlockHtml);
+    const codeBlockSource = saveArticleCodeBlock(codeBlockHtml, articlePath);
 
     result += source.slice(lastIndex, match.index);
     result += `${prefix}<ArticleCodeDrawer label={${JSON.stringify(summary)}} src={${JSON.stringify(
@@ -339,8 +347,8 @@ function addArticleCodeDrawerImport(source: string): string {
   )}`;
 }
 
-function isBlogArticleMdx(id: string): boolean {
-  return /\/src\/routes\/blog\/[^/]+\/index\.mdx(?:\?|$)/u.test(id);
+function getBlogArticlePath(id: string): string | null {
+  return /\/src\/routes\/blog\/(?<path>[^/]+)\/index\.mdx(?:\?|$)/u.exec(id)?.groups?.path ?? null;
 }
 
 function articleCodeDrawerMdxPlugin(): Plugin {
@@ -351,7 +359,9 @@ function articleCodeDrawerMdxPlugin(): Plugin {
       cleanGeneratedArticleCodeBlocks();
     },
     async transform(source, id): Promise<string | null> {
-      if (!isBlogArticleMdx(id)) {
+      const articlePath = getBlogArticlePath(id);
+
+      if (articlePath === null) {
         return null;
       }
 
@@ -361,7 +371,10 @@ function articleCodeDrawerMdxPlugin(): Plugin {
         return markdownWithArticleContents;
       }
 
-      const markdownWithCodeDrawers = await wrapMarkdownCodeBlocks(markdownWithArticleContents);
+      const markdownWithCodeDrawers = await wrapMarkdownCodeBlocks(
+        markdownWithArticleContents,
+        articlePath,
+      );
 
       return addArticleCodeDrawerImport(markdownWithCodeDrawers);
     },

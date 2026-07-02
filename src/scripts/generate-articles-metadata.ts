@@ -1,5 +1,13 @@
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import {
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { basename, join, parse } from "node:path";
 
 import { generateGlyphFrameSource } from "src/helpers/glyph-frames";
 import { getMarkdownProseWordCount, getReadTimeInMinutesFromWordCount } from "src/utilities/text";
@@ -17,8 +25,13 @@ interface ArticleFrontmatter {
 const ARTICLE_METADATA_DIRECTORY = "./src/media";
 const ARTICLES_METADATA_FILE_PATH = `${ARTICLE_METADATA_DIRECTORY}/articles.json`;
 const ARTICLES_DIRECTORY = "./src/routes/blog";
+const ARTICLE_PUBLIC_ASSETS_DIRECTORY = "./public/blog";
 const ARTICLE_COVER_GLYPH_FRAME_RATE = 1;
 const ARTICLE_COVER_GLYPH_FRAME_ROWS = 64;
+const ARTICLE_GIF_GLYPH_FRAME_RATE = 12;
+const ARTICLE_GIF_GLYPH_FRAME_ROWS = 64;
+const ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME = "assets";
+const ARTICLE_GENERATED_ONLY_EXTENSIONS = new Set([".gif"]);
 
 function readArticleFiles(): Array<{ filePath: string; path: string }> {
   return readdirSync(ARTICLES_DIRECTORY, { withFileTypes: true }).flatMap((entity) => {
@@ -104,17 +117,81 @@ function renderCoverImageMarkup(cover: string, coverAlt: string): string {
 </figure>`;
 }
 
+function getArticleAssetsDirectory(path: string): string {
+  return join(ARTICLES_DIRECTORY, path, ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME);
+}
+
+function getArticlePublicAssetsDirectory(path: string): string {
+  return join(ARTICLE_PUBLIC_ASSETS_DIRECTORY, path);
+}
+
+function getArticleAssetFileName(publicPath: string): string {
+  return basename(publicPath);
+}
+
+function prepareArticlePublicAssets(path: string): void {
+  const sourceDirectory = getArticleAssetsDirectory(path);
+  const publicDirectory = getArticlePublicAssetsDirectory(path);
+
+  rmSync(publicDirectory, { force: true, recursive: true });
+  mkdirSync(publicDirectory, { recursive: true });
+
+  if (!existsSync(sourceDirectory)) {
+    return;
+  }
+
+  for (const entity of readdirSync(sourceDirectory, { withFileTypes: true })) {
+    if (!entity.isFile()) {
+      continue;
+    }
+
+    const extension = parse(entity.name).ext.toLowerCase();
+
+    if (ARTICLE_GENERATED_ONLY_EXTENSIONS.has(extension)) {
+      continue;
+    }
+
+    copyFileSync(join(sourceDirectory, entity.name), join(publicDirectory, entity.name));
+  }
+}
+
 async function generateCoverFrames(path: string, cover: string): Promise<string> {
   const framesPath = `/blog/${path}/cover.frames`;
+  const coverFileName = getArticleAssetFileName(cover);
 
   await generateGlyphFrameSource({
     fps: ARTICLE_COVER_GLYPH_FRAME_RATE,
     output: join("./public", framesPath),
     rows: ARTICLE_COVER_GLYPH_FRAME_ROWS,
-    source: join("./public", cover),
+    source: join(getArticleAssetsDirectory(path), coverFileName),
   });
 
   return framesPath;
+}
+
+async function generateArticleGifFrames(path: string): Promise<void> {
+  const articleAssetsDirectory = getArticleAssetsDirectory(path);
+  const articlePublicAssetsDirectory = getArticlePublicAssetsDirectory(path);
+
+  if (!existsSync(articleAssetsDirectory)) {
+    return;
+  }
+
+  for (const entity of readdirSync(articleAssetsDirectory, { withFileTypes: true })) {
+    if (!entity.isFile() || !entity.name.toLowerCase().endsWith(".gif")) {
+      continue;
+    }
+
+    const source = join(articleAssetsDirectory, entity.name);
+    const { name } = parse(entity.name);
+
+    await generateGlyphFrameSource({
+      fps: ARTICLE_GIF_GLYPH_FRAME_RATE,
+      output: join(articlePublicAssetsDirectory, `${name}.frames`),
+      rows: ARTICLE_GIF_GLYPH_FRAME_ROWS,
+      source,
+    });
+  }
 }
 
 const results = [];
@@ -134,7 +211,9 @@ for (const { filePath, path } of readArticleFiles()) {
 
   const articleContent = stripLeadingWikiMetadata(stripDuplicateTitle(content, data.title));
   const readTime = getReadTimeInMinutesFromWordCount(getMarkdownProseWordCount(articleContent));
+  prepareArticlePublicAssets(path);
   const coverImageFramesPath = await generateCoverFrames(path, data.cover);
+  await generateArticleGifFrames(path);
 
   results.push({
     coverImageFramesPath,

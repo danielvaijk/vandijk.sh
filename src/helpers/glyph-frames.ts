@@ -26,7 +26,7 @@ type FrameDimensions = {
 const GLYPH_CELL_WIDTH = 8;
 const GLYPH_CELL_HEIGHT = 14;
 const GLYPH_HORIZONTAL_SCALE = 1.09;
-const VIDEO_EXTENSIONS = new Set([".avi", ".m4v", ".mkv", ".mov", ".mp4", ".webm"]);
+const VIDEO_EXTENSIONS = new Set([".avi", ".gif", ".m4v", ".mkv", ".mov", ".mp4", ".webm"]);
 
 function getFrameDimensions(width: number, height: number, rows: number): FrameDimensions {
   if (width <= 0 || height <= 0) {

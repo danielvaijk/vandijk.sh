@@ -15,7 +15,9 @@ node_modules
 # Generated
 public/assets/*
 !public/assets/.gitkeep
-public/*.frames
+public/blog/*
+!public/blog/.gitkeep
+*.frames
 
 src/media/articles.json
 

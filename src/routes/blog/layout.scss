@@ -29,6 +29,18 @@ article {
     }
   }
 
+  .article-image-glyph-raster {
+    position: relative;
+    margin: 1em 0;
+    background: transparent;
+    overflow: hidden;
+
+    figure {
+      aspect-ratio: 440 / 300;
+      margin: 0;
+    }
+  }
+
   img {
     display: block; // Removes any extra white space below the image.
     width: 100%;

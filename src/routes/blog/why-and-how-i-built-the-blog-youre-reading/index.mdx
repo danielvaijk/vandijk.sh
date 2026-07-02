@@ -10,6 +10,7 @@ toc: []
 ---
 
 import { ArticleCover } from "src/components/articles/article-cover";
+import { ArticleGlyphImage } from "src/components/articles/article-glyph-image";
 
 export default function Layout({ children: content }) {
   return <article>{content}</article>;
@@ -33,7 +34,10 @@ I began my programming journey in 2012 when I was 14. Like many kids that age, I
 
 Well… that’s the story I usually tell people. In reality, the official first piece of “finished” software I unleashed upon the world was malware written in Visual Basic for Windows, using [Visual Studio](https://visualstudio.microsoft.com/). It was a fake cheat for [Arma 2: Operation Arrowhead](https://en.wikipedia.org/wiki/Arma_2:_Operation_Arrowhead). Essentially, anyone trying to use the cheat software to… well… cheat in the game would get their serial key stolen from their Windows registry and emailed to me. I could then use their serial key to circumvent being banned from the game, impersonate their account, or sell it to someone else. Call it fighting fire **with fire.**
 
-![The ‘hellmo’ meme.](/blog/why-and-how-i-built-the-blog-youre-reading/hellmo.gif)
+<ArticleGlyphImage
+  alt="The ‘hellmo’ meme."
+  framesPath="/blog/why-and-how-i-built-the-blog-youre-reading/hellmo.frames"
+/>
 
 After years of working on miscellaneous Unity projects, I began to create and sell assets for other developers to use. The most notable and intricate of the bunch: a multiplayer first-person shooter, where the goal is to survive as many waves of zombies as possible, inspired by the Call of Duty zombie mode. I still have [showcase videos](https://www.youtube.com/watch?v=qlrVeC9zIps) of that project up on YouTube, where you can find my “programmer art” on full display.
 
@@ -71,7 +75,7 @@ The reason I chose [Cloudflare](https://www.cloudflare.com/) is that I’ve been
 
 <figure>
   <img
-    src="/blog/why-and-how-i-built-the-blog-youre-reading/47c87c6d0393e3cf16977eb1a9963b5ffbbc2114fd7830268d24bc5162c1c604.svg"
+    src="/blog/why-and-how-i-built-the-blog-youre-reading/cloudflare.svg"
     alt="Cloudflare’s global server network."
   />
   <figcaption>Cloudflare’s global server network.</figcaption>
@@ -85,7 +89,7 @@ For this project, I was very keen on maximizing performance.
 
 [Qwik](https://qwik.builder.io/) presented itself as not only a framework primarily focused on performance, but as one that introduced novel solutions to problems created by modern frameworks like React (such as requiring a hydration step client-side to load up the server-side rendered markup into a VDOM object). The idea that I could deliver an instantaneously interactive experience, while also making things that are not immediately required lazy loadable by default, was what sold me on giving this framework a shot.
 
-![Illustration of the load time differences between hydration and resumability.](/blog/why-and-how-i-built-the-blog-youre-reading/assets_fe30f73e01ef40558cd69a9493eba2a2_eee9dff8ee0e4b4e9ad1a8825643030c.webp)
+![Illustration of the load time differences between hydration and resumability.](/blog/why-and-how-i-built-the-blog-youre-reading/qwik.webp)
 
 You might be asking yourself: “Why not use popular frameworks like [Next.js](https://nextjs.org/) or [Remix.js](https://remix.run/)?” They address different concerns, like Developer Productivity and Web Standards, respectively. Those are not my focus for this project.
 
@@ -273,7 +277,7 @@ For the first part, I ended up creating a Wiki page titled “Blog” to hold ar
 
 <figure>
   <img
-    src="/blog/why-and-how-i-built-the-blog-youre-reading/Screenshot_2024-08-23_at_22.32.59.png"
+    src="/blog/why-and-how-i-built-the-blog-youre-reading/screenshot_notion.png"
     alt="The parent “Blog” page acting as an article database."
   />
   <figcaption>The parent “Blog” page acting as an article database.</figcaption>
@@ -1504,7 +1508,7 @@ We’ve come a long way from figuring out the barebones requirements for buildin
 
 <figure>
   <img
-    src="/blog/why-and-how-i-built-the-blog-youre-reading/Screenshot_2024-08-23_at_22.37.36.png"
+    src="/blog/why-and-how-i-built-the-blog-youre-reading/screenshot_lighthouse.png"
     alt="This article’s Lighthouse performance report."
   />
   <figcaption>This article’s Lighthouse performance report.</figcaption>
