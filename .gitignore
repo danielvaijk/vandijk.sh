@@ -18,8 +18,6 @@ public/assets/*
 public/*.frames
 
 src/media/articles.json
-src/routes/blog/*/index.mdx
-src/routes/blog/*/meta.json
 
 # Cloudflare
 functions/**/*.js

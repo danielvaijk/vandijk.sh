@@ -5,8 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "bun run build.articles && bun run build.glyphs && qwik build",
-    "build.articles": "bun run build.articles.content && bun run build.articles.metadata",
-    "build.articles.content": "bun src/scripts/generate-articles-content.ts",
+    "build.articles": "bun run build.articles.metadata",
     "build.articles.metadata": "bun src/scripts/generate-articles-metadata.ts",
     "build.client": "vite build",
     "build.glyphs": "bun src/scripts/generate-glyph-frames.ts",

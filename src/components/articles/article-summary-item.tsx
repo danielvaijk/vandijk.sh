@@ -7,7 +7,7 @@ import styles from "src/components/articles/article-summary-item.scss?inline";
 import { formatDateAsString } from "src/utilities/time";
 
 export interface ArticleSummaryProps {
-  coverImageFramesPath: string;
+  coverImageFramesPath?: string;
   coverImageMarkup: string;
   coverImagePublicPath: string;
   date: string;
@@ -46,7 +46,9 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
       <li class="article-summary">
         <Link class={scopeId} href={`/blog/${path}/`} prefetch>
           <div class="article-summary-cover-image">
-            <GlyphRaster layout="fill" source={{ type: "frames", url: coverImageFramesPath }} />
+            {coverImageFramesPath && (
+              <GlyphRaster layout="fill" source={{ type: "frames", url: coverImageFramesPath }} />
+            )}
 
             <div dangerouslySetInnerHTML={coverImageWithScopeId}></div>
           </div>

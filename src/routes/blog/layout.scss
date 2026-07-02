@@ -29,14 +29,15 @@ article {
     }
   }
 
+  img {
+    display: block; // Removes any extra white space below the image.
+    width: 100%;
+    max-width: 100%;
+    height: auto; // Let the browser calculate the height to maintain aspect ratio.
+  }
+
   figure {
     margin-inline: 0;
-
-    img {
-      width: 100%;
-      height: auto; // Let the browser calculate the height to maintain aspect ratio.
-      display: block; // Removes any extra white space below the image.
-    }
 
     &:first-of-type {
       aspect-ratio: 16 / 9;

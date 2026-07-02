@@ -24,8 +24,6 @@
 
 ## Blog Articles
 
-- Blog articles are generated from the wiki article directory.
-- Local development prefers `~/wiki/data/technical/blog/posts` when present.
-- CI fetches from GitHub repo `WIKI_REPOSITORY` on branch `main`.
-- CI requires `WIKI_GITHUB_TOKEN`.
-- Generated article files under `src/routes/blog/*` and `src/media/articles.json` are ignored.
+- Blog article pages live under `src/routes/blog/<article-slug>/index.mdx`.
+- Article images live under `public/blog/<article-slug>`.
+- `src/media/articles.json` is generated for the blog index and ignored.

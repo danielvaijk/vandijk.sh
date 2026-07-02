@@ -113,9 +113,7 @@ async function readImageFrame(image: Sharp, dimensions: FrameDimensions): Promis
     const pixelIndex = index * 4;
     const alpha = data[pixelIndex + 3] / 255;
     const brightness =
-      ((data[pixelIndex] * 0.2126 +
-        data[pixelIndex + 1] * 0.7152 +
-        data[pixelIndex + 2] * 0.0722) /
+      ((data[pixelIndex] * 0.2126 + data[pixelIndex + 1] * 0.7152 + data[pixelIndex + 2] * 0.0722) /
         255) *
       alpha;
 

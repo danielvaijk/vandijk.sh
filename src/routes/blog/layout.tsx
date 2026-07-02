@@ -1,11 +1,69 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, Slot, useStyles$ } from "@builder.io/qwik";
-import type { DocumentHeadProps, DocumentHeadValue } from "@builder.io/qwik-city";
+import type { DocumentHeadProps, DocumentHeadValue, DocumentMeta } from "@builder.io/qwik-city";
 import { useLocation, type DocumentHead } from "@builder.io/qwik-city";
 
 import { createPageMetaTags } from "src/helpers/meta";
 import stylesForLayout from "src/routes/blog/layout.scss?inline";
 import stylesForCodeHighlights from "src/styles/base/code.scss?inline";
+
+interface ArticleFrontmatter {
+  cover?: unknown;
+  coverAlt?: unknown;
+  date?: unknown;
+  topic?: unknown;
+}
+
+function getMetaContent(meta: readonly DocumentMeta[] | undefined, name: string): string {
+  const item = meta?.find((value): boolean => value.name === name);
+
+  return typeof item?.content === "string" ? item.content : "";
+}
+
+function getCaptionAltText(captionRaw: string): string {
+  return captionRaw.replace(/^\s*(?:\(.*?\))?\s*/u, "");
+}
+
+function createArticleMetaTags({
+  cover,
+  coverAlt,
+  date,
+  description,
+  pageUrl,
+  title,
+  topic,
+}: {
+  cover: string;
+  coverAlt: string;
+  date: string;
+  description: string;
+  pageUrl: URL;
+  title: string;
+  topic: string;
+}): Array<DocumentMeta> {
+  const imageUrl = new URL(cover, pageUrl).toString();
+  const pageUrlString = pageUrl.toString();
+  const imageAlt = getCaptionAltText(coverAlt);
+
+  return [
+    { content: title, property: "og:title" },
+    { content: description, property: "og:description" },
+    { content: "article", property: "og:type" },
+    { content: pageUrlString, property: "og:url" },
+    { content: "Daniel van Dijk", property: "article:author" },
+    { content: date, property: "article:published_time" },
+    { content: topic, property: "article:tag" },
+    { content: "en_US", property: "og:locale" },
+    { content: "Daniel van Dijk", property: "og:site_name" },
+    { content: imageUrl, property: "og:image" },
+    { content: imageAlt, property: "og:image:alt" },
+    { content: "summary_large_image", name: "twitter:card" },
+    { content: title, name: "twitter:title" },
+    { content: description, name: "twitter:description" },
+    { content: imageUrl, name: "twitter:image" },
+    { content: imageAlt, name: "twitter:image:alt" },
+  ];
+}
 
 export default component$((): QwikJSX.Element => {
   useStyles$(stylesForLayout);
@@ -34,7 +92,32 @@ export const head: DocumentHead = (props: DocumentHeadProps): DocumentHeadValue 
   const title = isArticle ? `${titleBase} - ${props.head.title}` : titleBase;
 
   if (isArticle) {
-    return { title };
+    const frontmatter = props.head.frontmatter as ArticleFrontmatter | undefined;
+    const { cover, coverAlt, date, topic } = frontmatter ?? {};
+    const description = getMetaContent(props.head.meta, "description");
+
+    if (
+      typeof cover === "string" &&
+      typeof coverAlt === "string" &&
+      typeof date === "string" &&
+      typeof topic === "string" &&
+      description.length > 0
+    ) {
+      return {
+        meta: createArticleMetaTags({
+          cover,
+          coverAlt,
+          date,
+          description,
+          pageUrl: props.url,
+          title: props.head.title,
+          topic,
+        }),
+        title,
+      };
+    }
+
+    return { meta: props.head.meta, title };
   }
 
   const description =

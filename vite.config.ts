@@ -3,9 +3,12 @@ import { qwikCity } from "@builder.io/qwik-city/vite";
 import { defineConfig, type UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
+import { articleCodeDrawerMdxPlugin } from "./src/scripts/mdx-code-drawer-plugin";
+
 export default defineConfig((): UserConfig => {
   return {
     plugins: [
+      articleCodeDrawerMdxPlugin(),
       qwikCity({
         mdxPlugins: {
           rehypeAutolinkHeadings: false,

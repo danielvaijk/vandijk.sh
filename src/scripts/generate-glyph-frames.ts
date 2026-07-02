@@ -1,7 +1,4 @@
-import {
-  generateGlyphFrameSource,
-  type GlyphFrameSource,
-} from "src/helpers/glyph-frames";
+import { generateGlyphFrameSource, type GlyphFrameSource } from "src/helpers/glyph-frames";
 
 const GLYPH_FRAME_SOURCES: Array<GlyphFrameSource> = [
   {
