@@ -86,6 +86,10 @@ article {
     }
   }
 
+  > h1 {
+    @include mixins.responsive(font-size, 1.8rem, 2.5rem);
+  }
+
   h2 {
     margin: calc(var(--glyph-space-y) * 5) auto 0 auto;
 
@@ -148,12 +152,22 @@ article {
       max-width: calc(var(--glyph-cell-width) * var(--text-narrow-glyph-columns));
       line-height: 1.1;
       text-align: center;
-      font-size: 1.25rem;
+      @include mixins.responsive(font-size, 1rem, 1.25rem);
       font-style: italic;
     }
   }
 
   p {
+    @include mixins.responsive(
+      margin-block-start,
+      calc(var(--glyph-space-y) * 2),
+      var(--glyph-space-y)
+    );
+    @include mixins.responsive(
+      margin-block-end,
+      calc(var(--glyph-space-y) * 2),
+      var(--glyph-space-y)
+    );
     @include mixins.justify-text;
   }
 
