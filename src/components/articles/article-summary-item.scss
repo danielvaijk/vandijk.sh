@@ -13,7 +13,8 @@
       --article-summary-cover-glyph-rows: 23;
 
       position: relative;
-      height: calc(var(--glyph-cell-height) * var(--article-summary-cover-glyph-rows));
+      aspect-ratio: calc(var(--article-summary-glyph-columns) * 4) /
+        calc(var(--article-summary-cover-glyph-rows) * 7);
       background: transparent;
       overflow: hidden;
 
