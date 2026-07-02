@@ -92,6 +92,7 @@ type GlyphRenderState = {
   rows: number;
   entropyMode: GlyphEntropyMode;
   shouldUpdateBrightness: boolean;
+  shouldUploadEntropy: boolean;
   sourceTime: number;
   viewportScrollX: number;
   viewportScrollY: number;
@@ -231,12 +232,24 @@ const resolveGlyphGrid = ({
   const resolvedCellWidth = cellWidth * cellScale;
   const resolvedCellHeight = cellHeight * cellScale;
 
+  // One extra row/col so the grid still covers the viewport when it is
+  // shifted by the fractional scroll offset to stay anchored to the document.
   return {
     cellHeight: resolvedCellHeight,
     cellWidth: resolvedCellWidth,
-    cols: Math.max(1, Math.ceil(cssWidth / resolvedCellWidth)),
-    rows: Math.max(1, Math.ceil(cssHeight / resolvedCellHeight)),
+    cols: Math.max(1, Math.ceil(cssWidth / resolvedCellWidth)) + 1,
+    rows: Math.max(1, Math.ceil(cssHeight / resolvedCellHeight)) + 1,
   };
+};
+
+const shiftGridRows = (values: Float32Array, cols: number, deltaRows: number): void => {
+  const offset = Math.abs(deltaRows) * cols;
+
+  if (deltaRows > 0) {
+    values.copyWithin(0, offset);
+  } else {
+    values.copyWithin(offset, 0, values.length - offset);
+  }
 };
 
 function getCachedValue<Value>(cache: Map<string, Value>, key: string): Value | undefined {
@@ -1113,7 +1126,6 @@ const createWebGlGlyphRenderer = ({
     ? `#version 300 es
     in vec2 a_corner;
     in vec2 a_position;
-    in vec2 a_brightness_uv;
     in float a_entropy_position;
     in float a_entropy_rate;
     in float a_entropy_scale;
@@ -1126,7 +1138,6 @@ const createWebGlGlyphRenderer = ({
     uniform sampler2D u_field_modifier_brightness;
     uniform int u_field_modifier_count;
     uniform vec2 u_atlas_grid;
-    uniform vec2 u_brightness_size;
     uniform vec2 u_canvas_size;
     uniform vec2 u_cell_size;
     uniform vec2 u_viewport_scroll;
@@ -1134,7 +1145,6 @@ const createWebGlGlyphRenderer = ({
     uniform float u_field_modifier_blends[${MAX_FIELD_MODIFIER_REGIONS}];
     out float v_brightness;
     out vec2 v_uv;
-    out vec2 v_brightness_uv;
     ${GLYPH_NOISE_GLSL}
     float hash(vec3 value) {
       value = fract(value * vec3(0.1031, 0.11369, 0.13787));
@@ -1146,6 +1156,17 @@ const createWebGlGlyphRenderer = ({
     }
     float glyphProceduralEntropyBrightness(float brightness) {
       return smoothstep(0.22, 0.78, brightness);
+    }
+    float glyphFieldModifierSample(int index, vec2 modifier_uv) {
+      modifier_uv = clamp(modifier_uv, vec2(0.0), vec2(0.999999));
+      float sample_x =
+        (modifier_uv.x * float(${FIELD_MODIFIER_SAMPLE_SIZE - 1}) + 0.5) /
+        float(${FIELD_MODIFIER_SAMPLE_SIZE});
+      float sample_y =
+        (float(index * ${FIELD_MODIFIER_SAMPLE_SIZE}) +
+        modifier_uv.y * float(${FIELD_MODIFIER_SAMPLE_SIZE - 1}) + 0.5) /
+        float(${FIELD_MODIFIER_SAMPLE_SIZE * MAX_FIELD_MODIFIER_REGIONS});
+      return texture(u_field_modifier_brightness, vec2(sample_x, sample_y)).r;
     }
     float glyphFieldModifierBrightness(vec2 world) {
       float modifier_brightness = 0.0;
@@ -1164,18 +1185,14 @@ const createWebGlGlyphRenderer = ({
           continue;
         }
 
-        vec2 modifier_uv = clamp((world - rect.xy) / rect.zw, vec2(0.0), vec2(0.999999));
-        float sample_x =
-          (modifier_uv.x * float(${FIELD_MODIFIER_SAMPLE_SIZE - 1}) + 0.5) /
-          float(${FIELD_MODIFIER_SAMPLE_SIZE});
-        float sample_y =
-          (float(index * ${FIELD_MODIFIER_SAMPLE_SIZE}) +
-          modifier_uv.y * float(${FIELD_MODIFIER_SAMPLE_SIZE - 1}) + 0.5) /
-          float(${FIELD_MODIFIER_SAMPLE_SIZE * MAX_FIELD_MODIFIER_REGIONS});
-        float sampled_brightness = texture(
-          u_field_modifier_brightness,
-          vec2(sample_x, sample_y)
-        ).r;
+        vec2 modifier_uv = (world - rect.xy) / rect.zw;
+        vec2 tap_offset = (u_cell_size * 0.25) / rect.zw;
+        float sampled_brightness = 0.25 * (
+          glyphFieldModifierSample(index, modifier_uv - tap_offset) +
+          glyphFieldModifierSample(index, modifier_uv + vec2(tap_offset.x, -tap_offset.y)) +
+          glyphFieldModifierSample(index, modifier_uv + vec2(-tap_offset.x, tap_offset.y)) +
+          glyphFieldModifierSample(index, modifier_uv + tap_offset)
+        );
         float mapped_brightness = smoothstep(
           0.0,
           ${FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT.toFixed(2)},
@@ -1195,14 +1212,15 @@ const createWebGlGlyphRenderer = ({
       return brightness + min(1.0, modifier_brightness * ${FIELD_MODIFIER_BRIGHTNESS_BOOST.toFixed(1)}) * (1.0 - brightness);
     }
     void main() {
-      vec2 cell = floor(a_brightness_uv * u_brightness_size);
-      vec2 world = u_viewport_scroll + a_position + vec2(0.5) * u_cell_size;
-      vec2 modifier_world = (floor(world / u_cell_size) + vec2(0.5)) * u_cell_size;
+      vec2 scroll_snap = mod(u_viewport_scroll, u_cell_size);
+      vec2 grid_position = a_position - scroll_snap;
+      vec2 world = u_viewport_scroll + grid_position + vec2(0.5) * u_cell_size;
+      vec2 world_cell = floor(world / u_cell_size);
       vec2 field_point = world / u_cell_size;
       float color_brightness = clamp(
         glyphApplyFieldModifiers(
           glyphSolarBrightness(field_point, u_source_time, u_noise_seed),
-          modifier_world
+          world
         ),
         0.0,
         1.0
@@ -1213,16 +1231,15 @@ const createWebGlGlyphRenderer = ({
         u_glyph_frame_rate *
         a_entropy_rate *
         a_entropy_scale;
-      float phase = hash(vec3(cell, u_entropy_seed));
+      float phase = hash(vec3(world_cell, u_entropy_seed));
       float epoch = floor(entropy_position + phase);
-      float glyph_index = floor(hash(vec3(cell, epoch + u_entropy_seed)) * u_glyph_count);
+      float glyph_index = floor(hash(vec3(world_cell, epoch + u_entropy_seed)) * u_glyph_count);
       vec2 glyph_cell = vec2(mod(glyph_index, u_atlas_grid.x), floor(glyph_index / u_atlas_grid.x));
-      vec2 pixel = a_position + a_corner * u_cell_size;
+      vec2 pixel = grid_position + a_corner * u_cell_size;
       vec2 clip = pixel / u_canvas_size * 2.0 - 1.0;
       gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
       v_brightness = color_brightness;
       v_uv = (glyph_cell + a_corner) / u_atlas_grid;
-      v_brightness_uv = a_brightness_uv;
     }`
     : `#version 300 es
     in vec2 a_corner;
@@ -1340,12 +1357,12 @@ const createWebGlGlyphRenderer = ({
     !paletteTexture ||
     cornerLocation < 0 ||
     positionLocation < 0 ||
-    brightnessUvLocation < 0 ||
+    (!usesGpuNoise && brightnessUvLocation < 0) ||
     entropyPositionLocation < 0 ||
     entropyRateLocation < 0 ||
     entropyScaleLocation < 0 ||
     !atlasGridLocation ||
-    !brightnessSizeLocation ||
+    (!usesGpuNoise && !brightnessSizeLocation) ||
     !canvasSizeLocation ||
     !cellSizeLocation ||
     !atlasLocation ||
@@ -1400,10 +1417,12 @@ const createWebGlGlyphRenderer = ({
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   gl.vertexAttribDivisor(positionLocation, 1);
 
-  gl.bindBuffer(gl.ARRAY_BUFFER, brightnessUvBuffer);
-  gl.enableVertexAttribArray(brightnessUvLocation);
-  gl.vertexAttribPointer(brightnessUvLocation, 2, gl.FLOAT, false, 0, 0);
-  gl.vertexAttribDivisor(brightnessUvLocation, 1);
+  if (brightnessUvLocation >= 0) {
+    gl.bindBuffer(gl.ARRAY_BUFFER, brightnessUvBuffer);
+    gl.enableVertexAttribArray(brightnessUvLocation);
+    gl.vertexAttribPointer(brightnessUvLocation, 2, gl.FLOAT, false, 0, 0);
+    gl.vertexAttribDivisor(brightnessUvLocation, 1);
+  }
 
   gl.bindBuffer(gl.ARRAY_BUFFER, entropyPositionBuffer);
   gl.enableVertexAttribArray(entropyPositionLocation);
@@ -1626,6 +1645,7 @@ const createWebGlGlyphRenderer = ({
       rows,
       entropyMode,
       shouldUpdateBrightness,
+      shouldUploadEntropy,
       sourceTime,
       viewportScrollX,
       viewportScrollY,
@@ -1698,16 +1718,16 @@ const createWebGlGlyphRenderer = ({
         gl.uniform1f(shaderEntropyLocation, entropyMode === "shader" ? 1 : 0);
       }
 
-      if (shouldUploadPositions) {
+      if (shouldUploadPositions || shouldUploadEntropy) {
         uploadEntropyScales(glyphEntropyScales);
       }
 
-      if (shouldUploadPositions || shouldUpdateBrightness) {
+      if (shouldUploadPositions || shouldUpdateBrightness || shouldUploadEntropy) {
         uploadEntropyRates(glyphEntropyRates);
       }
 
       if (usesGpuNoise) {
-        if (shouldUpdateBrightness) {
+        if (shouldUpdateBrightness || shouldUploadEntropy) {
           uploadEntropyPositions(glyphEntropyPositions, gl.DYNAMIC_DRAW);
         }
       } else if (shouldUploadPositions || entropyMode === "cpu") {
@@ -2046,6 +2066,7 @@ export const GlyphRaster = component$(
       let lastFrameAt = 0;
       let lastBrightnessSampleAt = 0;
       let lastEntropySampleSourceTime = 0;
+      let lastGridScrollRow = 0;
       let sourceTime = 0;
       let lastCssHeight = 0;
       let lastCssWidth = 0;
@@ -2106,6 +2127,7 @@ export const GlyphRaster = component$(
         }
         lastBrightnessSampleAt = 0;
         lastEntropySampleSourceTime = 0;
+        lastGridScrollRow = Math.floor(window.scrollY / cellHeight);
         adapter.resize?.(cols, rows);
         scheduleActiveGlyphRasters();
       };
@@ -2148,6 +2170,27 @@ export const GlyphRaster = component$(
           time - lastBrightnessSampleAt >= 1000 / PROCEDURAL_ENTROPY_SAMPLE_RATE;
         const shouldUpdateBrightness = shouldSampleBrightness;
         const isInitialBrightnessSample = lastBrightnessSampleAt === 0;
+        const viewportScrollX = window.scrollX;
+        const viewportScrollY = window.scrollY;
+
+        // The GPU noise path anchors the glyph grid to the document, so the
+        // per-instance entropy state has to follow document cells: shift it
+        // whenever scroll crosses a cell boundary and re-upload that frame.
+        let shouldUploadEntropy = false;
+
+        if (entropyMode === "shader" && gpuNoiseSeed !== undefined) {
+          const gridScrollRow = Math.floor(viewportScrollY / cellHeight);
+          const deltaRows = gridScrollRow - lastGridScrollRow;
+
+          lastGridScrollRow = gridScrollRow;
+
+          if (deltaRows !== 0 && Math.abs(deltaRows) < rows) {
+            shiftGridRows(glyphEntropyPositions, cols, deltaRows);
+            shiftGridRows(glyphEntropyRates, cols, deltaRows);
+            shiftGridRows(glyphEntropyScales, cols, deltaRows);
+            shouldUploadEntropy = true;
+          }
+        }
 
         changedGlyphCount = 0;
         lastFrameAt = time;
@@ -2170,8 +2213,8 @@ export const GlyphRaster = component$(
               const index = row * cols + col;
               const viewportX = offsetX + (col + 0.5) * cellWidth;
               const viewportY = offsetY + (row + 0.5) * cellHeight;
-              const worldX = viewportX + window.scrollX;
-              const worldY = viewportY + window.scrollY;
+              const worldX = viewportX + viewportScrollX;
+              const worldY = viewportY + viewportScrollY;
               const sampledBrightness = shouldUpdateBrightness
                 ? adapter.getBrightness(
                     Math.floor(worldX / cellWidth),
@@ -2250,9 +2293,10 @@ export const GlyphRaster = component$(
           rows,
           entropyMode,
           shouldUpdateBrightness,
+          shouldUploadEntropy,
           sourceTime: renderSourceTime,
-          viewportScrollX: window.scrollX,
-          viewportScrollY: window.scrollY,
+          viewportScrollX,
+          viewportScrollY,
         });
 
         if (adapter.frameCount) {
