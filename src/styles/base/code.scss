@@ -39,14 +39,14 @@ code[class*="language-"] *::selection {
 }
 
 pre[class*="language-"] {
-  padding: 1em;
-  margin: 0.5em 0;
+  padding: var(--glyph-space-y) calc(var(--glyph-space-x) * 2);
+  margin: var(--glyph-space-y) 0;
   overflow: auto;
   background: #1e1e1e;
 }
 
 :not(pre) > code[class*="language-"] {
-  padding: 0.1em 0.3em;
+  padding: calc(var(--glyph-space-y) * 0.25) calc(var(--glyph-space-x) * 0.5);
   border-radius: 0.3em;
   color: #db4c69;
   background: #1e1e1e;

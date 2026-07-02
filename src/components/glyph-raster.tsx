@@ -177,6 +177,31 @@ let glyphFieldModifierRegionsVersion = 0;
 const clamp = (value: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, value));
 
+const readCssLength = (name: string, fallback: number): number => {
+  const root = document.documentElement;
+  const value = getComputedStyle(root).getPropertyValue(name).trim();
+  if (!value) return fallback;
+
+  const probe = document.createElement("div");
+  probe.style.position = "absolute";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.width = value;
+  root.append(probe);
+
+  const resolved = probe.getBoundingClientRect().width;
+  probe.remove();
+
+  return Number.isFinite(resolved) && resolved > 0 ? resolved : fallback;
+};
+
+const resolveRuntimePreset = (preset: GlyphRasterPreset): GlyphRasterPreset => ({
+  ...preset,
+  cellHeight: readCssLength("--glyph-cell-height", preset.cellHeight),
+  cellWidth: readCssLength("--glyph-cell-width", preset.cellWidth),
+  fontSize: readCssLength("--glyph-font-size", preset.fontSize),
+});
+
 const resolveGlyphGrid = ({
   cellHeight,
   cellWidth,
@@ -1792,6 +1817,7 @@ export const GlyphRaster = component$(
       let removeResize = (): void => {};
       let removeVisibilityListener = (): void => {};
       let removeVisibilityObserver = (): void => {};
+      const runtimePreset = resolveRuntimePreset(preset);
 
       cleanup(() => {
         isCleanedUp = true;
@@ -1933,20 +1959,20 @@ export const GlyphRaster = component$(
           ? null
           : createGpuNoiseGlyphRenderer({
               canvas,
-              cellHeight: preset.cellHeight,
-              cellWidth: preset.cellWidth,
+              cellHeight: runtimePreset.cellHeight,
+              cellWidth: runtimePreset.cellWidth,
               characters: resolvedCharacters,
-              fontSize: preset.fontSize,
+              fontSize: runtimePreset.fontSize,
               gpuNoiseSeed,
             })) ??
         createWebGlGlyphRenderer({
           canvas,
-          cellHeight: preset.cellHeight,
-          cellWidth: preset.cellWidth,
+          cellHeight: runtimePreset.cellHeight,
+          cellWidth: runtimePreset.cellWidth,
           characters: resolvedCharacters,
-          fontSize: preset.fontSize,
+          fontSize: runtimePreset.fontSize,
         }) ??
-        createCanvasGlyphRenderer(canvas, preset.fontSize);
+        createCanvasGlyphRenderer(canvas, runtimePreset.fontSize);
       if (!renderer) return;
 
       const usesGpuGlyphSelection = renderer.usesGpuGlyphSelection === true;
@@ -1955,8 +1981,8 @@ export const GlyphRaster = component$(
       let changedGlyphCount = 0;
       let changedGlyphIndices = new Uint32Array();
       let brightnessValues = new Float32Array();
-      let cellHeight = preset.cellHeight;
-      let cellWidth = preset.cellWidth;
+      let cellHeight = runtimePreset.cellHeight;
+      let cellWidth = runtimePreset.cellWidth;
       let glyphEntropyPositions = new Float32Array();
       let glyphEntropyRates = new Float32Array();
       let glyphEntropyScales = new Float32Array();
@@ -2002,8 +2028,8 @@ export const GlyphRaster = component$(
         renderer.resize({ cssHeight, cssWidth, pixelRatio });
 
         const grid = resolveGlyphGrid({
-          cellHeight: preset.cellHeight,
-          cellWidth: preset.cellWidth,
+          cellHeight: runtimePreset.cellHeight,
+          cellWidth: runtimePreset.cellWidth,
           cssHeight,
           cssWidth,
         });

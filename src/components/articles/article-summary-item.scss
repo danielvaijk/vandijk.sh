@@ -2,7 +2,7 @@
 
 .article-summary {
   &:not(:last-child) {
-    margin-top: 2rem;
+    margin-top: calc(var(--glyph-space-y) * 2);
   }
 
   a {
@@ -42,11 +42,11 @@
     }
 
     > .article-summary-content {
-      margin-top: 0.8rem;
+      margin-top: var(--glyph-space-y);
 
       > time {
         display: block;
-        margin-bottom: 0.4rem;
+        margin-bottom: var(--glyph-space-y);
       }
 
       > h4 {

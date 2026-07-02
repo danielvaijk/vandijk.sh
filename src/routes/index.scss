@@ -1,7 +1,7 @@
 .homepage-splash-stage {
   position: fixed;
   inset: 0;
-  padding: 0 0.8rem;
+  padding: 0 calc(var(--glyph-space-x) * 2);
   display: flex;
   flex-direction: column;
   justify-content: center;

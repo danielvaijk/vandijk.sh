@@ -1,5 +1,10 @@
 :root {
   --font-family-global: Charter, "Bitstream Charter", "Sitka Text", Cambria, serif;
+  --glyph-font-size: 0.8125rem;
+  --glyph-cell-width: 0.5rem;
+  --glyph-cell-height: 0.875rem;
+  --glyph-space-x: var(--glyph-cell-width);
+  --glyph-space-y: var(--glyph-cell-height);
 
   transition: all 0.3s ease;
 }
@@ -52,5 +57,5 @@ html {
 
 @page {
   size: A3 portrait;
-  margin: 2rem;
+  margin: calc(var(--glyph-space-y) * 2);
 }

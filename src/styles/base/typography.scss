@@ -45,20 +45,20 @@ h3 {
 }
 
 p {
-  margin-block-start: 1em;
-  margin-block-end: 1em;
+  margin-block-start: var(--glyph-space-y);
+  margin-block-end: var(--glyph-space-y);
   margin-inline-start: 0;
   margin-inline-end: 0;
 }
 
 ul,
 ol {
-  padding-inline-start: 1.25em;
+  padding-inline-start: calc(var(--glyph-space-x) * 3);
 }
 
 li > ul,
 li > ol {
-  padding-inline-start: 0.75em;
+  padding-inline-start: calc(var(--glyph-space-x) * 2);
 }
 
 ol {

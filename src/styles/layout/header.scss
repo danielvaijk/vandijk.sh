@@ -6,7 +6,7 @@ header {
   flex-direction: column;
   justify-content: flex-start;
   align-items: center;
-  margin: 1.6rem 0;
+  margin: calc(var(--glyph-space-y) * 2) 0;
   user-select: none;
 
   @media print {
@@ -29,7 +29,7 @@ header {
 
   > nav {
     position: relative;
-    margin: 0.6rem 0 0;
+    margin: var(--glyph-space-y) 0 0;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -38,7 +38,7 @@ header {
       display: flex;
       flex-wrap: wrap;
       justify-content: center;
-      gap: 0.4rem 0.8rem;
+      gap: var(--glyph-space-y) calc(var(--glyph-space-x) * 2);
       text-align: center;
       list-style: none;
       margin: 0;

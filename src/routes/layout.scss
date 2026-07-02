@@ -1,13 +1,13 @@
 .page-pane {
-  --page-pane-padding: 0.8rem;
+  --page-pane-padding: calc(var(--glyph-space-x) * 2);
   --page-pane-padding-top: 0;
 
   position: relative;
   z-index: 1;
-  width: calc(100% - 1.6rem);
+  width: calc(100% - var(--glyph-space-x) * 4);
   max-width: 80rem;
-  min-height: calc(100vh - 1.6rem);
-  margin: 0.8rem;
+  min-height: calc(100vh - var(--glyph-space-y) * 2);
+  margin: var(--glyph-space-y) calc(var(--glyph-space-x) * 2);
   padding: var(--page-pane-padding-top) var(--page-pane-padding) var(--page-pane-padding);
   display: flex;
   flex-direction: column;
@@ -26,6 +26,6 @@ main {
   }
 
   &.is-homepage {
-    padding: 0.8rem;
+    padding: var(--glyph-space-y) calc(var(--glyph-space-x) * 2);
   }
 }
