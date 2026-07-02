@@ -21,7 +21,7 @@ h1 {
   & {
     display: block;
     margin: 0 auto;
-    max-width: 32rem;
+    max-width: calc(var(--glyph-cell-width) * var(--text-narrow-glyph-columns));
     line-height: 1.1;
     text-align: center;
     font-weight: 200;
@@ -38,7 +38,7 @@ h2 {
 
 h3 {
   font-size: 1.4rem;
-  max-width: 32rem;
+  max-width: calc(var(--glyph-cell-width) * var(--text-narrow-glyph-columns));
   line-height: 1.1;
   text-align: center;
   font-weight: 600;

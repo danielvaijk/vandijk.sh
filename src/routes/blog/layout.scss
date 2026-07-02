@@ -2,18 +2,21 @@
 
 article {
   width: 100%;
-  max-width: 46rem;
+  max-width: calc(var(--glyph-cell-width) * var(--article-glyph-columns));
   font-size: 1.125rem;
   line-height: 1.45;
   padding: 0 0 var(--glyph-space-y);
 
   .article-cover-glyph-raster {
+    --article-media-glyph-rows: 30;
+
     position: relative;
-    aspect-ratio: 16 / 9;
+    height: calc(var(--glyph-cell-height) * var(--article-media-glyph-rows));
     margin: var(--glyph-space-y) 0;
     background: transparent;
     overflow: hidden;
 
+    > .glyph-raster-region,
     figure:first-of-type {
       position: absolute;
       inset: 0;
@@ -24,19 +27,28 @@ article {
       img {
         width: 100%;
         height: 100%;
+        display: block;
+        object-fit: cover;
         opacity: 0;
       }
     }
   }
 
   .article-image-glyph-raster {
+    --article-media-glyph-rows: 36;
+
     position: relative;
+    height: calc(var(--glyph-cell-height) * var(--article-media-glyph-rows));
     margin: var(--glyph-space-y) 0;
     background: transparent;
     overflow: hidden;
 
+    > .glyph-raster-region,
     figure {
-      aspect-ratio: 440 / 300;
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
       margin: 0;
     }
   }
@@ -133,7 +145,7 @@ article {
   time[role="doc-subtitle"] {
     p {
       margin: var(--glyph-space-y) auto calc(var(--glyph-space-y) * 5) auto;
-      max-width: 32rem;
+      max-width: calc(var(--glyph-cell-width) * var(--text-narrow-glyph-columns));
       line-height: 1.1;
       text-align: center;
       font-size: 1.25rem;
@@ -171,8 +183,8 @@ article {
 
       &::after {
         content: "";
-        width: 0.45rem;
-        height: 0.45rem;
+        width: var(--glyph-cell-width);
+        height: calc(var(--glyph-cell-height) * 0.5);
         border: solid currentColor;
         border-width: 0 1px 1px 0;
         transform: rotate(45deg);

@@ -2077,8 +2077,8 @@ export const GlyphRaster = component$(
         const currentFrame = adapter.frameCount
           ? Math.floor(framePosition) % adapter.frameCount
           : 0;
-        const offsetX = (canvas.clientWidth - cols * cellWidth) / 2;
-        const offsetY = (canvas.clientHeight - rows * cellHeight) / 2;
+        const offsetX = 0;
+        const offsetY = 0;
         const entropyMode: GlyphEntropyMode =
           renderer.supportsShaderEntropy === true && resolvedSource.type === "procedural-noise"
             ? "shader"

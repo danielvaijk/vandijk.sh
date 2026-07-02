@@ -15,7 +15,7 @@
   }
 
   #homepage-title {
-    height: 2.6rem; // Prevents the ti cursor addition causing layout shifting.
+    height: calc(var(--glyph-cell-height) * 3); // Prevents cursor layout shifting.
     margin: 0;
 
     --ti-cursor-font-family: var(--font-family-global);

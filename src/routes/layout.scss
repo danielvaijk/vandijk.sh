@@ -1,21 +1,12 @@
-.page-pane {
-  --page-pane-padding: calc(var(--glyph-space-x) * 2);
-  --page-pane-padding-top: 0;
-
+main {
   position: relative;
   z-index: 1;
+  align-self: flex-start;
   width: calc(100% - var(--glyph-space-x) * 4);
-  max-width: 80rem;
+  max-width: calc(var(--glyph-cell-width) * var(--main-glyph-columns));
   min-height: calc(100vh - var(--glyph-space-y) * 2);
-  margin: var(--glyph-space-y) calc(var(--glyph-space-x) * 2);
-  padding: var(--page-pane-padding-top) var(--page-pane-padding) var(--page-pane-padding);
-  display: flex;
-  flex-direction: column;
-}
-
-main {
-  width: 100%;
-  height: 100%;
+  margin: 0 calc(var(--glyph-space-x) * 2) var(--glyph-space-y);
+  padding: 0 calc(var(--glyph-space-x) * 2) var(--glyph-space-y);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -26,6 +17,11 @@ main {
   }
 
   &.is-homepage {
+    align-self: stretch;
+    width: 100%;
+    max-width: none;
+    min-height: 100vh;
+    margin: 0;
     padding: var(--glyph-space-y) calc(var(--glyph-space-x) * 2);
   }
 }

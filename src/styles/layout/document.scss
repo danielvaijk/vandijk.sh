@@ -5,6 +5,10 @@
   --glyph-cell-height: 0.875rem;
   --glyph-space-x: var(--glyph-cell-width);
   --glyph-space-y: var(--glyph-cell-height);
+  --main-glyph-columns: 160;
+  --article-glyph-columns: 92;
+  --article-summary-glyph-columns: 72;
+  --text-narrow-glyph-columns: 64;
 
   transition: all 0.3s ease;
 }

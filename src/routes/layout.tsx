@@ -17,13 +17,11 @@ export default component$((): QwikJSX.Element => {
     <>
       <GlyphRaster source={{ type: "procedural-noise" }} />
 
-      <div class={isHomepage ? undefined : "page-pane"}>
-        {!isHomepage && <NavigationHeader />}
+      {!isHomepage && <NavigationHeader />}
 
-        <main class={isHomepage ? "is-homepage" : undefined}>
-          <Slot />
-        </main>
-      </div>
+      <main class={isHomepage ? "is-homepage" : undefined}>
+        <Slot />
+      </main>
 
       {!isHomepage && <GlyphTextReveal routeKey={url.pathname} />}
     </>

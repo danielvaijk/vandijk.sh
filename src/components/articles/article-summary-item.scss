@@ -10,11 +10,14 @@
     text-decoration: none;
 
     > .article-summary-cover-image {
+      --article-summary-cover-glyph-rows: 23;
+
       position: relative;
-      aspect-ratio: 16 / 9;
+      height: calc(var(--glyph-cell-height) * var(--article-summary-cover-glyph-rows));
       background: transparent;
       overflow: hidden;
 
+      > .glyph-raster-region,
       > div {
         position: absolute;
         inset: 0;
