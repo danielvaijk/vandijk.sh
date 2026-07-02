@@ -1,16 +1,26 @@
 :root {
   --font-family-global: Charter, "Bitstream Charter", "Sitka Text", Cambria, serif;
-  --glyph-font-size: 0.8125rem;
-  --glyph-cell-width: 0.5rem;
-  --glyph-cell-height: 0.875rem;
+  --glyph-font-size: 0.65rem;
+  --glyph-cell-width: 0.4rem;
+  --glyph-cell-height: 0.7rem;
   --glyph-space-x: var(--glyph-cell-width);
   --glyph-space-y: var(--glyph-cell-height);
-  --main-glyph-columns: 160;
-  --article-glyph-columns: 92;
-  --article-summary-glyph-columns: 72;
-  --text-narrow-glyph-columns: 64;
+  --main-glyph-columns: 200;
+  --article-glyph-columns: 115;
+  --article-summary-glyph-columns: 90;
+  --text-narrow-glyph-columns: 80;
 
   transition: all 0.3s ease;
+
+  @media (min-width: 46rem) {
+    --glyph-font-size: 0.8125rem;
+    --glyph-cell-width: 0.5rem;
+    --glyph-cell-height: 0.875rem;
+    --main-glyph-columns: 160;
+    --article-glyph-columns: 92;
+    --article-summary-glyph-columns: 72;
+    --text-narrow-glyph-columns: 64;
+  }
 }
 
 html,

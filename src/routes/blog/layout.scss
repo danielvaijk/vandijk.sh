@@ -8,7 +8,7 @@ article {
   padding: 0 0 var(--glyph-space-y);
 
   .article-cover-glyph-raster {
-    --article-media-glyph-rows: 30;
+    --article-media-glyph-rows: 38;
 
     position: relative;
     aspect-ratio: calc(var(--article-glyph-columns) * 4) / calc(var(--article-media-glyph-rows) * 7);
@@ -32,10 +32,14 @@ article {
         opacity: 0;
       }
     }
+
+    @media (min-width: 46rem) {
+      --article-media-glyph-rows: 30;
+    }
   }
 
   .article-image-glyph-raster {
-    --article-media-glyph-rows: 36;
+    --article-media-glyph-rows: 45;
 
     position: relative;
     aspect-ratio: calc(var(--article-glyph-columns) * 4) / calc(var(--article-media-glyph-rows) * 7);
@@ -50,6 +54,10 @@ article {
       width: 100%;
       height: 100%;
       margin: 0;
+    }
+
+    @media (min-width: 46rem) {
+      --article-media-glyph-rows: 36;
     }
   }
 
