@@ -4,5 +4,5 @@ import { component$ } from "@builder.io/qwik";
 import { CenteredTitle } from "src/components/centered-title";
 
 export default component$((): QwikJSX.Element => {
-  return <CenteredTitle title="404" subtitle="The article you're looking for doesn't exist." />;
+  return <CenteredTitle title="404" subtitle="This article doesn't exist." />;
 });
