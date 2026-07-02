@@ -8,59 +8,6 @@ import { GlyphRaster } from "src/components/glyph-raster";
 import { createPageMetaTags } from "src/helpers/meta";
 import styles from "src/routes/index.scss?inline";
 
-const GLYPH_CHARS =
-  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%&*+=-~.:;|/\\<>";
-const GLYPH_IN_DURATION = 520;
-const GLYPH_IN_FRAME_RATE = 1000 / 24;
-
-const randomGlyph = (): string => GLYPH_CHARS[Math.floor(Math.random() * GLYPH_CHARS.length)];
-
-const glyphInElement = (element: HTMLElement): (() => void) => {
-  const originalText = element.textContent ?? "";
-  const originalCharacters = Array.from(originalText);
-  let animationFrame = 0;
-  let isComplete = false;
-  let startedAt = 0;
-  let lastFrameAt = 0;
-
-  const render = (time: number): void => {
-    if (startedAt === 0) startedAt = time;
-    if (time - lastFrameAt < GLYPH_IN_FRAME_RATE) {
-      animationFrame = requestAnimationFrame(render);
-      return;
-    }
-
-    lastFrameAt = time;
-
-    const progress = Math.min(1, (time - startedAt) / GLYPH_IN_DURATION);
-    const revealCount = Math.floor(originalCharacters.length * progress);
-
-    element.textContent = originalCharacters
-      .map((character, index): string => {
-        if (/\s/u.test(character) || index < revealCount) return character;
-
-        return randomGlyph();
-      })
-      .join("");
-
-    if (progress < 1) {
-      animationFrame = requestAnimationFrame(render);
-    } else {
-      isComplete = true;
-      element.textContent = originalText;
-    }
-  };
-
-  animationFrame = requestAnimationFrame(render);
-
-  return (): void => {
-    cancelAnimationFrame(animationFrame);
-    if (!isComplete) {
-      element.textContent = originalText;
-    }
-  };
-};
-
 export default component$((): QwikJSX.Element => {
   const continuePrompt = useSignal("press any key to continue");
   const navigate = useNavigate();
@@ -116,22 +63,6 @@ export default component$((): QwikJSX.Element => {
 
     cleanup(() => {
       typeIt.destroy();
-    });
-  });
-
-  useVisibleTask$(({ cleanup, track }): void => {
-    track(() => continuePrompt.value);
-
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (prefersReducedMotion) return;
-
-    const subtitle = document.getElementById("homepage-subtitle");
-    const restoreAnimation = subtitle instanceof HTMLElement ? glyphInElement(subtitle) : null;
-
-    cleanup(() => {
-      if (restoreAnimation) {
-        restoreAnimation();
-      }
     });
   });
 

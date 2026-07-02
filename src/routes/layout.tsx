@@ -23,7 +23,7 @@ export default component$((): QwikJSX.Element => {
         <Slot />
       </main>
 
-      {!isHomepage && <GlyphTextReveal routeKey={url.pathname} />}
+      <GlyphTextReveal routeKey={url.pathname} />
     </>
   );
 });
