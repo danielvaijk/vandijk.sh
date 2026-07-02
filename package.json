@@ -4,7 +4,7 @@
   "description": "The vandijk.sh website.",
   "type": "module",
   "scripts": {
-    "build": "bun run build.articles && bun run build.glyphs && qwik build && bun run build.prune",
+    "build": "bun run build.articles && bun run build.glyphs && bun run build.types && bun run build.client && bun run build.server && bun run build.prune",
     "build.articles": "bun run build.articles.metadata",
     "build.articles.metadata": "bun src/scripts/generate-articles-metadata.ts",
     "build.client": "vite build",
@@ -36,6 +36,7 @@
     "@types/hast": "^3.0.4",
     "@types/node": "20.8.4",
     "hast-util-to-html": "^9.0.5",
+    "ignore": "5.3.1",
     "oxfmt": "^0.56.0",
     "oxlint": "^1.71.0",
     "refractor": "^5.0.0",
