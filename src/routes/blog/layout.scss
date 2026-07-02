@@ -60,20 +60,20 @@ article {
     height: auto; // Let the browser calculate the height to maintain aspect ratio.
   }
 
-  figure {
+  > figure {
     margin-inline: 0;
 
     &:first-of-type {
-      aspect-ratio: 16 / 9;
-      overflow: hidden;
-
       picture {
         display: block;
-        height: 100%;
+        aspect-ratio: 16 / 9;
+        overflow: hidden;
       }
 
-      img {
-        height: 100%;
+      > img,
+      picture img {
+        aspect-ratio: 16 / 9;
+        height: auto;
         object-fit: cover;
       }
     }
