@@ -137,7 +137,7 @@ export default component$((): QwikJSX.Element => {
 
   return (
     <section class="homepage-splash-stage">
-      <GlyphRaster blend={0.4} source={{ type: "frames", url: "/terminal-splash.frames" }} />
+      <GlyphRaster blend={0.4} source={{ type: "frames", url: "/eye.frames" }} />
       <h2 id="homepage-title">Hey there, I'm Daniel.</h2>
       <strong id="homepage-subtitle">{continuePrompt.value}</strong>
     </section>
