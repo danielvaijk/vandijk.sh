@@ -16,7 +16,6 @@ import { formatDateAsString } from "src/utilities/time";
 interface ImageCaption {
   altText: string;
   isHidden: boolean;
-  theme?: string;
 }
 
 interface GenerateImagesWithMarkupOptions {
@@ -77,12 +76,6 @@ function extractCaptionValues(captionRaw: string): ImageCaption {
           case "HIDDEN":
             caption.isHidden = true;
             break;
-          case "DARK":
-            caption.theme = "dark";
-            break;
-          case "LIGHT":
-            caption.theme = "light";
-            break;
           default:
             break;
         }
@@ -122,14 +115,9 @@ function renderImageMarkup({
 
   const img = `<img ${src} ${width} ${height} ${alt} ${decoding} ${loading} />`;
   const figcaption = caption.isHidden ? null : `<figcaption>${caption.altText}</figcaption>`;
-  let figureOpenTag = "<figure>";
-
-  if (typeof caption.theme !== "undefined") {
-    figureOpenTag = `<figure class="${caption.theme}-only">`;
-  }
 
   if (isSingleImage) {
-    return [figureOpenTag, img, figcaption, "</figure>"]
+    return ["<figure>", img, figcaption, "</figure>"]
       .filter((value): boolean => value !== null)
       .join("\n");
   }
@@ -139,7 +127,7 @@ function renderImageMarkup({
   const webpSourceSet = `srcset="${serializeSourceSet(webpSources)}"`;
 
   return [
-    figureOpenTag,
+    "<figure>",
     "<picture>",
     `<source ${sizes} ${avifSourceSet} />`,
     `<source ${sizes} ${webpSourceSet} />`,
