@@ -19,7 +19,6 @@ const REVEAL_CONTAINER_SELECTOR = [
 const HEADER_REVEAL_CONTAINER_SELECTOR = ["header > #header-name", "header nav li"].join(",");
 const TEXT_EXCLUDED_SELECTOR = [
   "canvas",
-  "code",
   "input",
   "kbd",
   "noscript",
