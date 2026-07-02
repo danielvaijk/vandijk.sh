@@ -7,11 +7,13 @@ a {
 
 a,
 .clickable {
-  transition: opacity 0.6s ease;
+  @include mixins.hover-capable {
+    transition: opacity 0.6s ease;
 
-  &:hover {
-    opacity: 0.6;
-    cursor: pointer;
+    &:hover {
+      opacity: 0.6;
+      cursor: pointer;
+    }
   }
 }
 

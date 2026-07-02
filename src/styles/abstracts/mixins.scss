@@ -20,6 +20,12 @@
   }
 }
 
+@mixin hover-capable {
+  @media (hover: hover) and (pointer: fine) {
+    @content;
+  }
+}
+
 @mixin justify-text {
   text-align: justify;
   word-wrap: break-word;
