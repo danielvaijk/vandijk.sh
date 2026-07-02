@@ -96,8 +96,8 @@ type GlyphRenderState = {
   shouldUpdateBrightness: boolean;
   shouldUploadEntropy: boolean;
   sourceTime: number;
-  viewportScrollX: number;
-  viewportScrollY: number;
+  gridOriginX: number;
+  gridOriginY: number;
 };
 
 type ActiveGlyphRaster = {
@@ -146,6 +146,11 @@ const FIELD_MODIFIER_BRIGHTNESS_BOOST = 1;
 const FIELD_MODIFIER_BRIGHTNESS_FLOOR = 0.07;
 const FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT = 1;
 const GLYPH_ENTROPY_RATE_EASE_SECONDS = 0.35;
+// Height of the document-anchored noise canvas in large-viewport multiples,
+// and how close (in viewport fractions) scroll may get to a canvas edge
+// before the canvas is re-centered around the viewport.
+const DOCUMENT_ANCHOR_OVERSCAN = 2.5;
+const DOCUMENT_ANCHOR_EDGE_MARGIN = 0.35;
 const MIN_GLYPH_CELL_SCALE = 1;
 const MAX_GLYPH_CELL_SCALE = 8;
 const MAX_GLYPH_GRID_CELLS = 18000;
@@ -200,6 +205,20 @@ const readCssLength = (name: string, fallback: number): number => {
   return Number.isFinite(resolved) && resolved > 0 ? resolved : fallback;
 };
 
+const readLargeViewportHeight = (): number => {
+  const probe = document.createElement("div");
+  probe.style.position = "fixed";
+  probe.style.visibility = "hidden";
+  probe.style.pointerEvents = "none";
+  probe.style.height = "100lvh";
+  document.documentElement.append(probe);
+
+  const height = probe.getBoundingClientRect().height;
+  probe.remove();
+
+  return height > 0 ? height : window.innerHeight;
+};
+
 const resolveRuntimePreset = (preset: GlyphRasterPreset): GlyphRasterPreset => ({
   ...preset,
   cellHeight: readCssLength("--glyph-cell-height", preset.cellHeight),
@@ -212,11 +231,13 @@ const resolveGlyphGrid = ({
   cellWidth,
   cssHeight,
   cssWidth,
+  maxCells = MAX_GLYPH_GRID_CELLS,
 }: {
   cellHeight: number;
   cellWidth: number;
   cssHeight: number;
   cssWidth: number;
+  maxCells?: number;
 }): {
   cellHeight: number;
   cellWidth: number;
@@ -227,7 +248,7 @@ const resolveGlyphGrid = ({
   const baseRows = Math.max(1, Math.ceil(cssHeight / cellHeight));
   const baseCellCount = baseCols * baseRows;
   const cellScale = clamp(
-    Math.sqrt(baseCellCount / MAX_GLYPH_GRID_CELLS),
+    Math.sqrt(baseCellCount / maxCells),
     MIN_GLYPH_CELL_SCALE,
     MAX_GLYPH_CELL_SCALE,
   );
@@ -1142,7 +1163,7 @@ const createWebGlGlyphRenderer = ({
     uniform vec2 u_atlas_grid;
     uniform vec2 u_canvas_size;
     uniform vec2 u_cell_size;
-    uniform vec2 u_viewport_scroll;
+    uniform vec2 u_grid_origin;
     uniform vec4 u_field_modifier_rects[${MAX_FIELD_MODIFIER_REGIONS}];
     uniform float u_field_modifier_blends[${MAX_FIELD_MODIFIER_REGIONS}];
     out float v_brightness;
@@ -1214,9 +1235,7 @@ const createWebGlGlyphRenderer = ({
       return brightness + min(1.0, modifier_brightness * ${FIELD_MODIFIER_BRIGHTNESS_BOOST.toFixed(1)}) * (1.0 - brightness);
     }
     void main() {
-      vec2 scroll_snap = mod(u_viewport_scroll, u_cell_size);
-      vec2 grid_position = a_position - scroll_snap;
-      vec2 world = u_viewport_scroll + grid_position + vec2(0.5) * u_cell_size;
+      vec2 world = u_grid_origin + a_position + vec2(0.5) * u_cell_size;
       vec2 world_cell = floor(world / u_cell_size);
       vec2 field_point = world / u_cell_size;
       float color_brightness = clamp(
@@ -1237,7 +1256,7 @@ const createWebGlGlyphRenderer = ({
       float epoch = floor(entropy_position + phase);
       float glyph_index = floor(hash(vec3(world_cell, epoch + u_entropy_seed)) * u_glyph_count);
       vec2 glyph_cell = vec2(mod(glyph_index, u_atlas_grid.x), floor(glyph_index / u_atlas_grid.x));
-      vec2 pixel = grid_position + a_corner * u_cell_size;
+      vec2 pixel = a_position + a_corner * u_cell_size;
       vec2 clip = pixel / u_canvas_size * 2.0 - 1.0;
       gl_Position = vec4(clip.x, -clip.y, 0.0, 1.0);
       v_brightness = color_brightness;
@@ -1314,9 +1333,7 @@ const createWebGlGlyphRenderer = ({
   const brightnessSizeLocation = gl.getUniformLocation(program, "u_brightness_size");
   const canvasSizeLocation = gl.getUniformLocation(program, "u_canvas_size");
   const cellSizeLocation = gl.getUniformLocation(program, "u_cell_size");
-  const viewportScrollLocation = usesGpuNoise
-    ? gl.getUniformLocation(program, "u_viewport_scroll")
-    : null;
+  const gridOriginLocation = usesGpuNoise ? gl.getUniformLocation(program, "u_grid_origin") : null;
   const atlasLocation = gl.getUniformLocation(program, "u_atlas");
   const brightnessLocation = gl.getUniformLocation(program, "u_brightness");
   const fieldModifierBrightnessLocation = usesGpuNoise
@@ -1374,7 +1391,7 @@ const createWebGlGlyphRenderer = ({
         !fieldModifierCountLocation ||
         !fieldModifierBlendsLocation ||
         !fieldModifierRectsLocation ||
-        !viewportScrollLocation)) ||
+        !gridOriginLocation)) ||
     !paletteLocation ||
     !colorCountLocation ||
     !entropySeedLocation ||
@@ -1649,8 +1666,8 @@ const createWebGlGlyphRenderer = ({
       shouldUpdateBrightness,
       shouldUploadEntropy,
       sourceTime,
-      viewportScrollX,
-      viewportScrollY,
+      gridOriginX,
+      gridOriginY,
     }: GlyphRenderState): void => {
       const cellCount = cols * rows;
       const didResize = positions.length !== cellCount * 2;
@@ -1707,7 +1724,7 @@ const createWebGlGlyphRenderer = ({
         gl.uniform1f(sourceTimeLocation, sourceTime);
         gl.uniform1f(entropySampleTimeLocation, entropySampleTime);
         gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
-        gl.uniform2f(viewportScrollLocation, viewportScrollX, viewportScrollY);
+        gl.uniform2f(gridOriginLocation, gridOriginX, gridOriginY);
         uploadFieldModifiers();
       } else if (
         !usesGpuNoise &&
@@ -1816,7 +1833,14 @@ const createGpuNoiseGlyphRenderer = ({
       if (!didCheckGpuNoise) {
         didCheckGpuNoise = true;
 
-        if (!hasVisibleRasterPixels(gl, canvas.width, canvas.height, state.backgroundColor)) {
+        if (
+          !hasVisibleRasterPixels(
+            gl,
+            Math.min(canvas.width, 512),
+            Math.min(canvas.height, 512),
+            state.backgroundColor,
+          )
+        ) {
           useFallback = true;
           fallbackRenderer.draw({ ...state, gpuNoiseSeed: undefined });
         }
@@ -2048,15 +2072,6 @@ export const GlyphRaster = component$(
       const canvas = document.getElementById(rasterId) as HTMLCanvasElement | null;
       if (!canvas) return;
 
-      canvas.style.position = "";
-      canvas.style.top = "";
-      canvas.style.right = "";
-      canvas.style.bottom = "";
-      canvas.style.left = "";
-      canvas.style.width = "";
-      canvas.style.height = "";
-      canvas.style.transform = "";
-
       const adapter = createNoiseAdapter();
       const gpuNoiseSeed = adapter.gpuNoiseSeed;
       const renderer =
@@ -2096,11 +2111,17 @@ export const GlyphRaster = component$(
       let lastFrameAt = 0;
       let lastBrightnessSampleAt = 0;
       let lastEntropySampleSourceTime = 0;
-      let lastGridScrollRow = 0;
       let sourceTime = 0;
       let lastCssHeight = 0;
       let lastCssWidth = 0;
       let lastPixelRatio = 0;
+      let canvasAnchorMode: "document" | "viewport" | "" = "";
+      let canvasTop = 0;
+      let documentHeight = 0;
+      let largeViewportHeight = window.innerHeight;
+      let lastDrawnCanvasTop = -1;
+      let lastDrawnSourceTime = -1;
+      let lastDrawnModifierVersion = -1;
 
       const randomGlyphIndex = (): number => Math.floor(Math.random() * resolvedCharacters.length);
       const randomGlyphIndexExcept = (currentIndex: number): number => {
@@ -2138,6 +2159,8 @@ export const GlyphRaster = component$(
           cellWidth: runtimePreset.cellWidth,
           cssHeight,
           cssWidth,
+          maxCells:
+            MAX_GLYPH_GRID_CELLS * (canvasAnchorMode === "document" ? DOCUMENT_ANCHOR_OVERSCAN : 1),
         });
 
         cellHeight = grid.cellHeight;
@@ -2157,9 +2180,52 @@ export const GlyphRaster = component$(
         }
         lastBrightnessSampleAt = 0;
         lastEntropySampleSourceTime = 0;
-        lastGridScrollRow = Math.floor(window.scrollY / cellHeight);
+        lastDrawnCanvasTop = -1;
+        lastDrawnSourceTime = -1;
+
+        if (canvasAnchorMode === "document") {
+          const maxTop = Math.max(0, Math.floor((documentHeight - cssHeight) / cellHeight));
+          canvasTop = clamp(Math.floor(canvasTop / cellHeight), 0, maxTop) * cellHeight;
+          canvas.style.top = `${canvasTop}px`;
+        }
+
         adapter.resize?.(cols, rows);
         scheduleActiveGlyphRasters();
+      };
+
+      // The document-anchored canvas keeps a document position so the
+      // compositor scrolls it in lockstep with the page; its height covers
+      // the viewport plus overscan, clamped to the document so it never
+      // extends the scrollable area.
+      const updateCanvasHeight = (): void => {
+        if (canvasAnchorMode !== "document") return;
+
+        documentHeight = Math.max(document.documentElement.scrollHeight, largeViewportHeight);
+
+        const overscanHeight = Math.round(largeViewportHeight * DOCUMENT_ANCHOR_OVERSCAN);
+        const nextHeight = `${Math.min(overscanHeight, Math.floor(documentHeight))}px`;
+
+        if (canvas.style.height !== nextHeight) {
+          canvas.style.height = nextHeight;
+        }
+      };
+
+      const applyAnchorMode = (mode: "document" | "viewport"): void => {
+        if (canvasAnchorMode === mode) return;
+
+        canvasAnchorMode = mode;
+
+        if (mode === "document") {
+          canvas.style.position = "absolute";
+          canvas.style.top = `${canvasTop}px`;
+        } else {
+          canvas.style.position = "";
+          canvas.style.top = "";
+          canvas.style.height = "";
+        }
+
+        updateCanvasHeight();
+        resize();
       };
 
       const render = (time: number): void => {
@@ -2201,27 +2267,61 @@ export const GlyphRaster = component$(
           time - lastBrightnessSampleAt >= 1000 / PROCEDURAL_ENTROPY_SAMPLE_RATE;
         const shouldUpdateBrightness = shouldSampleBrightness;
         const isInitialBrightnessSample = lastBrightnessSampleAt === 0;
-        const viewportScrollX = window.scrollX;
-        const viewportScrollY = window.scrollY;
+        const usesDocumentAnchor = entropyMode === "shader" && gpuNoiseSeed !== undefined;
 
-        // The GPU noise path anchors the glyph grid to the document, so the
-        // per-instance entropy state has to follow document cells: shift it
-        // whenever scroll crosses a cell boundary and re-upload that frame.
+        applyAnchorMode(usesDocumentAnchor ? "document" : "viewport");
+
+        if (usesDocumentAnchor && shouldUpdateBrightness) {
+          // Follow late document growth (images, fonts) at the sample cadence.
+          updateCanvasHeight();
+          resize();
+        }
+
+        const viewportScrollY = window.scrollY;
+        const viewportHeight = window.innerHeight;
+
+        // The compositor scrolls the document-anchored canvas in lockstep
+        // with the page; the main thread only re-centers it (in whole grid
+        // rows, shifting the entropy state to match) when scroll gets close
+        // to an edge of its overscan.
         let shouldUploadEntropy = false;
 
-        if (entropyMode === "shader" && gpuNoiseSeed !== undefined) {
-          const gridScrollRow = Math.floor(viewportScrollY / cellHeight);
-          const deltaRows = gridScrollRow - lastGridScrollRow;
+        if (usesDocumentAnchor) {
+          const edgeMargin = viewportHeight * DOCUMENT_ANCHOR_EDGE_MARGIN;
+          const canvasBottom = canvasTop + lastCssHeight;
+          const isNearTop = canvasTop > 0 && viewportScrollY < canvasTop + edgeMargin;
+          const isNearBottom =
+            canvasBottom < documentHeight - cellHeight &&
+            viewportScrollY + viewportHeight > canvasBottom - edgeMargin;
 
-          lastGridScrollRow = gridScrollRow;
+          if (isNearTop || isNearBottom) {
+            documentHeight = Math.max(document.documentElement.scrollHeight, largeViewportHeight);
 
-          if (deltaRows !== 0 && Math.abs(deltaRows) < rows) {
-            shiftGridRows(glyphEntropyPositions, cols, deltaRows);
-            shiftGridRows(glyphEntropyRates, cols, deltaRows);
-            shiftGridRows(glyphEntropyScales, cols, deltaRows);
-            shouldUploadEntropy = true;
+            const maxTopRow = Math.max(0, Math.floor((documentHeight - lastCssHeight) / cellHeight));
+            const centeredTopRow = Math.floor(
+              (viewportScrollY - (lastCssHeight - viewportHeight) / 2) / cellHeight,
+            );
+            const nextTop = clamp(centeredTopRow, 0, maxTopRow) * cellHeight;
+            const deltaRows = Math.round((nextTop - canvasTop) / cellHeight);
+
+            if (deltaRows !== 0) {
+              canvasTop = nextTop;
+              canvas.style.top = `${canvasTop}px`;
+
+              if (Math.abs(deltaRows) < rows) {
+                shiftGridRows(glyphEntropyPositions, cols, deltaRows);
+                shiftGridRows(glyphEntropyRates, cols, deltaRows);
+                shiftGridRows(glyphEntropyScales, cols, deltaRows);
+                shiftGridRows(brightnessValues, cols, deltaRows);
+              }
+
+              shouldUploadEntropy = true;
+            }
           }
         }
+
+        const gridOriginX = usesDocumentAnchor ? 0 : window.scrollX;
+        const gridOriginY = usesDocumentAnchor ? canvasTop : viewportScrollY;
 
         changedGlyphCount = 0;
         lastFrameAt = time;
@@ -2240,49 +2340,61 @@ export const GlyphRaster = component$(
 
         // In shader mode the sampled brightness only drives glyph churn rates
         // (the shader computes visible brightness itself), so it can be
-        // sampled once per block of cells to keep this pass off the frame
-        // budget; the display paths still sample every cell.
-        const rateSampleStep = entropyMode === "shader" && gpuNoiseSeed !== undefined ? 3 : 1;
+        // sampled once per block of cells and only for rows near the
+        // viewport; the display paths still sample every cell.
+        const rateSampleStep = usesDocumentAnchor ? 3 : 1;
+        let sampleStartRow = 0;
+        let sampleEndRow = rows - 1;
+
+        if (usesDocumentAnchor) {
+          const firstVisibleRow = Math.max(
+            0,
+            Math.floor((viewportScrollY - canvasTop) / cellHeight) - 4,
+          );
+
+          sampleStartRow = firstVisibleRow - (firstVisibleRow % rateSampleStep);
+          sampleEndRow = Math.min(
+            rows - 1,
+            Math.ceil((viewportScrollY + viewportHeight - canvasTop) / cellHeight) + 4,
+          );
+        }
 
         if (entropyMode === "cpu" || shouldUpdateBrightness || !usesGpuGlyphSelection) {
           for (let row = 0; row < rows; row += 1) {
             for (let col = 0; col < cols; col += 1) {
               const index = row * cols + col;
-              let brightness: number;
+              const shouldSampleCell =
+                shouldUpdateBrightness && row >= sampleStartRow && row <= sampleEndRow;
 
-              if (!shouldUpdateBrightness) {
-                brightness = brightnessValues[index];
-              } else if (row % rateSampleStep !== 0 || col % rateSampleStep !== 0) {
-                brightness =
-                  brightnessValues[
-                    (row - (row % rateSampleStep)) * cols + (col - (col % rateSampleStep))
-                  ];
-              } else {
-                const viewportX = offsetX + (col + 0.5) * cellWidth;
-                const viewportY = offsetY + (row + 0.5) * cellHeight;
-                const worldX = viewportX + viewportScrollX;
-                const worldY = viewportY + viewportScrollY;
-                const sampledBrightness = adapter.getBrightness(
-                  Math.floor(worldX / cellWidth),
-                  Math.floor(worldY / cellHeight),
-                  cols,
-                  rows,
-                  sourceTime,
-                  currentFrame,
-                );
+              if (shouldSampleCell) {
+                let brightness: number;
 
-                brightness = clamp(
-                  applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY),
-                  0,
-                  1,
-                );
-              }
+                if (row % rateSampleStep !== 0 || col % rateSampleStep !== 0) {
+                  brightness =
+                    brightnessValues[
+                      (row - (row % rateSampleStep)) * cols + (col - (col % rateSampleStep))
+                    ];
+                } else {
+                  const worldX = gridOriginX + offsetX + (col + 0.5) * cellWidth;
+                  const worldY = gridOriginY + offsetY + (row + 0.5) * cellHeight;
+                  const sampledBrightness = adapter.getBrightness(
+                    Math.floor(worldX / cellWidth),
+                    Math.floor(worldY / cellHeight),
+                    cols,
+                    rows,
+                    sourceTime,
+                    currentFrame,
+                  );
 
-              if (shouldUpdateBrightness) {
+                  brightness = clamp(
+                    applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY),
+                    0,
+                    1,
+                  );
+                }
+
                 brightnessValues[index] = brightness;
-              }
 
-              if (shouldUpdateBrightness) {
                 const targetEntropyRate = entropyRateForBrightness(brightness);
 
                 glyphEntropyRates[index] = isInitialBrightnessSample
@@ -2320,33 +2432,49 @@ export const GlyphRaster = component$(
             ? quantizeTime(sourceTime, PROCEDURAL_VISUAL_SAMPLE_RATE)
             : sourceTime;
 
-        renderer.draw({
-          backgroundColor: preset.backgroundColor,
-          brightnessValues,
-          cellHeight,
-          cellWidth,
-          changedGlyphCount,
-          changedGlyphIndices,
-          colors: preset.colors,
-          cols,
-          entropySampleTime: lastEntropySampleSourceTime,
-          gpuNoiseSeed,
-          glyphCharacters: resolvedCharacters,
-          glyphEntropyPositions,
-          glyphEntropyRates,
-          glyphEntropyScales,
-          glyphIndices,
-          glyphFrameRate: frameRate,
-          offsetX,
-          offsetY,
-          rows,
-          entropyMode,
-          shouldUpdateBrightness,
-          shouldUploadEntropy,
-          sourceTime: renderSourceTime,
-          viewportScrollX,
-          viewportScrollY,
-        });
+        // A document-anchored canvas shows the same pixels regardless of
+        // scroll, so only redraw when something it renders has changed.
+        const shouldDraw =
+          !usesDocumentAnchor ||
+          shouldUpdateBrightness ||
+          shouldUploadEntropy ||
+          renderSourceTime !== lastDrawnSourceTime ||
+          canvasTop !== lastDrawnCanvasTop ||
+          glyphFieldModifierRegionsVersion !== lastDrawnModifierVersion;
+
+        if (shouldDraw) {
+          lastDrawnSourceTime = renderSourceTime;
+          lastDrawnCanvasTop = canvasTop;
+          lastDrawnModifierVersion = glyphFieldModifierRegionsVersion;
+
+          renderer.draw({
+            backgroundColor: preset.backgroundColor,
+            brightnessValues,
+            cellHeight,
+            cellWidth,
+            changedGlyphCount,
+            changedGlyphIndices,
+            colors: preset.colors,
+            cols,
+            entropySampleTime: lastEntropySampleSourceTime,
+            gpuNoiseSeed,
+            glyphCharacters: resolvedCharacters,
+            glyphEntropyPositions,
+            glyphEntropyRates,
+            glyphEntropyScales,
+            glyphIndices,
+            glyphFrameRate: frameRate,
+            offsetX,
+            offsetY,
+            rows,
+            entropyMode,
+            shouldUpdateBrightness,
+            shouldUploadEntropy,
+            sourceTime: renderSourceTime,
+            gridOriginX,
+            gridOriginY,
+          });
+        }
 
         if (adapter.frameCount) {
           framePosition = (framePosition + elapsedFrames) % adapter.frameCount;
@@ -2355,9 +2483,21 @@ export const GlyphRaster = component$(
 
       activeRaster = { canRender, render };
       activeGlyphRasters.add(activeRaster);
-      resize();
-      window.addEventListener("resize", resize);
-      removeResize = () => window.removeEventListener("resize", resize);
+      largeViewportHeight = readLargeViewportHeight();
+      applyAnchorMode(
+        gpuNoiseSeed !== undefined && renderer.supportsShaderEntropy === true
+          ? "document"
+          : "viewport",
+      );
+
+      const onWindowResize = (): void => {
+        largeViewportHeight = readLargeViewportHeight();
+        updateCanvasHeight();
+        resize();
+      };
+
+      window.addEventListener("resize", onWindowResize);
+      removeResize = () => window.removeEventListener("resize", onWindowResize);
 
       const onVisibilityChange = (): void => {
         isDocumentVisible = document.visibilityState === "visible";
