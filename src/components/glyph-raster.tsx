@@ -18,6 +18,7 @@ export type GlyphRasterSource = GlyphRasterFrameSource | GlyphRasterNoiseSource;
 
 export type GlyphRasterProps = {
   blend?: number;
+  class?: string;
   layout?: GlyphRasterLayout;
   source?: GlyphRasterSource;
 };
@@ -112,6 +113,7 @@ type GlyphRasterPreset = {
 };
 
 type GlyphFieldModifierRegion = {
+  baseBlend: number;
   blend: number;
   brightnessGrid?: Uint8Array;
   documentLeft: number;
@@ -352,6 +354,19 @@ const updateGlyphFieldModifierRegionBounds = (
   if (shouldMarkChanged) {
     markGlyphFieldModifierRegionsChanged();
   }
+};
+
+const updateGlyphFieldModifierRegionBlend = (region: GlyphFieldModifierRegion): boolean => {
+  const opacity = Number.parseFloat(getComputedStyle(region.element).opacity);
+  const nextBlend = region.baseBlend * (Number.isFinite(opacity) ? clamp(opacity, 0, 1) : 1);
+
+  if (Math.abs(region.blend - nextBlend) <= 0.001) {
+    return false;
+  }
+
+  region.blend = nextBlend;
+  markGlyphFieldModifierRegionsChanged();
+  return true;
 };
 
 const applyGlyphFieldModifierBrightness = (
@@ -1799,13 +1814,14 @@ const createGpuNoiseGlyphRenderer = ({
 };
 
 export const GlyphRaster = component$(
-  ({ blend, layout, source }: GlyphRasterProps): QwikJSX.Element => {
+  ({ blend, class: className, layout, source }: GlyphRasterProps): QwikJSX.Element => {
     const rasterId = useId();
     const resolvedSource = resolveSource(source);
     const preset = resolvePreset(resolvedSource, layout);
     const modifierBlend = clamp(blend ?? 1, 0, 1);
     const resolvedCharacters = Array.from(new Set(GLYPH_CHARS));
     const style = `--glyph-raster-opacity: ${preset.opacity}; --glyph-raster-color: ${preset.backgroundColor};`;
+    const classes = className ? `${className} ` : "";
 
     useStylesScoped$(styles);
 
@@ -1815,6 +1831,7 @@ export const GlyphRaster = component$(
       let isRasterVisible = preset.layout === "fixed";
       let activeRaster: ActiveGlyphRaster | null = null;
       let removeResize = (): void => {};
+      let removeBlendObserver = (): void => {};
       let removeVisibilityListener = (): void => {};
       let removeVisibilityObserver = (): void => {};
       const runtimePreset = resolveRuntimePreset(preset);
@@ -1825,6 +1842,7 @@ export const GlyphRaster = component$(
           activeGlyphRasters.delete(activeRaster);
         }
         removeResize();
+        removeBlendObserver();
         removeVisibilityListener();
         removeVisibilityObserver();
       });
@@ -1834,6 +1852,7 @@ export const GlyphRaster = component$(
         if (!element) return;
 
         const region: GlyphFieldModifierRegion = {
+          baseBlend: modifierBlend,
           blend: modifierBlend,
           documentLeft: 0,
           documentTop: 0,
@@ -1845,16 +1864,41 @@ export const GlyphRaster = component$(
           updateGlyphFieldModifierRegionBounds(region);
           scheduleActiveGlyphRasters();
         };
+        const onRegionBlendChanged = (): void => {
+          if (updateGlyphFieldModifierRegionBlend(region)) {
+            scheduleActiveGlyphRasters();
+          }
+        };
         const resizeObserver = new ResizeObserver(onRegionChanged);
         const onWindowChanged = (): void => onRegionChanged();
         const onNextFrame = (): void => {
           animationFrame = 0;
           onRegionChanged();
         };
+        const onRegionBlendTransitionFrame = (): void => {
+          blendAnimationFrame = 0;
+          onRegionBlendChanged();
+
+          if (
+            !isCleanedUp &&
+            element.getAnimations().some((animation) => animation.playState === "running")
+          ) {
+            blendAnimationFrame = requestAnimationFrame(onRegionBlendTransitionFrame);
+          }
+        };
+        const onRegionBlendTransitionChanged = (): void => {
+          onRegionBlendChanged();
+
+          if (blendAnimationFrame === 0) {
+            blendAnimationFrame = requestAnimationFrame(onRegionBlendTransitionFrame);
+          }
+        };
         let animationFrame = 0;
+        let blendAnimationFrame = 0;
 
         glyphFieldModifierRegions.set(rasterId, region);
         onRegionChanged();
+        onRegionBlendChanged();
         createFrameModifierBrightnessGrids(resolvedSource)
           .then(({ aspectRatio, defaultFps, frameCount, grids }) => {
             if (isCleanedUp) return;
@@ -1900,6 +1944,9 @@ export const GlyphRaster = component$(
         resizeObserver.observe(element);
         window.addEventListener("load", onWindowChanged);
         window.addEventListener("resize", onWindowChanged);
+        element.addEventListener("transitionrun", onRegionBlendTransitionChanged);
+        element.addEventListener("transitionend", onRegionBlendTransitionChanged);
+        element.addEventListener("transitioncancel", onRegionBlendTransitionChanged);
 
         removeResize = () => {
           if (animationFrame !== 0) {
@@ -1911,6 +1958,14 @@ export const GlyphRaster = component$(
           glyphFieldModifierRegions.delete(rasterId);
           markGlyphFieldModifierRegionsChanged();
           scheduleActiveGlyphRasters();
+        };
+        removeBlendObserver = () => {
+          if (blendAnimationFrame !== 0) {
+            cancelAnimationFrame(blendAnimationFrame);
+          }
+          element.removeEventListener("transitionrun", onRegionBlendTransitionChanged);
+          element.removeEventListener("transitionend", onRegionBlendTransitionChanged);
+          element.removeEventListener("transitioncancel", onRegionBlendTransitionChanged);
         };
 
         if (preset.layout === "fill") {
@@ -2247,7 +2302,7 @@ export const GlyphRaster = component$(
       return (
         <span
           id={rasterId}
-          class={`glyph-raster-region glyph-raster-region--${preset.layout} glyph-raster-region--${resolvedSource.type}`}
+          class={`${classes}glyph-raster-region glyph-raster-region--${preset.layout} glyph-raster-region--${resolvedSource.type}`}
           style={regionStyle}
           aria-hidden="true"
         />
@@ -2257,7 +2312,7 @@ export const GlyphRaster = component$(
     return (
       <canvas
         id={rasterId}
-        class={`glyph-raster glyph-raster--${preset.layout} glyph-raster--${resolvedSource.type}`}
+        class={`${classes}glyph-raster glyph-raster--${preset.layout} glyph-raster--${resolvedSource.type}`}
         style={style}
         aria-hidden="true"
       />
