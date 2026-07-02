@@ -4,6 +4,7 @@ import { component$, useId, useStylesScoped$, useVisibleTask$ } from "@builder.i
 import styles from "src/components/glyph-raster.scss?inline";
 
 type GlyphRasterLayout = "fill" | "fixed";
+type GlyphRasterFrameFit = "contain" | "cover";
 
 export type GlyphRasterFrameSource = {
   type: "frames";
@@ -19,6 +20,7 @@ export type GlyphRasterSource = GlyphRasterFrameSource | GlyphRasterNoiseSource;
 export type GlyphRasterProps = {
   blend?: number;
   class?: string;
+  frameFit?: GlyphRasterFrameFit;
   layout?: GlyphRasterLayout;
   source?: GlyphRasterSource;
 };
@@ -1834,7 +1836,13 @@ const createGpuNoiseGlyphRenderer = ({
 };
 
 export const GlyphRaster = component$(
-  ({ blend, class: className, layout, source }: GlyphRasterProps): QwikJSX.Element => {
+  ({
+    blend,
+    class: className,
+    frameFit = "contain",
+    layout,
+    source,
+  }: GlyphRasterProps): QwikJSX.Element => {
     const rasterId = useId();
     const resolvedSource = resolveSource(source);
     const preset = resolvePreset(resolvedSource, layout);
@@ -1871,6 +1879,26 @@ export const GlyphRaster = component$(
         const element = document.getElementById(rasterId);
         if (!element) return;
 
+        let frameAspectRatio = 0;
+        const applyFixedFrameFit = (): void => {
+          if (preset.layout !== "fixed" || frameAspectRatio <= 0) {
+            return;
+          }
+
+          if (frameFit === "cover") {
+            const width = Math.max(window.innerWidth, window.innerHeight * frameAspectRatio);
+
+            element.style.width = `${width}px`;
+            element.style.height = `${width / frameAspectRatio}px`;
+            element.style.transform = "translate(-50%, -50%)";
+            return;
+          }
+
+          element.style.width = `min(100vw, ${window.innerHeight * frameAspectRatio}px)`;
+          element.style.height = `min(100vh, ${window.innerWidth / frameAspectRatio}px)`;
+          element.style.transform = "translate(-50%, -50%)";
+        };
+
         const region: GlyphFieldModifierRegion = {
           baseBlend: modifierBlend,
           blend: modifierBlend,
@@ -1881,6 +1909,7 @@ export const GlyphRaster = component$(
           width: 0,
         };
         const onRegionChanged = (): void => {
+          applyFixedFrameFit();
           updateGlyphFieldModifierRegionBounds(region);
           scheduleActiveGlyphRasters();
         };
@@ -1923,6 +1952,7 @@ export const GlyphRaster = component$(
           .then(({ aspectRatio, defaultFps, frameCount, grids }) => {
             if (isCleanedUp) return;
 
+            frameAspectRatio = aspectRatio;
             element.style.setProperty("--glyph-raster-frame-aspect", String(aspectRatio));
             onRegionChanged();
 
@@ -2359,7 +2389,9 @@ export const GlyphRaster = component$(
     if (resolvedSource.type === "frames") {
       const regionStyle =
         preset.layout === "fixed"
-          ? "position: fixed; left: 50%; top: 50%; width: min(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))); height: min(100vh, calc(100vw / var(--glyph-raster-frame-aspect, 1))); transform: translate(-50%, -50%); display: block; pointer-events: none;"
+          ? frameFit === "cover"
+            ? "position: fixed; left: 50%; top: 50%; width: max(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))); height: calc(max(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))) / var(--glyph-raster-frame-aspect, 1)); transform: translate(-50%, -50%); transform-origin: center center; display: block; pointer-events: none;"
+            : "position: fixed; left: 50%; top: 50%; width: min(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))); height: min(100vh, calc(100vw / var(--glyph-raster-frame-aspect, 1))); transform: translate(-50%, -50%); transform-origin: center center; display: block; pointer-events: none;"
           : "position: absolute; inset: 0; display: block; pointer-events: none;";
 
       return (
