@@ -2,9 +2,7 @@ main {
   position: relative;
   z-index: 1;
   align-self: flex-start;
-  width: calc(100% - var(--glyph-space-x) * 4);
-  max-width: calc(var(--glyph-cell-width) * var(--main-glyph-columns));
-  margin: 0 calc(var(--glyph-space-x) * 2) var(--glyph-space-y);
+  width: 100%;
   padding: 0 calc(var(--glyph-space-x) * 2) var(--glyph-space-y);
   display: flex;
   flex-direction: column;
@@ -18,7 +16,6 @@ main {
   &.is-homepage {
     align-self: stretch;
     width: 100%;
-    max-width: none;
     min-height: 100vh;
     margin: 0;
     padding: var(--glyph-space-y) calc(var(--glyph-space-x) * 2);
