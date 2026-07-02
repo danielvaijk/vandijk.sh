@@ -1,0 +1,35 @@
+.world-map {
+  display: block;
+  width: 100%;
+}
+
+.world-map__svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.world-map__land {
+  fill: #ffffff;
+  fill-opacity: 0.12;
+}
+
+.world-map__point-dot {
+  fill: #ffffff;
+  fill-opacity: 1;
+  animation: world-map-point-blink 3.5s ease-in-out;
+}
+
+@keyframes world-map-point-blink {
+  0% {
+    fill: #ffffff;
+  }
+
+  60% {
+    fill: #0051c3;
+  }
+
+  100% {
+    fill: #ffffff;
+  }
+}
