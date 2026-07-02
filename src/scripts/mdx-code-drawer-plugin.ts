@@ -2,39 +2,21 @@ import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
-import { format } from "oxfmt";
-import { refractor } from "refractor";
-import tsx from "refractor/tsx";
-import { toHtml } from "hast-util-to-html";
 import type { Plugin } from "vite";
+
+import { wrapMarkdownCodeBlocks } from "../helpers/markup";
+import {
+  getMarkdownProseWordCount,
+  getReadTimeInMinutesFromWordCount,
+  stripMarkdownCodeBlocks,
+} from "../utilities/text";
+import { formatDateAsString } from "../utilities/time";
 
 const ARTICLE_CODE_DRAWER_IMPORT =
   'import { ArticleCodeDrawer } from "src/components/articles/article-code-drawer";';
 const ARTICLES_PUBLIC_DIRECTORY = "./public/blog";
-const CODE_BLOCK_PRINT_WIDTH = 80;
-const WORDS_PER_MINUTE = 200;
-const CODE_BLOCK_LANGUAGE_FILE_EXTENSIONS: Record<string, string> = {
-  css: "css",
-  html: "html",
-  javascript: "js",
-  js: "js",
-  json: "json",
-  json5: "json5",
-  jsonc: "jsonc",
-  jsx: "jsx",
-  markdown: "md",
-  md: "md",
-  mdx: "mdx",
-  mjs: "mjs",
-  scss: "scss",
-  ts: "ts",
-  tsx: "tsx",
-  typescript: "ts",
-  yaml: "yaml",
-  yml: "yaml",
-};
-
-refractor.register(tsx);
+const MARKDOWN_CODE_BLOCK_REGEX =
+  /(^|\n)[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|$)/u;
 
 interface ArticleFrontmatter {
   date?: string;
@@ -49,14 +31,6 @@ function slugify(text: string): string {
     .replace(/\s+/gu, "-")
     .replace(/[^\w\\-]+/gu, "")
     .replace(/\\-\\-+/gu, "-");
-}
-
-function formatDateAsString(date: Date): string {
-  return new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "long",
-    year: "numeric",
-  }).format(date);
 }
 
 function cleanGeneratedArticleCodeBlocks(directory = ARTICLES_PUBLIC_DIRECTORY): void {
@@ -87,14 +61,6 @@ function saveArticleCodeBlock(html: string, articlePath: string): string {
   writeFileSync(join(outputDirectory, fileName), html);
 
   return `/blog/${articlePath}/${fileName}`;
-}
-
-function escapeHtmlText(value: string): string {
-  return value
-    .replace(/&/gu, "&amp;")
-    .replace(/</gu, "&lt;")
-    .replace(/>/gu, "&gt;")
-    .replace(/"/gu, "&quot;");
 }
 
 function parseFrontmatter(source: string): { body: string; frontmatter: ArticleFrontmatter } {
@@ -129,27 +95,6 @@ function parseFrontmatter(source: string): { body: string; frontmatter: ArticleF
   return { body: match.groups.body, frontmatter: data };
 }
 
-function stripMarkdownCodeBlocks(markdown: string): string {
-  return markdown.replace(
-    /(^|\n)[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|$)/gu,
-    "$1",
-  );
-}
-
-function getMarkdownProseWordCount(markdown: string): number {
-  const prose = stripMarkdownCodeBlocks(markdown).trim();
-
-  if (prose.length === 0) {
-    return 0;
-  }
-
-  return prose.split(/\s+/u).length;
-}
-
-function getReadTimeInMinutes(markdown: string): number {
-  return Math.ceil(getMarkdownProseWordCount(markdown) / WORDS_PER_MINUTE);
-}
-
 function getAnchorLinks(content: string): string {
   return stripMarkdownCodeBlocks(content)
     .split("\n")
@@ -177,7 +122,7 @@ function createArticleContentsBlock({
   date: Date;
   topic: string;
 }): string {
-  const readTime = getReadTimeInMinutes(articleContent);
+  const readTime = getReadTimeInMinutesFromWordCount(getMarkdownProseWordCount(articleContent));
   const anchorLinks = getAnchorLinks(articleContent);
 
   return `<time dateTime="${date.toISOString()}" role="doc-subtitle">
@@ -235,102 +180,6 @@ function addArticleContents(source: string): string {
   return source.slice(0, source.length - body.length) + bodyWithContents;
 }
 
-function getCodeBlockLanguage(info: string): string | null {
-  const language = info.trim().split(/\s+/u)[0]?.toLowerCase();
-
-  if (typeof language !== "string" || language.length === 0) {
-    return null;
-  }
-
-  return language;
-}
-
-function getCodeDrawerSummary(info: string): string {
-  return getCodeBlockLanguage(info)?.toUpperCase() ?? "Code";
-}
-
-function getCodeBlockFileName(info: string): string | null {
-  const language = getCodeBlockLanguage(info);
-
-  if (language === null) {
-    return null;
-  }
-
-  const extension = CODE_BLOCK_LANGUAGE_FILE_EXTENSIONS[language];
-
-  if (typeof extension !== "string") {
-    return null;
-  }
-
-  return `article-code-block.${extension}`;
-}
-
-async function formatMarkdownCodeBlock(code: string, info: string): Promise<string> {
-  const fileName = getCodeBlockFileName(info);
-
-  if (fileName === null) {
-    return code;
-  }
-
-  const result = await format(fileName, `${code}\n`, {
-    printWidth: CODE_BLOCK_PRINT_WIDTH,
-  });
-
-  if (result.errors.length > 0) {
-    return code;
-  }
-
-  return result.code.replace(/\n$/u, "");
-}
-
-function renderCodeBlockHtml(code: string, info: string): string {
-  const language = getCodeBlockLanguage(info);
-  const languageClass = language === null ? "" : ` class="language-${escapeHtmlText(language)}"`;
-  let codeHtml = escapeHtmlText(code);
-
-  if (language !== null && refractor.registered(language)) {
-    codeHtml = toHtml(refractor.highlight(code, language));
-  }
-
-  return `<pre><code${languageClass}>${codeHtml}</code></pre>`;
-}
-
-async function wrapMarkdownCodeBlocks(source: string, articlePath: string): Promise<string> {
-  const codeBlockRegex =
-    /(^|\n)(?<indent>[ \t]*)(?<fence>`{3,}|~{3,})(?<info>[^\n]*)\n(?<code>[\s\S]*?)\n[ \t]*\k<fence>[ \t]*(?=\n|$)/gu;
-  let result = "";
-  let lastIndex = 0;
-
-  for (const match of source.matchAll(codeBlockRegex)) {
-    const groups = match.groups as
-      | {
-          code: string;
-          fence: string;
-          indent: string;
-          info: string;
-        }
-      | undefined;
-
-    if (typeof groups === "undefined" || typeof match.index !== "number") {
-      continue;
-    }
-
-    const prefix = match[1] ?? "";
-    const summary = getCodeDrawerSummary(groups.info);
-    const code = await formatMarkdownCodeBlock(groups.code, groups.info);
-    const codeBlockHtml = renderCodeBlockHtml(code, groups.info);
-    const codeBlockSource = saveArticleCodeBlock(codeBlockHtml, articlePath);
-
-    result += source.slice(lastIndex, match.index);
-    result += `${prefix}<ArticleCodeDrawer label={${JSON.stringify(summary)}} src={${JSON.stringify(
-      codeBlockSource,
-    )}} />`;
-    lastIndex = match.index + match[0].length;
-  }
-
-  return result + source.slice(lastIndex);
-}
-
 function addArticleCodeDrawerImport(source: string): string {
   if (source.includes(ARTICLE_CODE_DRAWER_IMPORT)) {
     return source;
@@ -367,14 +216,14 @@ function articleCodeDrawerMdxPlugin(): Plugin {
 
       const markdownWithArticleContents = addArticleContents(source);
 
-      if (!markdownWithArticleContents.includes("```")) {
+      if (!MARKDOWN_CODE_BLOCK_REGEX.test(markdownWithArticleContents)) {
         return markdownWithArticleContents;
       }
 
-      const markdownWithCodeDrawers = await wrapMarkdownCodeBlocks(
-        markdownWithArticleContents,
-        articlePath,
-      );
+      const markdownWithCodeDrawers = await wrapMarkdownCodeBlocks(markdownWithArticleContents, {
+        saveCodeBlockContent: async ({ html }): Promise<string> =>
+          saveArticleCodeBlock(html, articlePath),
+      });
 
       return addArticleCodeDrawerImport(markdownWithCodeDrawers);
     },

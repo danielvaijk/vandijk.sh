@@ -10,8 +10,8 @@ import {
   type ImageSourceSet,
   createSourceSetFromImageVariants,
   serializeSourceSet,
-} from "src/helpers/image";
-import { formatDateAsString } from "src/utilities/time";
+} from "./image";
+import { formatDateAsString } from "../utilities/time";
 
 interface ImageCaption {
   altText: string;
