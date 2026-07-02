@@ -2140,12 +2140,13 @@ export const GlyphRaster = component$(
           MIN_FRAME_RATE,
           MAX_FRAME_RATE,
         );
-        const renderFrameRate =
-          resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined
-            ? MAX_FRAME_RATE
-            : frameRate;
+        // The GPU noise raster draws every animation frame so the
+        // document-anchored field never trails the compositor-scrolled page
+        // on high-refresh displays; noise time is quantized separately.
+        const rendersAtDisplayRate =
+          resolvedSource.type === "procedural-noise" && gpuNoiseSeed !== undefined;
 
-        if (time - lastFrameAt < 1000 / renderFrameRate) {
+        if (!rendersAtDisplayRate && time - lastFrameAt < 1000 / frameRate) {
           return;
         }
 
@@ -2207,27 +2208,45 @@ export const GlyphRaster = component$(
           lastBrightnessSampleAt = time;
         }
 
+        // In shader mode the sampled brightness only drives glyph churn rates
+        // (the shader computes visible brightness itself), so it can be
+        // sampled once per block of cells to keep this pass off the frame
+        // budget; the display paths still sample every cell.
+        const rateSampleStep = entropyMode === "shader" && gpuNoiseSeed !== undefined ? 3 : 1;
+
         if (entropyMode === "cpu" || shouldUpdateBrightness || !usesGpuGlyphSelection) {
           for (let row = 0; row < rows; row += 1) {
             for (let col = 0; col < cols; col += 1) {
               const index = row * cols + col;
-              const viewportX = offsetX + (col + 0.5) * cellWidth;
-              const viewportY = offsetY + (row + 0.5) * cellHeight;
-              const worldX = viewportX + viewportScrollX;
-              const worldY = viewportY + viewportScrollY;
-              const sampledBrightness = shouldUpdateBrightness
-                ? adapter.getBrightness(
-                    Math.floor(worldX / cellWidth),
-                    Math.floor(worldY / cellHeight),
-                    cols,
-                    rows,
-                    sourceTime,
-                    currentFrame,
-                  )
-                : brightnessValues[index];
-              const brightness = shouldUpdateBrightness
-                ? clamp(applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY), 0, 1)
-                : sampledBrightness;
+              let brightness: number;
+
+              if (!shouldUpdateBrightness) {
+                brightness = brightnessValues[index];
+              } else if (row % rateSampleStep !== 0 || col % rateSampleStep !== 0) {
+                brightness =
+                  brightnessValues[
+                    (row - (row % rateSampleStep)) * cols + (col - (col % rateSampleStep))
+                  ];
+              } else {
+                const viewportX = offsetX + (col + 0.5) * cellWidth;
+                const viewportY = offsetY + (row + 0.5) * cellHeight;
+                const worldX = viewportX + viewportScrollX;
+                const worldY = viewportY + viewportScrollY;
+                const sampledBrightness = adapter.getBrightness(
+                  Math.floor(worldX / cellWidth),
+                  Math.floor(worldY / cellHeight),
+                  cols,
+                  rows,
+                  sourceTime,
+                  currentFrame,
+                );
+
+                brightness = clamp(
+                  applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY),
+                  0,
+                  1,
+                );
+              }
 
               if (shouldUpdateBrightness) {
                 brightnessValues[index] = brightness;
