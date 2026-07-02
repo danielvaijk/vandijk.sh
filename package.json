@@ -8,7 +8,7 @@
     "build.articles": "bun run build.articles.metadata",
     "build.articles.metadata": "bun src/scripts/generate-articles-metadata.ts",
     "build.client": "vite build",
-    "build.glyphs": "bun src/scripts/generate-glyph-frames.ts src/media/eye.mp4",
+    "build.glyphs": "bun src/scripts/generate-glyph-frames.ts src/media/eye.gif",
     "build.prune": "bun src/scripts/prune-generated-frame-sources.ts",
     "build.preview": "vite build --ssr src/entry.preview.tsx",
     "build.server": "vite build -c adapters/vite.config.ts",

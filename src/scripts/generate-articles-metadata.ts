@@ -184,10 +184,11 @@ async function generateArticleGifFrames(path: string): Promise<void> {
 
     const source = join(articleAssetsDirectory, entity.name);
     const { name } = parse(entity.name);
+    const output = join(articlePublicAssetsDirectory, `${name}.frames`);
 
     await generateGlyphFrameSource({
       fps: ARTICLE_GIF_GLYPH_FRAME_RATE,
-      output: join(articlePublicAssetsDirectory, `${name}.frames`),
+      output,
       rows: ARTICLE_GIF_GLYPH_FRAME_ROWS,
       source,
     });

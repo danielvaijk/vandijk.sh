@@ -1,6 +1,5 @@
-import { execFileSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, extname } from "node:path";
+import { dirname } from "node:path";
 
 import sharp, { type Sharp } from "sharp";
 
@@ -9,13 +8,6 @@ type GlyphFrameSource = {
   output: string;
   rows: number;
   source: string;
-};
-
-type VideoMetadata = {
-  streams?: Array<{
-    height?: number;
-    width?: number;
-  }>;
 };
 
 type FrameDimensions = {
@@ -32,7 +24,6 @@ const DETAIL_SHARPEN_AMOUNT = 0.72;
 const MIN_CONTRAST_RANGE = 0.003;
 const SHADOW_PERCENTILE = 0.02;
 const HIGHLIGHT_PERCENTILE = 0.98;
-const VIDEO_EXTENSIONS = new Set([".avi", ".gif", ".m4v", ".mkv", ".mov", ".mp4", ".webm"]);
 const DITHER_MATRIX = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
 
 function getFrameDimensions(width: number, height: number, rows: number): FrameDimensions {
@@ -226,73 +217,84 @@ function processRawFrames(
   return processedFrames;
 }
 
-function getVideoDimensions(source: string, rows: number): FrameDimensions {
-  const output = execFileSync(
-    "ffprobe",
-    [
-      "-v",
-      "error",
-      "-select_streams",
-      "v:0",
-      "-show_entries",
-      "stream=width,height",
-      "-of",
-      "json",
-      source,
-    ],
-    { encoding: "utf-8" },
-  );
-  const metadata = JSON.parse(output) as VideoMetadata;
-  const stream = metadata.streams?.[0];
-
-  if (!stream?.width || !stream.height) {
-    throw new Error(`Could not read video dimensions for ${source}.`);
-  }
-
-  return getFrameDimensions(stream.width, stream.height, rows);
-}
-
 async function getImageDimensions(source: string, rows: number): Promise<FrameDimensions> {
-  const metadata = await sharp(source).metadata();
+  const metadata = await sharp(source, { animated: true }).metadata();
+  const height = metadata.pageHeight ?? metadata.height;
 
-  if (!metadata.width || !metadata.height) {
+  if (!metadata.width || !height) {
     throw new Error(`Could not read image dimensions for ${source}.`);
   }
 
-  return getFrameDimensions(metadata.width, metadata.height, rows);
+  return getFrameDimensions(metadata.width, height, rows);
 }
 
-function readVideoFrames(source: GlyphFrameSource, dimensions: FrameDimensions): Buffer {
-  const rawFrames = execFileSync(
-    "ffmpeg",
-    [
-      "-v",
-      "error",
-      "-i",
-      source.source,
-      "-an",
-      "-sn",
-      "-dn",
-      "-vf",
-      `fps=${source.fps},scale=${dimensions.cols}:${dimensions.rows}:flags=lanczos,format=rgb24`,
-      "-f",
-      "rawvideo",
-      "-",
-    ],
-    { maxBuffer: 1024 * 1024 * 64 },
-  );
+function sampleProcessedFrames({
+  delays,
+  dimensions,
+  fps,
+  processedFrames,
+}: {
+  delays?: number[];
+  dimensions: FrameDimensions;
+  fps: number;
+  processedFrames: Buffer;
+}): Buffer {
+  const frameSize = dimensions.cols * dimensions.rows;
+  const sourceFrameCount = processedFrames.length / frameSize;
 
-  return processRawFrames(rawFrames, dimensions, 3);
+  if (sourceFrameCount <= 1 || delays === undefined || delays.length !== sourceFrameCount) {
+    return processedFrames;
+  }
+
+  const totalDuration = delays.reduce((total, delay): number => total + delay, 0);
+  const outputFrameCount = Math.max(1, Math.round((totalDuration / 1000) * fps));
+
+  if (outputFrameCount === sourceFrameCount) {
+    return processedFrames;
+  }
+
+  const sampledFrames = Buffer.alloc(outputFrameCount * frameSize);
+  const frameDuration = 1000 / fps;
+  let sourceFrameIndex = 0;
+  let sourceFrameEnd = delays[0];
+
+  for (let outputFrameIndex = 0; outputFrameIndex < outputFrameCount; outputFrameIndex += 1) {
+    const outputTime = outputFrameIndex * frameDuration;
+
+    while (sourceFrameIndex < sourceFrameCount - 1 && outputTime >= sourceFrameEnd) {
+      sourceFrameIndex += 1;
+      sourceFrameEnd += delays[sourceFrameIndex];
+    }
+
+    processedFrames.copy(
+      sampledFrames,
+      outputFrameIndex * frameSize,
+      sourceFrameIndex * frameSize,
+      (sourceFrameIndex + 1) * frameSize,
+    );
+  }
+
+  return sampledFrames;
 }
 
-async function readImageFrame(image: Sharp, dimensions: FrameDimensions): Promise<Buffer> {
+async function readImageFrame(
+  image: Sharp,
+  dimensions: FrameDimensions,
+  fps: number,
+): Promise<Buffer> {
+  const metadata = await image.metadata();
   const { data } = await image
     .resize(dimensions.cols, dimensions.rows, { fit: "fill", kernel: sharp.kernel.lanczos3 })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
 
-  return processRawFrames(data, dimensions, 4);
+  return sampleProcessedFrames({
+    delays: metadata.delay,
+    dimensions,
+    fps,
+    processedFrames: processRawFrames(data, dimensions, 4),
+  });
 }
 
 function createFramesFile(fps: number, dimensions: FrameDimensions, rawFrames: Buffer): Buffer {
@@ -332,19 +334,18 @@ async function createImageGlyphFrames({
   }
 
   const dimensions = getFrameDimensions(metadata.width, metadata.height, rows);
-  const rawFrames = await readImageFrame(image.clone(), dimensions);
+  const rawFrames = await readImageFrame(image.clone(), dimensions, fps);
 
   return createFramesFile(fps, dimensions, rawFrames);
 }
 
 async function generateGlyphFrameSource(source: GlyphFrameSource): Promise<void> {
-  const isVideo = VIDEO_EXTENSIONS.has(extname(source.source).toLowerCase());
-  const dimensions = isVideo
-    ? getVideoDimensions(source.source, source.rows)
-    : await getImageDimensions(source.source, source.rows);
-  const rawFrames = isVideo
-    ? readVideoFrames(source, dimensions)
-    : await readImageFrame(sharp(source.source), dimensions);
+  const dimensions = await getImageDimensions(source.source, source.rows);
+  const rawFrames = await readImageFrame(
+    sharp(source.source, { animated: true }),
+    dimensions,
+    source.fps,
+  );
   const framesFile = createFramesFile(source.fps, dimensions, rawFrames);
 
   await mkdir(dirname(source.output), { recursive: true });

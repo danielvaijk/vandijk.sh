@@ -3,7 +3,7 @@ import { join, parse } from "node:path";
 
 const DEFAULT_FRAME_RATE = 18;
 const DEFAULT_ROWS = 40;
-const DEFAULT_SOURCES = ["src/media/eye.mp4"];
+const DEFAULT_SOURCES = ["src/media/eye.gif"];
 
 function createGlyphFrameSource(source: string): GlyphFrameSource {
   const { name } = parse(source);
