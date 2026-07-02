@@ -4,7 +4,6 @@ main {
   align-self: flex-start;
   width: calc(100% - var(--glyph-space-x) * 4);
   max-width: calc(var(--glyph-cell-width) * var(--main-glyph-columns));
-  min-height: calc(100vh - var(--glyph-space-y) * 2);
   margin: 0 calc(var(--glyph-space-x) * 2) var(--glyph-space-y);
   padding: 0 calc(var(--glyph-space-x) * 2) var(--glyph-space-y);
   display: flex;
@@ -13,7 +12,7 @@ main {
   justify-content: flex-start;
 
   &:not(.is-homepage) {
-    flex: 1;
+    flex: 1 0 auto;
   }
 
   &.is-homepage {
