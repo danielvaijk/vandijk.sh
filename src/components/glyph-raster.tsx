@@ -482,15 +482,16 @@ const hasActiveGlyphRaster = (): boolean => {
 };
 
 const renderActiveGlyphRasters = (time: number): void => {
-  activeGlyphRasterFrame = 0;
-
+  // Keep the fired handle non-zero while rasters render so re-entrant
+  // scheduleActiveGlyphRasters() calls (e.g. resize() from within render)
+  // cannot arm a second, parallel rAF chain.
   for (const raster of activeGlyphRasters) {
     raster.render(time);
   }
 
-  if (hasActiveGlyphRaster()) {
-    activeGlyphRasterFrame = requestAnimationFrame(renderActiveGlyphRasters);
-  }
+  activeGlyphRasterFrame = hasActiveGlyphRaster()
+    ? requestAnimationFrame(renderActiveGlyphRasters)
+    : 0;
 };
 
 const scheduleActiveGlyphRasters = (): void => {
