@@ -5,6 +5,7 @@ import styles from "src/components/glyph-raster.scss?inline";
 
 type GlyphRasterLayout = "fill" | "fixed";
 type GlyphRasterFrameFit = "contain" | "cover";
+type GlyphRasterAnchor = "auto" | "document" | "viewport";
 
 export type GlyphRasterFrameSource = {
   type: "frames";
@@ -21,6 +22,7 @@ export type GlyphRasterProps = {
   blend?: number;
   class?: string;
   frameFit?: GlyphRasterFrameFit;
+  anchor?: GlyphRasterAnchor;
   layout?: GlyphRasterLayout;
   opacity?: number;
   source?: GlyphRasterSource;
@@ -1875,6 +1877,7 @@ const createGpuNoiseGlyphRenderer = ({
 
 export const GlyphRaster = component$(
   ({
+    anchor = "auto",
     blend,
     class: className,
     frameFit = "contain",
@@ -1920,23 +1923,64 @@ export const GlyphRaster = component$(
         if (!element) return;
 
         let frameAspectRatio = 0;
-        const applyFixedFrameFit = (): void => {
-          if (preset.layout !== "fixed" || frameAspectRatio <= 0) {
+        const readFrameFitBounds = ():
+          | {
+              height: number;
+              left: number;
+              top: number;
+              width: number;
+            }
+          | undefined => {
+          if (preset.layout === "fixed") {
+            const viewport = window.visualViewport;
+
+            return {
+              height: viewport?.height ?? window.innerHeight,
+              left: viewport?.offsetLeft ?? 0,
+              top: viewport?.offsetTop ?? 0,
+              width: viewport?.width ?? window.innerWidth,
+            };
+          }
+
+          const parentBounds = element.parentElement?.getBoundingClientRect();
+          if (!parentBounds) return undefined;
+
+          return {
+            height: parentBounds.height,
+            left: 0,
+            top: 0,
+            width: parentBounds.width,
+          };
+        };
+
+        const applyFrameFit = (): void => {
+          if (frameAspectRatio <= 0 || (preset.layout === "fill" && frameFit !== "cover")) {
             return;
           }
 
-          if (frameFit === "cover") {
-            const width = Math.max(window.innerWidth, window.innerHeight * frameAspectRatio);
+          const bounds = readFrameFitBounds();
 
-            element.style.width = `${width}px`;
-            element.style.height = `${width / frameAspectRatio}px`;
-            element.style.transform = "translate(-50%, -50%)";
+          if (!bounds || bounds.height <= 0 || bounds.width <= 0) {
             return;
           }
 
-          element.style.width = `min(100vw, ${window.innerHeight * frameAspectRatio}px)`;
-          element.style.height = `min(100vh, ${window.innerWidth / frameAspectRatio}px)`;
+          const fitWidth =
+            frameFit === "cover"
+              ? Math.max(bounds.width, bounds.height * frameAspectRatio)
+              : Math.min(bounds.width, bounds.height * frameAspectRatio);
+          const fitHeight = fitWidth / frameAspectRatio;
+
+          element.style.width = `${fitWidth}px`;
+          element.style.height = `${fitHeight}px`;
+          element.style.left = `${bounds.left + bounds.width / 2}px`;
+          element.style.top = `${bounds.top + bounds.height / 2}px`;
           element.style.transform = "translate(-50%, -50%)";
+
+          if (preset.layout === "fill") {
+            element.style.right = "auto";
+            element.style.bottom = "auto";
+            return;
+          }
         };
 
         const region: GlyphFieldModifierRegion = {
@@ -1949,7 +1993,7 @@ export const GlyphRaster = component$(
           width: 0,
         };
         const onRegionChanged = (): void => {
-          applyFixedFrameFit();
+          applyFrameFit();
           updateGlyphFieldModifierRegionBounds(region);
           scheduleActiveGlyphRasters();
         };
@@ -2034,6 +2078,8 @@ export const GlyphRaster = component$(
         resizeObserver.observe(element);
         window.addEventListener("load", onWindowChanged);
         window.addEventListener("resize", onWindowChanged);
+        window.visualViewport?.addEventListener("resize", onWindowChanged);
+        window.visualViewport?.addEventListener("scroll", onWindowChanged);
         element.addEventListener("transitionrun", onRegionBlendTransitionChanged);
         element.addEventListener("transitionend", onRegionBlendTransitionChanged);
         element.addEventListener("transitioncancel", onRegionBlendTransitionChanged);
@@ -2045,6 +2091,8 @@ export const GlyphRaster = component$(
           resizeObserver.disconnect();
           window.removeEventListener("load", onWindowChanged);
           window.removeEventListener("resize", onWindowChanged);
+          window.visualViewport?.removeEventListener("resize", onWindowChanged);
+          window.visualViewport?.removeEventListener("scroll", onWindowChanged);
           glyphFieldModifierRegions.delete(rasterId);
           markGlyphFieldModifierRegionsChanged();
           scheduleActiveGlyphRasters();
@@ -2283,7 +2331,9 @@ export const GlyphRaster = component$(
           time - lastBrightnessSampleAt >= 1000 / PROCEDURAL_ENTROPY_SAMPLE_RATE;
         const shouldUpdateBrightness = shouldSampleBrightness;
         const isInitialBrightnessSample = lastBrightnessSampleAt === 0;
-        const usesDocumentAnchor = entropyMode === "shader" && gpuNoiseSeed !== undefined;
+        const usesDocumentAnchor =
+          anchor !== "viewport" &&
+          (anchor === "document" || (entropyMode === "shader" && gpuNoiseSeed !== undefined));
 
         applyAnchorMode(usesDocumentAnchor ? "document" : "viewport");
 
