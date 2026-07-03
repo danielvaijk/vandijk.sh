@@ -11,7 +11,7 @@ const REVEAL_DURATION_MS = 720;
 const REVEAL_STAGGER_MS = 260;
 const REVEAL_FRAME_RATE = 1000 / 24;
 const REVEAL_CONTAINER_SELECTOR = [
-  "#homepage-subtitle",
+  ".centered-title-subtitle",
   "header > #header-name",
   "header nav li",
 ].join(",");
