@@ -739,34 +739,6 @@ const parseColor = (color: string): [number, number, number, number] => {
   return parsedColor;
 };
 
-const hasVisibleRasterPixels = (
-  gl: WebGL2RenderingContext,
-  width: number,
-  height: number,
-  backgroundColor: string,
-): boolean => {
-  if (width <= 0 || height <= 0) return true;
-
-  const pixels = new Uint8Array(width * height * 4);
-  const [backgroundRed, backgroundGreen, backgroundBlue] = parseColor(backgroundColor);
-  const red = Math.round(backgroundRed * 255);
-  const green = Math.round(backgroundGreen * 255);
-  const blue = Math.round(backgroundBlue * 255);
-
-  gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-
-  for (let index = 0; index < pixels.length; index += 4) {
-    const distance =
-      Math.abs(pixels[index] - red) +
-      Math.abs(pixels[index + 1] - green) +
-      Math.abs(pixels[index + 2] - blue);
-
-    if (distance > 24) return true;
-  }
-
-  return false;
-};
-
 const compileShader = (
   gl: WebGL2RenderingContext,
   source: string,
@@ -1800,82 +1772,6 @@ const createWebGlGlyphRenderer = ({
   };
 };
 
-const createGpuNoiseGlyphRenderer = ({
-  canvas,
-  cellHeight,
-  cellWidth,
-  characters,
-  fontSize,
-  gpuNoiseSeed,
-}: {
-  canvas: HTMLCanvasElement;
-  cellHeight: number;
-  cellWidth: number;
-  characters: string[];
-  fontSize: number;
-  gpuNoiseSeed: number;
-}): GlyphRenderer | null => {
-  const gpuRenderer = createWebGlGlyphRenderer({
-    canvas,
-    cellHeight,
-    cellWidth,
-    characters,
-    fontSize,
-    gpuNoiseSeed,
-  });
-  if (!gpuRenderer) return null;
-
-  const fallbackRenderer = createWebGlGlyphRenderer({
-    canvas,
-    cellHeight,
-    cellWidth,
-    characters,
-    fontSize,
-  });
-  const gl = canvas.getContext("webgl2");
-  let didCheckGpuNoise = false;
-  let useFallback = false;
-
-  if (!fallbackRenderer || !gl) return gpuRenderer;
-
-  return {
-    draw: (state: GlyphRenderState): void => {
-      if (useFallback) {
-        fallbackRenderer.draw({ ...state, gpuNoiseSeed: undefined });
-        return;
-      }
-
-      gpuRenderer.draw(state);
-
-      if (!didCheckGpuNoise) {
-        didCheckGpuNoise = true;
-
-        if (
-          !hasVisibleRasterPixels(
-            gl,
-            Math.min(canvas.width, 512),
-            Math.min(canvas.height, 512),
-            state.backgroundColor,
-          )
-        ) {
-          useFallback = true;
-          fallbackRenderer.draw({ ...state, gpuNoiseSeed: undefined });
-        }
-      }
-    },
-    resize: (size: GlyphRenderSize): void => {
-      gpuRenderer.resize(size);
-      fallbackRenderer.resize(size);
-      didCheckGpuNoise = false;
-      useFallback = false;
-    },
-    get supportsShaderEntropy() {
-      return !useFallback && gpuRenderer.supportsShaderEntropy === true;
-    },
-    usesGpuGlyphSelection: true,
-  };
-};
-
 export const GlyphRaster = component$(
   ({
     anchor = "auto",
@@ -2140,16 +2036,14 @@ export const GlyphRaster = component$(
       const adapter = createNoiseAdapter();
       const gpuNoiseSeed = adapter.gpuNoiseSeed;
       const renderer =
-        (gpuNoiseSeed === undefined
-          ? null
-          : createGpuNoiseGlyphRenderer({
-              canvas,
-              cellHeight: runtimePreset.cellHeight,
-              cellWidth: runtimePreset.cellWidth,
-              characters: resolvedCharacters,
-              fontSize: runtimePreset.fontSize,
-              gpuNoiseSeed,
-            })) ??
+        createWebGlGlyphRenderer({
+          canvas,
+          cellHeight: runtimePreset.cellHeight,
+          cellWidth: runtimePreset.cellWidth,
+          characters: resolvedCharacters,
+          fontSize: runtimePreset.fontSize,
+          gpuNoiseSeed,
+        }) ??
         createWebGlGlyphRenderer({
           canvas,
           cellHeight: runtimePreset.cellHeight,
