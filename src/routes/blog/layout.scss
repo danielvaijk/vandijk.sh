@@ -235,11 +235,18 @@ article {
 
   *:not(pre) {
     > code {
-      padding: calc(var(--glyph-space-y) * 0.25) calc(var(--glyph-space-x) * 0.5);
+      --inline-code-padding-y: 1px;
+
+      padding: var(--inline-code-padding-y) calc(var(--glyph-space-x) * 0.5);
       color: var(--inline-code-text-color);
       font-weight: 400;
+      line-height: 1;
+      vertical-align: baseline;
+      text-align: start;
+      box-decoration-break: clone;
       border: 1px solid var(--inline-code-border-color);
       background-color: var(--inline-code-background-color);
+      -webkit-box-decoration-break: clone;
     }
   }
 
