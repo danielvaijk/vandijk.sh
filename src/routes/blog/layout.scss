@@ -3,8 +3,8 @@
 article {
   width: 100%;
   max-width: calc(var(--glyph-cell-width) * var(--article-glyph-columns));
-  font-size: 1.125rem;
-  line-height: 1.45;
+  @include mixins.responsive(font-size, 1rem, 1.125rem);
+  @include mixins.responsive(line-height, 1.32, 1.45);
   padding: 0 0 var(--glyph-space-y);
 
   .article-cover-glyph-raster {
@@ -94,18 +94,8 @@ article {
     }
   }
 
-  > h1 {
-    @include mixins.responsive(font-size, 1.8rem, 2.5rem);
-  }
-
   h2 {
     margin: calc(var(--glyph-space-y) * 5) auto 0 auto;
-
-    + p:first-letter {
-      font-size: 160%;
-      line-height: 1;
-      margin-right: calc(var(--glyph-space-x) * 0.25);
-    }
 
     &#contents {
       margin-top: calc(var(--glyph-space-y) * 5);
@@ -117,14 +107,18 @@ article {
         font-weight: 400;
         font-style: italic;
 
-        &:first-letter {
-          font-size: unset;
-          line-height: unset;
-          margin-right: unset;
-        }
-
         + ul {
           margin: calc(var(--glyph-space-y) * 2) auto calc(var(--glyph-space-y) * 5) auto;
+
+          li + li {
+            margin-top: 0;
+          }
+
+          li > ul,
+          li > ol {
+            margin-block-start: 0;
+            margin-block-end: 0;
+          }
 
           li {
             text-align: start;
@@ -168,12 +162,12 @@ article {
   p {
     @include mixins.responsive(
       margin-block-start,
-      calc(var(--glyph-space-y) * 2),
+      calc(var(--glyph-space-y) * 1.75),
       var(--glyph-space-y)
     );
     @include mixins.responsive(
       margin-block-end,
-      calc(var(--glyph-space-y) * 2),
+      calc(var(--glyph-space-y) * 1.75),
       var(--glyph-space-y)
     );
     @include mixins.justify-text;
@@ -249,9 +243,35 @@ article {
     }
   }
 
-  ul {
+  ul,
+  ol {
+    @include mixins.responsive(
+      margin-block-start,
+      calc(var(--glyph-space-y) * 1.75),
+      var(--glyph-space-y)
+    );
+    @include mixins.responsive(
+      margin-block-end,
+      calc(var(--glyph-space-y) * 1.75),
+      var(--glyph-space-y)
+    );
+
+    li + li {
+      @include mixins.responsive(margin-top, calc(var(--glyph-space-y) * 0.75), 0);
+    }
+
     li {
       @include mixins.justify-text;
     }
+  }
+
+  li > ul,
+  li > ol {
+    @include mixins.responsive(
+      margin-block-start,
+      calc(var(--glyph-space-y) * 0.75),
+      var(--glyph-space-y)
+    );
+    margin-block-end: 0;
   }
 }

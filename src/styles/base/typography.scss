@@ -17,8 +17,17 @@ a,
   }
 }
 
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  text-wrap: pretty;
+}
+
 h1 {
-  @include mixins.responsive(font-size, 2.2rem, 2.5rem);
+  @include mixins.responsive(font-size, 1.8rem, 2.5rem);
 
   & {
     display: block;

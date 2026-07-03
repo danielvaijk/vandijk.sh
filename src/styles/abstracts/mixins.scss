@@ -29,10 +29,13 @@
 @mixin justify-text {
   text-align: justify;
   word-wrap: break-word;
-  overflow-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-all;
   hyphens: auto;
 
   @media print {
+    overflow-wrap: break-word;
+    word-break: normal;
     hyphens: unset;
   }
 }
