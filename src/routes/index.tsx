@@ -34,7 +34,7 @@ export default component$((): QwikJSX.Element => {
 
   return (
     <section class="homepage-splash-stage">
-      <GlyphRaster blend={0.4} frameFit="cover" source={{ type: "frames", url: "/eye.frames" }} />
+      <GlyphRaster blend={0.6} frameFit="cover" source={{ type: "frames", url: "/eye.frames" }} />
       <CenteredTitle
         subtitle={continuePrompt.value}
         subtitleId="homepage-subtitle"
