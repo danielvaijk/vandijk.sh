@@ -22,6 +22,7 @@ export type GlyphRasterProps = {
   class?: string;
   frameFit?: GlyphRasterFrameFit;
   layout?: GlyphRasterLayout;
+  opacity?: number;
   source?: GlyphRasterSource;
 };
 
@@ -98,6 +99,7 @@ type GlyphRenderState = {
   sourceTime: number;
   gridOriginX: number;
   gridOriginY: number;
+  visualRange: number;
 };
 
 type ActiveGlyphRaster = {
@@ -112,7 +114,6 @@ type GlyphRasterPreset = {
   colors: string[];
   fontSize: number;
   layout: GlyphRasterLayout;
-  opacity: number;
 };
 
 type GlyphFieldModifierRegion = {
@@ -135,6 +136,7 @@ const GLYPH_HORIZONTAL_SCALE = 1.09;
 const NOISE_CELL_WIDTH = 8;
 const NOISE_CELL_HEIGHT = 14;
 const NOISE_FONT_SIZE = 13;
+const NOISE_VISUAL_WHITE_POINT = 0.63;
 const DEFAULT_FRAME_RATE = 18;
 const MIN_FRAME_RATE = 1;
 const MAX_FRAME_RATE = 60;
@@ -544,6 +546,9 @@ const solarSurfaceBrightness = (col: number, row: number, time: number, seed: nu
   return clamp(0.12 + (depth + (convection + 1) * 0.07) * pulse, 0, 1);
 };
 
+const noiseVisualBrightness = (brightness: number, visualRange: number): number =>
+  clamp((brightness / NOISE_VISUAL_WHITE_POINT) * visualRange, 0, 1);
+
 const resolveSource = (source: GlyphRasterSource | undefined): GlyphRasterSource => {
   if (source) return source;
 
@@ -560,7 +565,6 @@ const resolvePreset = (
   colors: source.type === "procedural-noise" ? NOISE_COLORS : GLYPH_COLORS,
   fontSize: NOISE_FONT_SIZE,
   layout: layout ?? "fixed",
-  opacity: source.type === "frames" ? 0.22 : 1,
 });
 
 const createNoiseAdapter = (): SourceAdapter => {
@@ -1070,6 +1074,10 @@ float glyphSolarBrightness(vec2 cell, float time, float seed) {
 
   return clamp(0.12 + (depth + (convection + 1.0) * 0.07) * pulse, 0.0, 1.0);
 }
+
+float glyphNoiseVisualBrightness(float brightness) {
+  return clamp((brightness / ${NOISE_VISUAL_WHITE_POINT.toFixed(2)}) * u_visual_range, 0.0, 1.0);
+}
 `;
 
 const createWebGlGlyphRenderer = ({
@@ -1158,6 +1166,7 @@ const createWebGlGlyphRenderer = ({
     uniform float u_source_time;
     uniform float u_entropy_sample_time;
     uniform float u_glyph_frame_rate;
+    uniform float u_visual_range;
     uniform sampler2D u_field_modifier_brightness;
     uniform int u_field_modifier_count;
     uniform vec2 u_atlas_grid;
@@ -1238,13 +1247,11 @@ const createWebGlGlyphRenderer = ({
       vec2 world = u_grid_origin + a_position + vec2(0.5) * u_cell_size;
       vec2 world_cell = floor(world / u_cell_size);
       vec2 field_point = world / u_cell_size;
-      float color_brightness = clamp(
-        glyphApplyFieldModifiers(
-          glyphSolarBrightness(field_point, u_source_time, u_noise_seed),
-          world
+      float color_brightness = glyphApplyFieldModifiers(
+        glyphNoiseVisualBrightness(
+          glyphSolarBrightness(field_point, u_source_time, u_noise_seed)
         ),
-        0.0,
-        1.0
+        world
       );
       float entropy_position =
         a_entropy_position +
@@ -1353,6 +1360,9 @@ const createWebGlGlyphRenderer = ({
   const entropySeedLocation = gl.getUniformLocation(program, "u_entropy_seed");
   const glyphCountLocation = gl.getUniformLocation(program, "u_glyph_count");
   const noiseSeedLocation = usesGpuNoise ? gl.getUniformLocation(program, "u_noise_seed") : null;
+  const visualRangeLocation = usesGpuNoise
+    ? gl.getUniformLocation(program, "u_visual_range")
+    : null;
   const sourceTimeLocation = gl.getUniformLocation(program, "u_source_time");
   const entropySampleTimeLocation = usesGpuNoise
     ? gl.getUniformLocation(program, "u_entropy_sample_time")
@@ -1391,7 +1401,8 @@ const createWebGlGlyphRenderer = ({
         !fieldModifierCountLocation ||
         !fieldModifierBlendsLocation ||
         !fieldModifierRectsLocation ||
-        !gridOriginLocation)) ||
+        !gridOriginLocation ||
+        !visualRangeLocation)) ||
     !paletteLocation ||
     !colorCountLocation ||
     !entropySeedLocation ||
@@ -1668,6 +1679,7 @@ const createWebGlGlyphRenderer = ({
       sourceTime,
       gridOriginX,
       gridOriginY,
+      visualRange,
     }: GlyphRenderState): void => {
       const cellCount = cols * rows;
       const didResize = positions.length !== cellCount * 2;
@@ -1718,12 +1730,14 @@ const createWebGlGlyphRenderer = ({
         noiseSeedLocation &&
         sourceTimeLocation &&
         entropySampleTimeLocation &&
-        glyphFrameRateLocation
+        glyphFrameRateLocation &&
+        visualRangeLocation
       ) {
         gl.uniform1f(noiseSeedLocation, stateGpuNoiseSeed ?? 0);
         gl.uniform1f(sourceTimeLocation, sourceTime);
         gl.uniform1f(entropySampleTimeLocation, entropySampleTime);
         gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
+        gl.uniform1f(visualRangeLocation, visualRange);
         gl.uniform2f(gridOriginLocation, gridOriginX, gridOriginY);
         uploadFieldModifiers();
       } else if (
@@ -1865,14 +1879,16 @@ export const GlyphRaster = component$(
     class: className,
     frameFit = "contain",
     layout,
+    opacity,
     source,
   }: GlyphRasterProps): QwikJSX.Element => {
     const rasterId = useId();
     const resolvedSource = resolveSource(source);
     const preset = resolvePreset(resolvedSource, layout);
     const modifierBlend = clamp(blend ?? 1, 0, 1);
+    const visualRange = resolvedSource.type === "procedural-noise" ? clamp(opacity ?? 1, 0, 1) : 1;
     const resolvedCharacters = Array.from(new Set(GLYPH_CHARS));
-    const style = `--glyph-raster-opacity: ${preset.opacity}; --glyph-raster-color: ${preset.backgroundColor};`;
+    const style = `--glyph-raster-color: ${preset.backgroundColor};`;
     const classes = className ? `${className} ` : "";
 
     useStylesScoped$(styles);
@@ -2386,8 +2402,12 @@ export const GlyphRaster = component$(
                     currentFrame,
                   );
 
+                  const baseBrightness =
+                    resolvedSource.type === "procedural-noise"
+                      ? noiseVisualBrightness(sampledBrightness, visualRange)
+                      : sampledBrightness;
                   brightness = clamp(
-                    applyGlyphFieldModifierBrightness(sampledBrightness, worldX, worldY),
+                    applyGlyphFieldModifierBrightness(baseBrightness, worldX, worldY),
                     0,
                     1,
                   );
@@ -2473,6 +2493,7 @@ export const GlyphRaster = component$(
             sourceTime: renderSourceTime,
             gridOriginX,
             gridOriginY,
+            visualRange,
           });
         }
 

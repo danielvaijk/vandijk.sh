@@ -15,7 +15,7 @@ export default component$((): QwikJSX.Element => {
 
   return (
     <>
-      <GlyphRaster source={{ type: "procedural-noise" }} />
+      <GlyphRaster opacity={0.6} source={{ type: "procedural-noise" }} />
 
       {!isHomepage && <NavigationHeader />}
 
