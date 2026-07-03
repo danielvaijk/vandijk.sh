@@ -2159,7 +2159,12 @@ export const GlyphRaster = component$(
       const updateCanvasHeight = (): void => {
         if (canvasAnchorMode !== "document") return;
 
-        documentHeight = Math.max(document.documentElement.scrollHeight, largeViewportHeight);
+        // Measure content height from the body's in-flow box: the canvas is
+        // absolutely positioned against the initial containing block, so
+        // documentElement.scrollHeight would include the canvas's own stale
+        // overhang after a client-side navigation to a shorter page and the
+        // height would never shrink back.
+        documentHeight = Math.max(document.body.offsetHeight, largeViewportHeight);
 
         const overscanHeight = Math.round(largeViewportHeight * DOCUMENT_ANCHOR_OVERSCAN);
         const nextHeight = `${Math.min(overscanHeight, Math.floor(documentHeight))}px`;
@@ -2256,7 +2261,7 @@ export const GlyphRaster = component$(
             viewportScrollY + viewportHeight > canvasBottom - edgeMargin;
 
           if (isNearTop || isNearBottom) {
-            documentHeight = Math.max(document.documentElement.scrollHeight, largeViewportHeight);
+            documentHeight = Math.max(document.body.offsetHeight, largeViewportHeight);
 
             const maxTopRow = Math.max(0, Math.floor((documentHeight - lastCssHeight) / cellHeight));
             const centeredTopRow = Math.floor(
