@@ -235,11 +235,12 @@ article {
 
   *:not(pre) {
     > code {
-      --inline-code-padding-y: 1px;
+      --inline-code-padding-y: 0;
 
       padding: var(--inline-code-padding-y) calc(var(--glyph-space-x) * 0.5);
       color: var(--inline-code-text-color);
-      font-weight: 400;
+      font-size: 0.8em;
+      font-weight: inherit;
       line-height: 1;
       vertical-align: baseline;
       text-align: start;

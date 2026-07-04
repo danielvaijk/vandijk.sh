@@ -2263,7 +2263,10 @@ export const GlyphRaster = component$(
           if (isNearTop || isNearBottom) {
             documentHeight = Math.max(document.body.offsetHeight, largeViewportHeight);
 
-            const maxTopRow = Math.max(0, Math.floor((documentHeight - lastCssHeight) / cellHeight));
+            const maxTopRow = Math.max(
+              0,
+              Math.floor((documentHeight - lastCssHeight) / cellHeight),
+            );
             const centeredTopRow = Math.floor(
               (viewportScrollY - (lastCssHeight - viewportHeight) / 2) / cellHeight,
             );
