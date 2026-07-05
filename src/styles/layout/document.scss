@@ -66,6 +66,17 @@ html {
     @media print {
       font-family: Georgia, "Times New Roman", Times, serif;
     }
+
+    > header,
+    > main,
+    > footer {
+      transform: translate3d(0, var(--elastic-overscroll-offset, 0), 0);
+      will-change: transform;
+
+      @media print, (prefers-reduced-motion: reduce) {
+        transform: none;
+      }
+    }
   }
 }
 

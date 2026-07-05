@@ -1,0 +1,44 @@
+.elastic-overscroll {
+  --elastic-overscroll-top: 0;
+  --elastic-overscroll-bottom: 0;
+
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+
+  @media print, (prefers-reduced-motion: reduce) {
+    display: none;
+  }
+}
+
+.elastic-overscroll__text {
+  position: absolute;
+  left: 0;
+  right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  // Matches MAX_DISTANCE in elastic-overscroll.tsx so the band exactly fills
+  // the gap revealed at full pull.
+  height: 8rem;
+  margin: 0;
+  color: color-mix(in srgb, var(--link-color) 56%, var(--text-color));
+  font-size: 0.8125rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  will-change: translate, opacity;
+}
+
+.elastic-overscroll__text--top {
+  top: 0;
+  translate: 0 calc(-100% + var(--elastic-overscroll-top) * 1px);
+  opacity: min(calc(var(--elastic-overscroll-top) / 32), 1);
+}
+
+.elastic-overscroll__text--bottom {
+  bottom: 0;
+  translate: 0 calc(100% - var(--elastic-overscroll-bottom) * 1px);
+  opacity: min(calc(var(--elastic-overscroll-bottom) / 32), 1);
+}

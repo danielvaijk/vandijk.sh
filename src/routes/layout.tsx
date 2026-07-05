@@ -2,6 +2,7 @@ import type { QwikJSX } from "@builder.io/qwik";
 import { component$, Slot, useStylesScoped$ } from "@builder.io/qwik";
 import { useLocation } from "@builder.io/qwik-city";
 
+import { ElasticOverscroll } from "src/components/elastic-overscroll";
 import { GlyphRaster } from "src/components/glyph-raster";
 import { GlyphTextReveal } from "src/components/glyph-text-reveal";
 import { NavigationHeader } from "src/components/navigation/navigation-header";
@@ -27,6 +28,7 @@ export default component$((): QwikJSX.Element => {
         <Slot />
       </main>
 
+      <ElasticOverscroll />
       <GlyphTextReveal routeKey={url.pathname} />
     </>
   );

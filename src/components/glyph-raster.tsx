@@ -1,6 +1,7 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useId, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
 
+import { getElasticOverscrollOffset } from "src/components/elastic-overscroll-state";
 import styles from "src/components/glyph-raster.scss?inline";
 
 type GlyphRasterLayout = "fill" | "fixed";
@@ -2078,7 +2079,7 @@ export const GlyphRaster = component$(
       let canvasTop = 0;
       let documentHeight = 0;
       let largeViewportHeight = window.innerHeight;
-      let lastDrawnCanvasTop = -1;
+      let lastDrawnGridOriginY = Number.NaN;
       let lastDrawnSourceTime = -1;
       let lastDrawnModifierVersion = -1;
 
@@ -2139,7 +2140,7 @@ export const GlyphRaster = component$(
         }
         lastBrightnessSampleAt = 0;
         lastEntropySampleSourceTime = 0;
-        lastDrawnCanvasTop = -1;
+        lastDrawnGridOriginY = Number.NaN;
         lastDrawnSourceTime = -1;
 
         if (canvasAnchorMode === "document") {
@@ -2289,8 +2290,13 @@ export const GlyphRaster = component$(
           }
         }
 
+        // Shifting the sampled world by the elastic overscroll offset moves
+        // the noise field (and the modifier regions drawn into it) in
+        // lockstep with the translated page content, revealing fresh noise
+        // beyond the document edge.
         const gridOriginX = usesDocumentAnchor ? 0 : window.scrollX;
-        const gridOriginY = usesDocumentAnchor ? canvasTop : viewportScrollY;
+        const gridOriginY =
+          (usesDocumentAnchor ? canvasTop : viewportScrollY) - getElasticOverscrollOffset();
 
         changedGlyphCount = 0;
         lastFrameAt = time;
@@ -2412,12 +2418,12 @@ export const GlyphRaster = component$(
           shouldUpdateBrightness ||
           shouldUploadEntropy ||
           renderSourceTime !== lastDrawnSourceTime ||
-          canvasTop !== lastDrawnCanvasTop ||
+          gridOriginY !== lastDrawnGridOriginY ||
           glyphFieldModifierRegionsVersion !== lastDrawnModifierVersion;
 
         if (shouldDraw) {
           lastDrawnSourceTime = renderSourceTime;
-          lastDrawnCanvasTop = canvasTop;
+          lastDrawnGridOriginY = gridOriginY;
           lastDrawnModifierVersion = glyphFieldModifierRegionsVersion;
 
           renderer.draw({
