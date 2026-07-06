@@ -7,4 +7,10 @@
   justify-content: center;
   text-align: center;
   color: #f4f4f4;
+
+  // Tap-and-hold to continue must not trigger text selection or the
+  // long-press callout while the whiteout ramps up.
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }

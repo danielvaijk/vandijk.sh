@@ -1,6 +1,7 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useId, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
 
+import { getGlyphWhiteout } from "src/components/glyph-whiteout-state";
 import styles from "src/components/glyph-raster.scss?inline";
 
 type GlyphRasterLayout = "fill" | "fixed";
@@ -102,6 +103,7 @@ type GlyphRenderState = {
   gridOriginX: number;
   gridOriginY: number;
   visualRange: number;
+  whiteout: number;
 };
 
 type ActiveGlyphRaster = {
@@ -1142,6 +1144,7 @@ const createWebGlGlyphRenderer = ({
     uniform float u_entropy_sample_time;
     uniform float u_glyph_frame_rate;
     uniform float u_visual_range;
+    uniform float u_whiteout;
     uniform sampler2D u_field_modifier_brightness;
     uniform int u_field_modifier_count;
     uniform vec2 u_atlas_grid;
@@ -1222,11 +1225,15 @@ const createWebGlGlyphRenderer = ({
       vec2 world = u_grid_origin + a_position + vec2(0.5) * u_cell_size;
       vec2 world_cell = floor(world / u_cell_size);
       vec2 field_point = world / u_cell_size;
-      float color_brightness = glyphApplyFieldModifiers(
-        glyphNoiseVisualBrightness(
-          glyphSolarBrightness(field_point, u_source_time, u_noise_seed)
+      float color_brightness = mix(
+        glyphApplyFieldModifiers(
+          glyphNoiseVisualBrightness(
+            glyphSolarBrightness(field_point, u_source_time, u_noise_seed)
+          ),
+          world
         ),
-        world
+        1.0,
+        u_whiteout
       );
       float entropy_position =
         a_entropy_position +
@@ -1338,6 +1345,7 @@ const createWebGlGlyphRenderer = ({
   const visualRangeLocation = usesGpuNoise
     ? gl.getUniformLocation(program, "u_visual_range")
     : null;
+  const whiteoutLocation = usesGpuNoise ? gl.getUniformLocation(program, "u_whiteout") : null;
   const sourceTimeLocation = gl.getUniformLocation(program, "u_source_time");
   const entropySampleTimeLocation = usesGpuNoise
     ? gl.getUniformLocation(program, "u_entropy_sample_time")
@@ -1377,7 +1385,8 @@ const createWebGlGlyphRenderer = ({
         !fieldModifierBlendsLocation ||
         !fieldModifierRectsLocation ||
         !gridOriginLocation ||
-        !visualRangeLocation)) ||
+        !visualRangeLocation ||
+        !whiteoutLocation)) ||
     !paletteLocation ||
     !colorCountLocation ||
     !entropySeedLocation ||
@@ -1655,6 +1664,7 @@ const createWebGlGlyphRenderer = ({
       gridOriginX,
       gridOriginY,
       visualRange,
+      whiteout,
     }: GlyphRenderState): void => {
       const cellCount = cols * rows;
       const didResize = positions.length !== cellCount * 2;
@@ -1706,13 +1716,15 @@ const createWebGlGlyphRenderer = ({
         sourceTimeLocation &&
         entropySampleTimeLocation &&
         glyphFrameRateLocation &&
-        visualRangeLocation
+        visualRangeLocation &&
+        whiteoutLocation
       ) {
         gl.uniform1f(noiseSeedLocation, stateGpuNoiseSeed ?? 0);
         gl.uniform1f(sourceTimeLocation, sourceTime);
         gl.uniform1f(entropySampleTimeLocation, entropySampleTime);
         gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
         gl.uniform1f(visualRangeLocation, visualRange);
+        gl.uniform1f(whiteoutLocation, whiteout);
         gl.uniform2f(gridOriginLocation, gridOriginX, gridOriginY);
         uploadFieldModifiers();
       } else if (
@@ -2081,6 +2093,7 @@ export const GlyphRaster = component$(
       let lastDrawnCanvasTop = -1;
       let lastDrawnSourceTime = -1;
       let lastDrawnModifierVersion = -1;
+      let lastDrawnWhiteout = -1;
 
       const randomGlyphIndex = (): number => Math.floor(Math.random() * resolvedCharacters.length);
       const randomGlyphIndexExcept = (currentIndex: number): number => {
@@ -2291,6 +2304,7 @@ export const GlyphRaster = component$(
 
         const gridOriginX = usesDocumentAnchor ? 0 : window.scrollX;
         const gridOriginY = usesDocumentAnchor ? canvasTop : viewportScrollY;
+        const whiteout = getGlyphWhiteout();
 
         changedGlyphCount = 0;
         lastFrameAt = time;
@@ -2359,11 +2373,15 @@ export const GlyphRaster = component$(
                     resolvedSource.type === "procedural-noise"
                       ? noiseVisualBrightness(sampledBrightness, visualRange)
                       : sampledBrightness;
-                  brightness = clamp(
+                  // The whiteout lift both whitens the fallback display paths
+                  // and raises the entropy rates below, so the field churns
+                  // faster as it brightens.
+                  const modifiedBrightness = clamp(
                     applyGlyphFieldModifierBrightness(baseBrightness, worldX, worldY),
                     0,
                     1,
                   );
+                  brightness = modifiedBrightness + whiteout * (1 - modifiedBrightness);
                 }
 
                 brightnessValues[index] = brightness;
@@ -2413,12 +2431,14 @@ export const GlyphRaster = component$(
           shouldUploadEntropy ||
           renderSourceTime !== lastDrawnSourceTime ||
           canvasTop !== lastDrawnCanvasTop ||
-          glyphFieldModifierRegionsVersion !== lastDrawnModifierVersion;
+          glyphFieldModifierRegionsVersion !== lastDrawnModifierVersion ||
+          whiteout !== lastDrawnWhiteout;
 
         if (shouldDraw) {
           lastDrawnSourceTime = renderSourceTime;
           lastDrawnCanvasTop = canvasTop;
           lastDrawnModifierVersion = glyphFieldModifierRegionsVersion;
+          lastDrawnWhiteout = whiteout;
 
           renderer.draw({
             backgroundColor: preset.backgroundColor,
@@ -2447,6 +2467,7 @@ export const GlyphRaster = component$(
             gridOriginX,
             gridOriginY,
             visualRange,
+            whiteout,
           });
         }
 
