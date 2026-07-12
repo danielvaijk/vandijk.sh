@@ -4,13 +4,13 @@ import { join } from "node:path";
 
 import type { Plugin } from "vite";
 
-import { wrapMarkdownCodeBlocks } from "../helpers/markup";
+import { wrapMarkdownCodeBlocks } from "../src/helpers/markup";
 import {
   getMarkdownProseWordCount,
   getReadTimeInMinutesFromWordCount,
   stripMarkdownCodeBlocks,
-} from "../utilities/text";
-import { formatDateAsString } from "../utilities/time";
+} from "../src/utilities/text";
+import { formatDateAsString } from "../src/utilities/time";
 
 const ARTICLE_CODE_DRAWER_IMPORT =
   'import { ArticleCodeDrawer } from "src/components/articles/article-code-drawer";';
@@ -98,7 +98,7 @@ function parseFrontmatter(source: string): { body: string; frontmatter: ArticleF
 function getAnchorLinks(content: string): string {
   return stripMarkdownCodeBlocks(content)
     .split("\n")
-    .flatMap((line): Array<string> => {
+    .flatMap((line: string): Array<string> => {
       const match = /^(?<level>#{2,3})\s+(?<title>.+)$/u.exec(line);
 
       if (match?.groups === undefined) {
@@ -221,7 +221,7 @@ function articleCodeDrawerMdxPlugin(): Plugin {
       }
 
       const markdownWithCodeDrawers = await wrapMarkdownCodeBlocks(markdownWithArticleContents, {
-        saveCodeBlockContent: async ({ html }): Promise<string> =>
+        saveCodeBlockContent: async ({ html }: { html: string }): Promise<string> =>
           saveArticleCodeBlock(html, articlePath),
       });
 
