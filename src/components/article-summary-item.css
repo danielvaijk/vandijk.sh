@@ -1,6 +1,12 @@
 .article-summary {
+  --article-summary-cover-glyph-rows: 38;
+
   &:not(:last-child) {
     margin-top: calc(var(--glyph-space-y) * 2);
+  }
+
+  @media (width >= 46rem) {
+    --article-summary-cover-glyph-rows: 30;
   }
 
   a {
@@ -8,10 +14,8 @@
     text-decoration: none;
 
     > .article-summary-cover-image {
-      --article-summary-cover-glyph-rows: 29;
-
       position: relative;
-      aspect-ratio: calc(var(--article-summary-glyph-columns) * 4) /
+      aspect-ratio: calc(var(--article-glyph-columns) * 4) /
         calc(var(--article-summary-cover-glyph-rows) * 7);
       background: transparent;
       overflow: hidden;
@@ -48,10 +52,6 @@
       picture {
         display: block;
         height: 100%;
-      }
-
-      @media (width >= 46rem) {
-        --article-summary-cover-glyph-rows: 23;
       }
     }
 
