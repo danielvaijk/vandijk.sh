@@ -59,8 +59,8 @@ const ARTICLE_CODE_DRAWER_IMPORT =
 const ARTICLES_METADATA_MODULE_ID = "virtual:articles";
 const RESOLVED_ARTICLES_METADATA_MODULE_ID = `\0${ARTICLES_METADATA_MODULE_ID}`;
 const ARTICLES_DIRECTORY = "src/routes/blog";
+const ARTICLE_MEDIA_DIRECTORY = "src/media/blog";
 const ARTICLE_PUBLIC_ASSETS_DIRECTORY = "public/blog";
-const ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME = "assets";
 const ARTICLES_PUBLIC_DIRECTORY = "./public/blog";
 const CODE_BLOCK_PRINT_WIDTH = 80;
 const CODE_BLOCK_LANGUAGE_FILE_EXTENSIONS: Record<string, string> = {
@@ -483,7 +483,7 @@ function renderCoverImageMarkup(cover: string, coverAlt: string): string {
 }
 
 function getArticleAssetsDirectory(root: string, path: string): string {
-  return resolve(root, ARTICLES_DIRECTORY, path, ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME);
+  return resolve(root, ARTICLE_MEDIA_DIRECTORY, path);
 }
 
 function getArticlePublicAssetsDirectory(root: string, path: string): string {

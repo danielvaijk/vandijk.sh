@@ -49,8 +49,8 @@ interface ArticleImageManifestEntry {
 }
 
 const ARTICLES_DIRECTORY = "src/routes/blog";
+const ARTICLE_MEDIA_DIRECTORY = "src/media/blog";
 const ARTICLE_PUBLIC_ASSETS_DIRECTORY = "public/blog";
-const ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME = "assets";
 const ARTICLE_IMAGE_EXTENSIONS = new Set([".avif", ".jpeg", ".jpg", ".png", ".svg", ".webp"]);
 const ARTICLE_GENERATED_ONLY_EXTENSIONS = new Set([".gif"]);
 const ARTICLE_MARKDOWN_IMAGE_REGEX =
@@ -68,7 +68,7 @@ const articleImageManifest = new Map<string, ArticleImageManifestEntry>();
 const articleImageBuilds = new Map<string, Promise<void>>();
 
 function getArticleAssetsDirectory(root: string, path: string): string {
-  return resolve(root, ARTICLES_DIRECTORY, path, ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME);
+  return resolve(root, ARTICLE_MEDIA_DIRECTORY, path);
 }
 
 function getArticlePublicAssetsDirectory(root: string, path: string): string {
