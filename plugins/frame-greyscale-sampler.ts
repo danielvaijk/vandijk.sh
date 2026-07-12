@@ -1,20 +1,20 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname, extname, join, resolve } from "node:path";
+import path from "node:path";
 
 import sharp, { type Sharp } from "sharp";
 import type { Plugin, ResolvedConfig } from "vite";
-import type { GlyphRasterFrameOptions } from "../src/vfx/glyph-raster/frame-options";
+import type { GlyphRasterFrameOptions } from "src/vfx/glyph-raster/frame-options";
 
-type GlyphFrameSource = {
+interface GlyphFrameSource {
   output: string;
   source: string;
-};
+}
 
-type FrameDimensions = {
+interface FrameDimensions {
   cols: number;
   rows: number;
-};
+}
 
 const DITHER_MATRIX_SIZE = 4;
 const DITHER_BYTE_SPREAD = 0.75;
@@ -57,7 +57,9 @@ function clamp(value: number, min: number, max: number): number {
 function srgbToLinear(value: number): number {
   const normalized = value / 255;
 
-  if (normalized <= 0.04045) return normalized / 12.92;
+  if (normalized <= 0.04045) {
+    return normalized / 12.92;
+  }
 
   return ((normalized + 0.055) / 1.055) ** 2.4;
 }
@@ -65,12 +67,24 @@ function srgbToLinear(value: number): number {
 function linearToSrgb(value: number): number {
   const clamped = clamp(value, 0, 1);
 
-  if (clamped <= 0.0031308) return clamped * 12.92;
+  if (clamped <= 0.0031308) {
+    return clamped * 12.92;
+  }
 
   return 1.055 * clamped ** (1 / 2.4) - 0.055;
 }
 
-function getLuminance(red: number, green: number, blue: number, alpha = 1): number {
+function getLuminance({
+  red,
+  green,
+  blue,
+  alpha = 1,
+}: {
+  red: number;
+  green: number;
+  blue: number;
+  alpha?: number;
+}): number {
   const linearLuminance =
     srgbToLinear(red) * 0.2126 + srgbToLinear(green) * 0.7152 + srgbToLinear(blue) * 0.0722;
 
@@ -204,17 +218,17 @@ function processRawFrames(
   const processedFrames = Buffer.alloc((rawFrames.length / rawFrameSize) * frameSize);
   const brightness = new Float32Array(frameSize);
 
-  for (let rawFrameOffset = 0, frameOffset = 0; rawFrameOffset < rawFrames.length; ) {
+  for (let frameOffset = 0, rawFrameOffset = 0; rawFrameOffset < rawFrames.length; ) {
     for (let index = 0; index < frameSize; index += 1) {
       const pixelIndex = rawFrameOffset + index * channels;
       const alpha = channels >= 4 ? rawFrames[pixelIndex + 3] / 255 : 1;
 
-      brightness[index] = getLuminance(
-        rawFrames[pixelIndex],
-        rawFrames[pixelIndex + 1],
-        rawFrames[pixelIndex + 2],
+      brightness[index] = getLuminance({
         alpha,
-      );
+        blue: rawFrames[pixelIndex + 2],
+        green: rawFrames[pixelIndex + 1],
+        red: rawFrames[pixelIndex],
+      });
     }
 
     createProcessedFrame(brightness, dimensions).copy(processedFrames, frameOffset);
@@ -240,14 +254,14 @@ async function getImageDimensions(
 }
 
 function getFrameRate(
-  delays: number[] | undefined,
+  delays: number[] | null,
   processedFrames: Buffer,
   dimensions: FrameDimensions,
 ): number {
   const frameSize = dimensions.cols * dimensions.rows;
   const sourceFrameCount = processedFrames.length / frameSize;
 
-  if (sourceFrameCount <= 1 || delays === undefined || delays.length !== sourceFrameCount) {
+  if (sourceFrameCount <= 1 || !delays || delays.length !== sourceFrameCount) {
     return 1;
   }
 
@@ -273,7 +287,7 @@ async function readImageFrames(
   const rawFrames = processRawFrames(data, dimensions, 4);
 
   return {
-    fps: getFrameRate(metadata.delay, rawFrames, dimensions),
+    fps: getFrameRate(metadata.delay ?? null, rawFrames, dimensions),
     rawFrames,
   };
 }
@@ -290,9 +304,9 @@ function createFramesFile(fps: number, dimensions: FrameDimensions, rawFrames: B
   const header = Buffer.from(
     `${JSON.stringify({
       cols: dimensions.cols,
-      rows: dimensions.rows,
       fps,
       n_frames: rawFrames.length / frameSize,
+      rows: dimensions.rows,
     })}\n`,
   );
 
@@ -310,24 +324,19 @@ async function generateGreyscaleFrameSource(
   );
   const framesFile = createFramesFile(fps, dimensions, rawFrames);
 
-  await mkdir(dirname(source.output), { recursive: true });
+  await mkdir(path.dirname(source.output), { recursive: true });
   await writeFile(source.output, framesFile);
-  console.info(
-    `Generated ${source.output} from ${source.source} (${dimensions.cols}x${dimensions.rows}, ${
-      rawFrames.length / (dimensions.cols * dimensions.rows)
-    } frame${rawFrames.length === dimensions.cols * dimensions.rows ? "" : "s"}).`,
-  );
 }
 
-function readSourceFiles(directory: string): Array<string> {
-  return readdirSync(directory, { withFileTypes: true }).flatMap((entity): Array<string> => {
-    const entry = join(directory, entity.name);
+function readSourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entity): string[] => {
+    const entry = path.join(directory, entity.name);
 
     if (entity.isDirectory()) {
       return readSourceFiles(entry);
     }
 
-    if (!entity.isFile() || !SITE_GLYPH_SOURCE_FILE_EXTENSIONS.has(extname(entity.name))) {
+    if (!entity.isFile() || !SITE_GLYPH_SOURCE_FILE_EXTENSIONS.has(path.extname(entity.name))) {
       return [];
     }
 
@@ -335,15 +344,15 @@ function readSourceFiles(directory: string): Array<string> {
   });
 }
 
-function getSiteGlyphFrameNames(root: string): Array<string> {
-  const sourceDirectory = resolve(root, "src");
+function getSiteGlyphFrameNames(root: string): string[] {
+  const sourceDirectory = path.resolve(root, "src");
   const names = new Set<string>();
 
   for (const sourceFile of readSourceFiles(sourceDirectory)) {
-    const source = readFileSync(sourceFile, "utf-8");
+    const source = readFileSync(sourceFile, "utf8");
 
     for (const match of source.matchAll(SITE_GLYPH_FRAME_URL_REGEX)) {
-      const name = match.groups?.name;
+      const name = match.groups ? match.groups.name : null;
 
       if (typeof name === "string") {
         names.add(name);
@@ -351,16 +360,16 @@ function getSiteGlyphFrameNames(root: string): Array<string> {
     }
   }
 
-  return Array.from(names).sort();
+  return [...names].sort();
 }
 
 function resolveSiteGlyphFrameSource(root: string, name: string): GlyphFrameSource | null {
   for (const extension of SITE_GLYPH_SOURCE_EXTENSIONS) {
-    const source = resolve(root, SITE_GLYPH_SOURCE_DIRECTORY, `${name}${extension}`);
+    const source = path.resolve(root, SITE_GLYPH_SOURCE_DIRECTORY, `${name}${extension}`);
 
     if (existsSync(source)) {
       return {
-        output: resolve(root, SITE_GLYPH_PUBLIC_DIRECTORY, `${name}.frames`),
+        output: path.resolve(root, SITE_GLYPH_PUBLIC_DIRECTORY, `${name}.frames`),
         source,
       };
     }
@@ -369,8 +378,8 @@ function resolveSiteGlyphFrameSource(root: string, name: string): GlyphFrameSour
   return null;
 }
 
-function resolveSiteGlyphFrameSources(root: string): Array<GlyphFrameSource> {
-  return getSiteGlyphFrameNames(root).flatMap((name): Array<GlyphFrameSource> => {
+function resolveSiteGlyphFrameSources(root: string): GlyphFrameSource[] {
+  return getSiteGlyphFrameNames(root).flatMap((name): GlyphFrameSource[] => {
     const source = resolveSiteGlyphFrameSource(root, name);
 
     return source === null ? [] : [source];
@@ -378,18 +387,21 @@ function resolveSiteGlyphFrameSources(root: string): Array<GlyphFrameSource> {
 }
 
 function frameGreyscaleSamplerPlugin(options: GlyphRasterFrameOptions): Plugin {
-  let config: ResolvedConfig;
+  let config: ResolvedConfig | null = null;
 
   return {
-    name: "glyph-frames",
-    configResolved(resolvedConfig): void {
-      config = resolvedConfig;
-    },
     async buildStart(): Promise<void> {
+      if (!config) {
+        throw new Error("Vite config was not resolved before build start.");
+      }
       for (const source of resolveSiteGlyphFrameSources(config.root)) {
         await generateGreyscaleFrameSource(source, options);
       }
     },
+    configResolved(resolvedConfig): void {
+      config = resolvedConfig;
+    },
+    name: "glyph-frames",
   };
 }
 

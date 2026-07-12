@@ -1,5 +1,4 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$, Slot, useContextProvider, useStyles$ } from "@builder.io/qwik";
+import { type QwikJSX, Slot, component$, useContextProvider, useStyles$ } from "@builder.io/qwik";
 
 import { WorldMapContext } from "src/components/world-map-context";
 import styles from "src/components/world-map.css?inline";
@@ -17,8 +16,9 @@ export const WorldMap = component$(({ dotDiameter, label }: WorldMapProps): Qwik
   useStyles$(styles);
 
   return (
-    <div aria-label={label} class="world-map" role="img">
+    <div class="world-map">
       <svg
+        aria-label={label}
         aria-hidden="true"
         class="world-map__svg"
         focusable="false"

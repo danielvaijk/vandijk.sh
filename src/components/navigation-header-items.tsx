@@ -1,9 +1,8 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$ } from "@builder.io/qwik";
+import { type QwikJSX, component$ } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
-export const NavigationHeaderItems = component$((): QwikJSX.Element => {
-  return (
+export const NavigationHeaderItems = component$(
+  (): QwikJSX.Element => (
     <nav>
       <ul>
         <li>
@@ -27,5 +26,5 @@ export const NavigationHeaderItems = component$((): QwikJSX.Element => {
         </li>
       </ul>
     </nav>
-  );
-});
+  ),
+);

@@ -1,5 +1,4 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$, Slot, useStylesScoped$ } from "@builder.io/qwik";
+import { type QwikJSX, Slot, component$, useStylesScoped$ } from "@builder.io/qwik";
 import { useLocation } from "@builder.io/qwik-city";
 
 import { GlyphRaster } from "src/components/glyph-raster";
@@ -23,7 +22,7 @@ export default component$((): QwikJSX.Element => {
 
       {!isHomepage && <NavigationHeader />}
 
-      <main class={isHomepage ? "is-homepage" : undefined}>
+      <main class={isHomepage ? "is-homepage" : null}>
         <Slot />
       </main>
 

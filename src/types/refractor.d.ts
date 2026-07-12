@@ -7,11 +7,17 @@ declare module "refractor" {
     registered: (language: string) => boolean;
   }
 
-  export type RefractorSyntax = ((refractor: Refractor) => void) & {
+  type RefractorSyntax = ((refractor: Refractor) => void) & {
     displayName: string;
   };
 
-  export const refractor: Refractor;
+  const refractor: Refractor;
+
+  export {
+    type Refractor,
+    type RefractorSyntax,
+    refractor,
+  };
 }
 
 declare module "refractor/tsx" {
@@ -20,3 +26,5 @@ declare module "refractor/tsx" {
   const syntax: RefractorSyntax;
   export default syntax;
 }
+
+export type RefractorDtsModuleMarker = unknown;

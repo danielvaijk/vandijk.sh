@@ -1,5 +1,4 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$, useStylesScoped$ } from "@builder.io/qwik";
+import { type QwikJSX, component$, useStylesScoped$ } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
 import { GlyphRaster } from "src/components/glyph-raster";
@@ -37,11 +36,12 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
     }).format(dateParsed);
 
     // Qwik will not automatically add the scoped styles to injected HTML,
-    // so as a workaround we manually insert it as a class name to any
-    // figure, picture, and img HTML elements in the markup string.
-    const coverImageWithScopeId = coverImageMarkup.replace(
+    // So as a workaround we manually insert it as a class name to any
+    // Figure, picture, and img HTML elements in the markup string.
+    const coverImageWithScopeId = coverImageMarkup.replaceAll(
       /<(?<tag>figure|picture|img)(?<attributes>[^>]*)>/gu,
-      (_, tag: string, attributes: string): string => `<${tag}${attributes} class="${scopeId}">`,
+      (_match: string, tag: string, attributes: string): string =>
+        `<${tag}${attributes} class="${scopeId}">`,
     );
 
     return (

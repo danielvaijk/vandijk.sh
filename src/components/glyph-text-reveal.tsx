@@ -1,12 +1,10 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$, useVisibleTask$ } from "@builder.io/qwik";
+import { type QwikJSX, component$, useVisibleTask$ } from "@builder.io/qwik";
 
-type GlyphTextRevealProps = {
+interface GlyphTextRevealProps {
   routeKey: string;
-};
+}
 
-const GLYPH_CHARS =
-  "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%&*+=-~.:;|/\\<>";
+const GLYPH_CHARS = String.raw`0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%&*+=-~.:;|/\<>`;
 const REVEAL_DURATION_MS = 720;
 const REVEAL_STAGGER_MS = 260;
 const REVEAL_FRAME_RATE = 1000 / 24;
@@ -33,7 +31,7 @@ const TEXT_EXCLUDED_SELECTOR = [
 const revealedElements = new WeakSet<Element>();
 const scannedContainers = new WeakSet<Element>();
 
-type AnimatedGlyphToken = {
+interface AnimatedGlyphToken {
   isComplete: boolean;
   original: string;
   originalCharacters: string[];
@@ -41,36 +39,36 @@ type AnimatedGlyphToken = {
   overlay: HTMLSpanElement;
   overlayCharacters: string[];
   startOffset: number;
-};
+}
 
-type ActiveGlyphReveal = {
+interface ActiveGlyphReveal {
   cancel: () => void;
   complete: () => void;
   lastFrameAt: number;
   render: (time: number) => boolean;
   startedAt: number;
-};
+}
 
-type GlyphTextRevealTarget = {
+interface GlyphTextRevealTarget {
   element: Element;
   textNodes: Text[];
-};
+}
 
-type WrappedTextNode = {
+interface WrappedTextNode {
   original: string;
   wrapper: HTMLSpanElement;
-};
+}
 
 const activeReveals = new Set<ActiveGlyphReveal>();
 let sharedAnimationFrame = 0;
-let randomSeed = Math.floor(Math.random() * 0xffffffff) || 1;
+let randomSeed = Math.floor(Math.random() * 0xFF_FF_FF_FF) || 1;
 
 const randomUnit = (): number => {
   randomSeed ^= randomSeed << 13;
   randomSeed ^= randomSeed >>> 17;
   randomSeed ^= randomSeed << 5;
 
-  return (randomSeed >>> 0) / 0x100000000;
+  return Math.trunc(randomSeed) / 0x1_00_00_00_00;
 };
 
 const randomGlyph = (): string => GLYPH_CHARS[Math.floor(randomUnit() * GLYPH_CHARS.length)];
@@ -78,7 +76,9 @@ const randomGlyph = (): string => GLYPH_CHARS[Math.floor(randomUnit() * GLYPH_CH
 const shouldAnimateTextNode = (node: Text, excludedSelector = TEXT_EXCLUDED_SELECTOR): boolean => {
   const parent = node.parentElement;
 
-  if (!parent || parent.closest(excludedSelector)) return false;
+  if (!parent || parent.closest(excludedSelector)) {
+    return false;
+  }
 
   return node.data.trim().length > 0;
 };
@@ -108,7 +108,7 @@ const createGlyphToken = (
   const element = document.createElement("span");
   const original = document.createElement("span");
   const overlay = document.createElement("span");
-  const originalCharacters = Array.from(text);
+  const originalCharacters = [...text];
   const overlayCharacters = createScrambledCharacters(originalCharacters);
 
   element.dataset.glyphTextReveal = "";
@@ -180,14 +180,15 @@ const createRevealContainers = (
   root: HTMLElement,
   selector: string,
   excludedSelector: string,
-): Element[] => {
-  return Array.from(root.querySelectorAll(selector)).filter(
+): Element[] =>
+  [...root.querySelectorAll(selector)].filter(
     (element): boolean => !element.closest(excludedSelector),
   );
-};
 
 const scheduleSharedAnimation = (): void => {
-  if (sharedAnimationFrame !== 0 || activeReveals.size === 0) return;
+  if (sharedAnimationFrame !== 0 || activeReveals.size === 0) {
+    return;
+  }
 
   sharedAnimationFrame = requestAnimationFrame(renderActiveReveals);
 };
@@ -196,8 +197,12 @@ const renderActiveReveals = (time: number): void => {
   sharedAnimationFrame = 0;
 
   for (const reveal of activeReveals) {
-    if (reveal.startedAt === 0) reveal.startedAt = time;
-    if (time - reveal.lastFrameAt < REVEAL_FRAME_RATE) continue;
+    if (reveal.startedAt === 0) {
+      reveal.startedAt = time;
+    }
+    if (time - reveal.lastFrameAt < REVEAL_FRAME_RATE) {
+      continue;
+    }
 
     reveal.lastFrameAt = time;
 
@@ -215,7 +220,9 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
   const wrappedTextNodes: WrappedTextNode[] = [];
 
   for (const textNode of textNodes) {
-    if (!textNode.isConnected || !shouldAnimateTextNode(textNode)) continue;
+    if (!textNode.isConnected || !shouldAnimateTextNode(textNode)) {
+      continue;
+    }
 
     const original = textNode.data;
     const wrapper = document.createElement("span");
@@ -224,7 +231,9 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
     wrapper.dataset.glyphTextReveal = "";
 
     for (const part of original.split(/(\s+)/u)) {
-      if (part.length === 0) continue;
+      if (part.length === 0) {
+        continue;
+      }
 
       if (/^\s+$/u.test(part)) {
         fragment.append(document.createTextNode(part));
@@ -241,12 +250,18 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
     wrappedTextNodes.push({ original, wrapper });
   }
 
-  if (tokens.length === 0) return (): void => {};
+  if (tokens.length === 0) {
+    return (): void => {
+      /* Empty */
+    };
+  }
 
   let isCleanedUp = false;
 
   const restoreTextNodes = (): void => {
-    if (isCleanedUp) return;
+    if (isCleanedUp) {
+      return;
+    }
     isCleanedUp = true;
 
     for (const { original, wrapper } of wrappedTextNodes) {
@@ -255,7 +270,9 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
   };
 
   const completeReveal = (): void => {
-    if (isCleanedUp) return;
+    if (isCleanedUp) {
+      return;
+    }
 
     for (const { originalElement, overlay } of tokens) {
       originalElement.style.color = "";
@@ -273,7 +290,9 @@ const animateTextNodes = (textNodes: Text[]): (() => void) => {
       let isComplete = true;
 
       for (const token of tokens) {
-        if (token.isComplete) continue;
+        if (token.isComplete) {
+          continue;
+        }
 
         const progress = Math.min(
           1,
@@ -307,9 +326,11 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
   useVisibleTask$(({ cleanup, track }): void => {
     track(() => routeKey);
 
-    const prefersReducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const prefersReducedMotion = globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const root = document.body;
-    if (!root || prefersReducedMotion) return;
+    if (!root || prefersReducedMotion) {
+      return;
+    }
 
     const restoreAnimations = new Set<() => void>();
     const targetsByElement = new Map<Element, Text[]>();
@@ -317,11 +338,15 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
     const targetObserver = new IntersectionObserver(
       (entries): void => {
         for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
+          if (!entry.isIntersecting) {
+            continue;
+          }
 
           const target = entry.target as Element;
           const textNodes = targetsByElement.get(target);
-          if (!textNodes) continue;
+          if (!textNodes) {
+            continue;
+          }
 
           targetObserver.unobserve(target);
           targetsByElement.delete(target);
@@ -334,11 +359,15 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
       { threshold: 0.01 },
     );
     const observeContainerTargets = (container: Element): void => {
-      if (scannedContainers.has(container)) return;
+      if (scannedContainers.has(container)) {
+        return;
+      }
       scannedContainers.add(container);
 
       for (const { element, textNodes } of createRevealTargets(container)) {
-        if (observedRevealTargets.has(element) || revealedElements.has(element)) continue;
+        if (observedRevealTargets.has(element) || revealedElements.has(element)) {
+          continue;
+        }
 
         observedRevealTargets.add(element);
         targetsByElement.set(element, textNodes);
@@ -348,7 +377,9 @@ export const GlyphTextReveal = component$(({ routeKey }: GlyphTextRevealProps): 
     const containerObserver = new IntersectionObserver(
       (entries): void => {
         for (const entry of entries) {
-          if (!entry.isIntersecting) continue;
+          if (!entry.isIntersecting) {
+            continue;
+          }
 
           const container = entry.target;
           containerObserver.unobserve(container);

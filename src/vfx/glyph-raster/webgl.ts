@@ -1,24 +1,24 @@
 import { createGlyphRasterShaderSources } from "src/vfx/glyph-raster/shaders";
 import { clamp } from "src/vfx/shared/math";
 
-export type GlyphEntropyMode = "cpu" | "shader";
+type GlyphEntropyMode = "cpu" | "shader";
 
-export type GlyphRenderSize = {
+interface GlyphRenderSize {
   cssHeight: number;
   cssWidth: number;
   pixelRatio: number;
-};
+}
 
-export type GlyphFieldModifierRegion = {
+interface GlyphFieldModifierRegion {
   blend: number;
   brightnessGrid?: Uint8Array;
   documentLeft: number;
   documentTop: number;
   height: number;
   width: number;
-};
+}
 
-export type GlyphRenderState = {
+interface GlyphRenderState {
   backgroundColor: string;
   brightnessValues: Float32Array;
   cellHeight: number;
@@ -46,14 +46,14 @@ export type GlyphRenderState = {
   gridOriginX: number;
   gridOriginY: number;
   visualRange: number;
-};
+}
 
-export type GlyphRenderer = {
+interface GlyphRenderer {
   draw: (state: GlyphRenderState) => void;
   resize: (size: GlyphRenderSize) => void;
   supportsShaderEntropy: boolean;
   usesGpuGlyphSelection: boolean;
-};
+}
 
 const GLYPH_FONT_FAMILY = 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif';
 const FIELD_MODIFIER_BRIGHTNESS_BOOST = 1;
@@ -85,9 +85,11 @@ const glyphDrawMetricsCache = new Map<
 >();
 const parsedColorCache = new Map<string, [number, number, number, number]>();
 
-function getCachedValue<Value>(cache: Map<string, Value>, key: string): Value | undefined {
+function getCachedValue<Value>(cache: Map<string, Value>, key: string): Value | null {
   const value = cache.get(key);
-  if (value === undefined) return undefined;
+  if (typeof value === "undefined") {
+    return null;
+  }
 
   cache.delete(key);
   cache.set(key, value);
@@ -95,27 +97,36 @@ function getCachedValue<Value>(cache: Map<string, Value>, key: string): Value | 
   return value;
 }
 
-function setCachedValue<Value>(
-  cache: Map<string, Value>,
-  key: string,
-  value: Value,
-  maxSize: number,
-): void {
+function setCachedValue<Value>({
+  cache,
+  key,
+  value,
+  maxSize,
+}: {
+  cache: Map<string, Value>;
+  key: string;
+  value: Value;
+  maxSize: number;
+}): void {
   cache.delete(key);
   cache.set(key, value);
 
   while (cache.size > maxSize) {
     const oldestKey = cache.keys().next().value;
-    if (oldestKey === undefined) return;
+    if (!oldestKey) {
+      return;
+    }
 
     cache.delete(oldestKey);
   }
 }
-const parseColor = (color: string): [number, number, number, number] => {
+function parseColor(color: string): [number, number, number, number] {
   const cachedColor = getCachedValue(parsedColorCache, color);
-  if (cachedColor) return cachedColor;
+  if (cachedColor) {
+    return cachedColor;
+  }
 
-  let parsedColor: [number, number, number, number];
+  let parsedColor: [number, number, number, number] = [0, 0, 0, 1];
 
   if (/^#[\da-f]{3}$/iu.test(color)) {
     parsedColor = [
@@ -135,18 +146,25 @@ const parseColor = (color: string): [number, number, number, number] => {
     parsedColor = [1, 1, 1, 1];
   }
 
-  setCachedValue(parsedColorCache, color, parsedColor, MAX_PARSED_COLOR_CACHE_SIZE);
+  setCachedValue({
+    cache: parsedColorCache,
+    key: color,
+    maxSize: MAX_PARSED_COLOR_CACHE_SIZE,
+    value: parsedColor,
+  });
 
   return parsedColor;
-};
+}
 
-const compileShader = (
+function compileShader(
   gl: WebGL2RenderingContext,
   source: string,
   type: number,
-): WebGLShader | null => {
+): WebGLShader | null {
   const shader = gl.createShader(type);
-  if (!shader) return null;
+  if (!shader) {
+    return null;
+  }
 
   gl.shaderSource(shader, source);
   gl.compileShader(shader);
@@ -157,18 +175,20 @@ const compileShader = (
   }
 
   return shader;
-};
+}
 
-const createProgram = (
+function createProgram(
   gl: WebGL2RenderingContext,
   vertexSource: string,
   fragmentSource: string,
-): WebGLProgram | null => {
+): WebGLProgram | null {
   const vertexShader = compileShader(gl, vertexSource, gl.VERTEX_SHADER);
   const fragmentShader = compileShader(gl, fragmentSource, gl.FRAGMENT_SHADER);
   const program = gl.createProgram();
 
-  if (!vertexShader || !fragmentShader || !program) return null;
+  if (!vertexShader || !fragmentShader || !program) {
+    return null;
+  }
 
   gl.attachShader(program, vertexShader);
   gl.attachShader(program, fragmentShader);
@@ -182,9 +202,9 @@ const createProgram = (
   }
 
   return program;
-};
+}
 
-const getGlyphDrawMetrics = (
+function getGlyphDrawMetrics(
   context: CanvasRenderingContext2D,
   glyph: string,
   cellWidth: number,
@@ -194,10 +214,12 @@ const getGlyphDrawMetrics = (
   offsetX: number;
   offsetY: number;
   scale: number;
-} => {
+} {
   const cacheKey = [glyph, cellWidth, cellHeight, fontSize].join(":");
   const cachedMetrics = getCachedValue(glyphDrawMetricsCache, cacheKey);
-  if (cachedMetrics) return cachedMetrics;
+  if (cachedMetrics) {
+    return cachedMetrics;
+  }
 
   const metrics = context.measureText(glyph);
   const left = metrics.actualBoundingBoxLeft || 0;
@@ -217,35 +239,35 @@ const getGlyphDrawMetrics = (
   const offsetY = (cellHeight - glyphHeight * scale) / 2 + ascent * scale;
   const resolvedMetrics = { offsetX, offsetY, scale };
 
-  setCachedValue(
-    glyphDrawMetricsCache,
-    cacheKey,
-    resolvedMetrics,
-    MAX_GLYPH_DRAW_METRICS_CACHE_SIZE,
-  );
+  setCachedValue({
+    cache: glyphDrawMetricsCache,
+    key: cacheKey,
+    maxSize: MAX_GLYPH_DRAW_METRICS_CACHE_SIZE,
+    value: resolvedMetrics,
+  });
 
   return resolvedMetrics;
-};
+}
 
-const drawGlyphInCell = (
+function drawGlyphInCell(
   context: CanvasRenderingContext2D,
   glyph: string,
-  x: number,
-  y: number,
+  positionX: number,
+  positionY: number,
   cellWidth: number,
   cellHeight: number,
   fontSize: number,
-): void => {
+): void {
   const metrics = getGlyphDrawMetrics(context, glyph, cellWidth, cellHeight, fontSize);
 
   context.save();
-  context.translate(x + metrics.offsetX, y + metrics.offsetY);
+  context.translate(positionX + metrics.offsetX, positionY + metrics.offsetY);
   context.scale(metrics.scale, metrics.scale);
   context.fillText(glyph, 0, 0);
   context.restore();
-};
+}
 
-const createGlyphAtlas = ({
+function createGlyphAtlas({
   cellHeight,
   cellWidth,
   characters,
@@ -260,10 +282,12 @@ const createGlyphAtlas = ({
 }): {
   canvas: HTMLCanvasElement;
   glyphUvs: Float32Array;
-} => {
+} {
   const cacheKey = [cellHeight, cellWidth, characters.join(""), fontSize, pixelRatio].join(":");
   const cachedAtlas = getCachedValue(glyphAtlasCache, cacheKey);
-  if (cachedAtlas) return cachedAtlas;
+  if (cachedAtlas) {
+    return cachedAtlas;
+  }
 
   const atlasCols = Math.ceil(Math.sqrt(characters.length));
   const atlasRows = Math.ceil(characters.length / atlasCols);
@@ -276,7 +300,9 @@ const createGlyphAtlas = ({
   canvas.width = atlasCols * atlasCellWidth;
   canvas.height = atlasRows * atlasCellHeight;
 
-  if (!context) return { canvas, glyphUvs };
+  if (!context) {
+    return { canvas, glyphUvs };
+  }
 
   context.clearRect(0, 0, canvas.width, canvas.height);
   context.fillStyle = "#ffffff";
@@ -287,24 +313,37 @@ const createGlyphAtlas = ({
     const glyph = characters[index];
     const col = index % atlasCols;
     const row = Math.floor(index / atlasCols);
-    const x = col * atlasCellWidth;
-    const y = row * atlasCellHeight;
+    const cellX = col * atlasCellWidth;
+    const cellY = row * atlasCellHeight;
     const uvIndex = index * 4;
 
-    drawGlyphInCell(context, glyph, x, y, atlasCellWidth, atlasCellHeight, fontSize * pixelRatio);
-    glyphUvs[uvIndex] = x / canvas.width;
-    glyphUvs[uvIndex + 1] = y / canvas.height;
+    drawGlyphInCell(
+      context,
+      glyph,
+      cellX,
+      cellY,
+      atlasCellWidth,
+      atlasCellHeight,
+      fontSize * pixelRatio,
+    );
+    glyphUvs[uvIndex] = cellX / canvas.width;
+    glyphUvs[uvIndex + 1] = cellY / canvas.height;
     glyphUvs[uvIndex + 2] = atlasCellWidth / canvas.width;
     glyphUvs[uvIndex + 3] = atlasCellHeight / canvas.height;
   }
 
   const atlas = { canvas, glyphUvs };
-  setCachedValue(glyphAtlasCache, cacheKey, atlas, MAX_GLYPH_ATLAS_CACHE_SIZE);
+  setCachedValue({
+    cache: glyphAtlasCache,
+    key: cacheKey,
+    maxSize: MAX_GLYPH_ATLAS_CACHE_SIZE,
+    value: atlas,
+  });
 
   return atlas;
-};
+}
 
-export const createWebGlGlyphRenderer = ({
+function createWebGlGlyphRenderer({
   canvas,
   cellHeight,
   cellWidth,
@@ -312,7 +351,7 @@ export const createWebGlGlyphRenderer = ({
   fontSize,
   gpuNoiseSeed,
   fieldModifierRegions,
-}: {
+  }: {
   canvas: HTMLCanvasElement;
   cellHeight: number;
   cellWidth: number;
@@ -320,7 +359,7 @@ export const createWebGlGlyphRenderer = ({
   fontSize: number;
   gpuNoiseSeed?: number;
   fieldModifierRegions: ReadonlyMap<string, GlyphFieldModifierRegion>;
-}): GlyphRenderer | null => {
+}): GlyphRenderer | null {
   const gl = canvas.getContext("webgl2", {
     alpha: true,
     antialias: false,
@@ -328,9 +367,11 @@ export const createWebGlGlyphRenderer = ({
     premultipliedAlpha: false,
     stencil: false,
   });
-  if (!gl) return null;
+  if (!gl) {
+    return null;
+  }
 
-  const usesGpuNoise = gpuNoiseSeed !== undefined;
+  const usesGpuNoise = typeof gpuNoiseSeed !== "undefined";
   const { fragmentSource, vertexSource } = createGlyphRasterShaderSources({
     fieldModifierBrightnessBoost: FIELD_MODIFIER_BRIGHTNESS_BOOST,
     fieldModifierBrightnessFloor: FIELD_MODIFIER_BRIGHTNESS_FLOOR,
@@ -342,7 +383,9 @@ export const createWebGlGlyphRenderer = ({
   });
 
   const program = createProgram(gl, vertexSource, fragmentSource);
-  if (!program) return null;
+  if (!program) {
+    return null;
+  }
 
   const vertexArray = gl.createVertexArray();
   const cornerBuffer = gl.createBuffer();
@@ -457,7 +500,7 @@ export const createWebGlGlyphRenderer = ({
   const fieldModifierBlends = new Float32Array(MAX_FIELD_MODIFIER_REGIONS);
   const atlasCols = Math.ceil(Math.sqrt(characters.length));
   const atlasRows = Math.ceil(characters.length / atlasCols);
-  const entropySeed = Math.random() * 100000;
+  const entropySeed = Math.random() * 100_000;
 
   gl.useProgram(program);
   gl.bindVertexArray(vertexArray);
@@ -611,7 +654,7 @@ export const createWebGlGlyphRenderer = ({
 
     lastFieldModifierVersion = fieldModifierRegionsVersion;
 
-    const regions = Array.from(fieldModifierRegions.values())
+    const regions = [...fieldModifierRegions.values()]
       .filter((region) => region.width > 0 && region.height > 0 && region.brightnessGrid)
       .slice(0, MAX_FIELD_MODIFIER_REGIONS);
 
@@ -821,4 +864,13 @@ export const createWebGlGlyphRenderer = ({
     supportsShaderEntropy: true,
     usesGpuGlyphSelection: true,
   };
+}
+
+export { createWebGlGlyphRenderer };
+export type {
+  GlyphEntropyMode,
+  GlyphFieldModifierRegion,
+  GlyphRenderSize,
+  GlyphRenderState,
+  GlyphRenderer,
 };

@@ -1,7 +1,11 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$, Slot, useStyles$ } from "@builder.io/qwik";
-import type { DocumentHeadProps, DocumentHeadValue, DocumentMeta } from "@builder.io/qwik-city";
-import { useLocation, type DocumentHead } from "@builder.io/qwik-city";
+import { type QwikJSX, Slot, component$, useStyles$ } from "@builder.io/qwik";
+import {
+  type DocumentHead,
+  type DocumentHeadProps,
+  type DocumentHeadValue,
+  type DocumentMeta,
+  useLocation,
+} from "@builder.io/qwik-city";
 
 import stylesForLayout from "src/routes/blog/layout.css?inline";
 import stylesForCodeHighlights from "src/styles/code.css?inline";
@@ -14,9 +18,9 @@ interface ArticleFrontmatter {
 }
 
 function getMetaContent(meta: readonly DocumentMeta[] | undefined, name: string): string {
-  const item = meta?.find((value): boolean => value.name === name);
+  const item = meta ? meta.find((value): boolean => value.name === name) : null;
 
-  return typeof item?.content === "string" ? item.content : "";
+  return item && typeof item.content === "string" ? item.content : "";
 }
 
 function getCaptionAltText(captionRaw: string): string {
@@ -39,7 +43,7 @@ function createArticleMetaTags({
   pageUrl: URL;
   title: string;
   topic: string;
-}): Array<DocumentMeta> {
+}): DocumentMeta[] {
   const imageUrl = new URL(cover, pageUrl).toString();
   const pageUrlString = pageUrl.toString();
   const imageAlt = getCaptionAltText(coverAlt);
@@ -85,8 +89,8 @@ export const head: DocumentHead = (props: DocumentHeadProps): DocumentHeadValue 
   const isArticle = Boolean(props.head.title);
 
   // For article pages the title is set in the MDX frontmatter, but we override it
-  // to include a base title. The original title (without the base) is still used
-  // for the Open Graph title, so it's not completely useless.
+  // To include a base title. The original title (without the base) is still used
+  // For the Open Graph title, so it's not completely useless.
   const titleBase = "Daniel van Dijk's Blog";
   const title = isArticle ? `${titleBase} - ${props.head.title}` : titleBase;
 

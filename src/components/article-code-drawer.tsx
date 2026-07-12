@@ -1,5 +1,4 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { $, component$, useSignal } from "@builder.io/qwik";
+import { $, type QwikJSX, component$, useSignal } from "@builder.io/qwik";
 
 const codeContentCache = new Map<string, Promise<string>>();
 
@@ -8,17 +7,17 @@ interface ArticleCodeDrawerProps {
   src: string;
 }
 
-function getCodeContent(src: string): Promise<string> {
+async function getCodeContent(src: string): Promise<string> {
   let content = codeContentCache.get(src);
 
   if (typeof content === "undefined") {
-    content = fetch(src).then(async (response): Promise<string> => {
-      if (!response.ok) {
-        throw new Error(`Code block request failed with ${response.status}.`);
-      }
+    const response = await fetch(src);
 
-      return response.text();
-    });
+    if (!response.ok) {
+      throw new Error(`Code block request failed with ${response.status}.`);
+    }
+
+    content = Promise.resolve(response.text());
     codeContentCache.set(src, content);
   }
 

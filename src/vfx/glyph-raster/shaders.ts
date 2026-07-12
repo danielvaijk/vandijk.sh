@@ -1,10 +1,10 @@
-import proceduralFragmentSource from "src/vfx/glyph-raster/shaders/glyph-raster-procedural.frag.glsl?raw";
 import frameFragmentSource from "src/vfx/glyph-raster/shaders/glyph-raster-frame.frag.glsl?raw";
-import proceduralVertexSource from "src/vfx/glyph-raster/shaders/glyph-raster-procedural.vert.glsl?raw";
 import frameVertexSource from "src/vfx/glyph-raster/shaders/glyph-raster-frame.vert.glsl?raw";
+import proceduralFragmentSource from "src/vfx/glyph-raster/shaders/glyph-raster-procedural.frag.glsl?raw";
+import proceduralVertexSource from "src/vfx/glyph-raster/shaders/glyph-raster-procedural.vert.glsl?raw";
 import solarNoiseSource from "src/vfx/solar-noise/shaders/solar-noise.glsl?raw";
 
-export type GlyphRasterShaderOptions = {
+interface GlyphRasterShaderOptions {
   fieldModifierBrightnessBoost: number;
   fieldModifierBrightnessFloor: number;
   fieldModifierBrightnessWhitePoint: number;
@@ -12,14 +12,14 @@ export type GlyphRasterShaderOptions = {
   maxFieldModifierRegions: number;
   noiseVisualWhitePoint: number;
   usesGpuNoise: boolean;
-};
+}
 
-export type GlyphRasterShaderSources = {
+interface GlyphRasterShaderSources {
   fragmentSource: string;
   vertexSource: string;
-};
+}
 
-const withShaderDefines = (
+function withShaderDefines(
   source: string,
   {
     fieldModifierBrightnessBoost,
@@ -29,31 +29,46 @@ const withShaderDefines = (
     maxFieldModifierRegions,
     noiseVisualWhitePoint,
   }: Omit<GlyphRasterShaderOptions, "usesGpuNoise">,
-): string => {
+): string {
   const defines = [
-    "#define GLYPH_FIELD_MODIFIER_BRIGHTNESS_BOOST " + fieldModifierBrightnessBoost.toFixed(1),
-    "#define GLYPH_FIELD_MODIFIER_BRIGHTNESS_FLOOR " + fieldModifierBrightnessFloor.toFixed(2),
-    "#define GLYPH_FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT " +
-      fieldModifierBrightnessWhitePoint.toFixed(2),
-    "#define GLYPH_FIELD_MODIFIER_SAMPLE_SIZE " + fieldModifierSampleSize,
-    "#define GLYPH_MAX_FIELD_MODIFIER_REGIONS " + maxFieldModifierRegions,
-    "#define GLYPH_NOISE_VISUAL_WHITE_POINT " + noiseVisualWhitePoint.toFixed(2),
+    `#define GLYPH_FIELD_MODIFIER_BRIGHTNESS_BOOST ${fieldModifierBrightnessBoost.toFixed(1)}`,
+    `#define GLYPH_FIELD_MODIFIER_BRIGHTNESS_FLOOR ${fieldModifierBrightnessFloor.toFixed(2)}`,
+    `#define GLYPH_FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT ${fieldModifierBrightnessWhitePoint.toFixed(
+      2,
+    )}`,
+    `#define GLYPH_FIELD_MODIFIER_SAMPLE_SIZE ${fieldModifierSampleSize}`,
+    `#define GLYPH_MAX_FIELD_MODIFIER_REGIONS ${maxFieldModifierRegions}`,
+    `#define GLYPH_NOISE_VISUAL_WHITE_POINT ${noiseVisualWhitePoint.toFixed(2)}`,
   ].join("\n");
 
-  return source.replace("#version 300 es", "#version 300 es\n" + defines);
-};
+  return source.replace("#version 300 es", `#version 300 es\n${defines}`);
+}
 
-export const createGlyphRasterShaderSources = ({
-  usesGpuNoise,
-  ...options
-}: GlyphRasterShaderOptions): GlyphRasterShaderSources => {
+function createGlyphRasterShaderSources(
+  options: GlyphRasterShaderOptions,
+): GlyphRasterShaderSources {
+  const { usesGpuNoise } = options;
+  const shaderOptions: Omit<GlyphRasterShaderOptions, "usesGpuNoise"> = {
+    fieldModifierBrightnessBoost: options.fieldModifierBrightnessBoost,
+    fieldModifierBrightnessFloor: options.fieldModifierBrightnessFloor,
+    fieldModifierBrightnessWhitePoint: options.fieldModifierBrightnessWhitePoint,
+    fieldModifierSampleSize: options.fieldModifierSampleSize,
+    maxFieldModifierRegions: options.maxFieldModifierRegions,
+    noiseVisualWhitePoint: options.noiseVisualWhitePoint,
+  };
   const vertexSource = usesGpuNoise
     ? proceduralVertexSource.replace("// SOLAR_NOISE_PLACEHOLDER", solarNoiseSource)
     : frameVertexSource;
   const fragmentSource = usesGpuNoise ? proceduralFragmentSource : frameFragmentSource;
 
   return {
-    fragmentSource: withShaderDefines(fragmentSource, options),
-    vertexSource: withShaderDefines(vertexSource, options),
+    fragmentSource: withShaderDefines(fragmentSource, shaderOptions),
+    vertexSource: withShaderDefines(vertexSource, shaderOptions),
   };
+}
+
+export {
+  createGlyphRasterShaderSources,
+  type GlyphRasterShaderOptions,
+  type GlyphRasterShaderSources,
 };

@@ -1,16 +1,31 @@
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { basename, join, parse, resolve } from "node:path";
+import { createRequire } from "node:module";
 
 import { toHtml } from "hast-util-to-html";
+import type { Root } from "hast";
 import { format } from "oxfmt";
-import { refractor } from "refractor";
-import tsx from "refractor/tsx";
 import type { Plugin, ResolvedConfig } from "vite";
 
 import type { GlyphRasterFrameOptions } from "../src/vfx/glyph-raster/frame-options";
 import { generateGreyscaleFrameSource } from "./frame-greyscale-sampler";
 import { ensureArticleImages } from "./image-optimizer";
+
+type RefractorSyntax = (refractor: unknown) => void;
+
+interface RefractorInstance {
+  highlight: (value: string, language: string) => Root;
+  register: (syntax: RefractorSyntax) => void;
+  registered: (language: string) => boolean;
+}
+
+const require = createRequire(import.meta.url);
+const { refractor } = require("refractor") as { refractor: RefractorInstance };
+const tsxModule = require("refractor/tsx") as RefractorSyntax & { displayName: string } & {
+  default?: RefractorSyntax & { displayName: string };
+};
+const tsx = (tsxModule.default ?? tsxModule) as RefractorSyntax & { displayName: string };
 
 interface ArticleMetadataFrontmatter {
   cover: string;
@@ -83,7 +98,7 @@ const WORDS_PER_MINUTE = 200;
 
 refractor.register(tsx);
 
-function readArticleFiles(root: string): Array<{ filePath: string; path: string }> {
+function readArticleFiles(root: string): { filePath: string; path: string }[] {
   const articlesDirectory = resolve(root, ARTICLES_DIRECTORY);
 
   return readdirSync(articlesDirectory, { withFileTypes: true }).flatMap((entity) => {
@@ -105,10 +120,10 @@ function parseArticleMetadataFrontmatter(filePath: string): {
   content: string;
   data: ArticleMetadataFrontmatter;
 } {
-  const markdown = readFileSync(filePath, "utf-8");
+  const markdown = readFileSync(filePath, "utf8");
   const match = /^---\n(?<frontmatter>[\s\S]*?)\n---\n?(?<content>[\s\S]*)$/u.exec(markdown);
 
-  if (match?.groups === undefined) {
+  if (!match || !match.groups) {
     throw new Error(`${filePath} is missing frontmatter.`);
   }
 
@@ -151,9 +166,10 @@ function getCaptionAltText(captionRaw: string): string {
 }
 
 function stripDuplicateTitle(content: string, title: string): string {
-  const firstLine = content.split("\n", 1)[0]?.trim();
+  const firstLineValue = content.split("\n", 1)[0];
+  const firstLine = firstLineValue ? firstLineValue.trim() : null;
 
-  if (firstLine === `# ${title}`) {
+  if (firstLine !== null && firstLine === `# ${title}`) {
     return content.slice(firstLine.length).trim();
   }
 
@@ -161,15 +177,17 @@ function stripDuplicateTitle(content: string, title: string): string {
 }
 
 function stripLeadingWikiMetadata(content: string): string {
-  return content.replace(/^(?:owner|tags|last_edited_time|cover_alt|snippet): .*\n/gmu, "").trim();
+  return content
+    .replaceAll(/^(?:owner|tags|last_edited_time|cover_alt|snippet): .*\n/gmu, "")
+    .trim();
 }
 
 function escapeHtmlText(value: string): string {
   return value
-    .replace(/&/gu, "&amp;")
-    .replace(/</gu, "&lt;")
-    .replace(/>/gu, "&gt;")
-    .replace(/"/gu, "&quot;");
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
 }
 
 function escapeJsString(value: string): string {
@@ -187,9 +205,10 @@ function getCodeDrawerSummary(info: string): string {
 }
 
 function getCodeBlockLanguage(info: string): string | null {
-  const language = info.trim().split(/\s+/u)[0]?.toLowerCase();
+  const firstLanguage = info.trim().split(/\s+/u)[0];
+  const language = firstLanguage ? firstLanguage.toLowerCase() : null;
 
-  if (typeof language !== "string" || language.length === 0) {
+  if (!language) {
     return null;
   }
 
@@ -232,11 +251,11 @@ function stripFrontmatter(markdown: string): string {
 
 function stripMarkdownTextSyntax(text: string): string {
   return text
-    .replace(/!\[[^\]]*\]\([^)]*\)/gu, "")
-    .replace(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
-    .replace(/`([^`]+)`/gu, "$1")
-    .replace(/[*_~]+/gu, "")
-    .replace(/<[^>]+>/gu, " ");
+    .replaceAll(/!\[[^\]]*\]\([^)]*\)/gu, "")
+    .replaceAll(/\[([^\]]+)\]\([^)]*\)/gu, "$1")
+    .replaceAll(/`([^`]+)`/gu, "$1")
+    .replaceAll(/[*_~]+/gu, "")
+    .replaceAll(/<[^>]+>/gu, " ");
 }
 
 function getMarkdownProseText(markdown: string): string {
@@ -349,16 +368,14 @@ async function wrapMarkdownCodeBlocks(
   let lastIndex = 0;
 
   for (const match of content.matchAll(codeBlockRegex)) {
-    const groups = match.groups as
-      | {
-          code: string;
-          fence: string;
-          indent: string;
-          info: string;
-        }
-      | undefined;
+    const groups = match.groups as {
+      code: string;
+      fence: string;
+      indent: string;
+      info: string;
+    } | null;
 
-    if (typeof groups === "undefined" || typeof match.index !== "number") {
+    if (!groups || typeof match.index !== "number") {
       continue;
     }
 
@@ -366,11 +383,10 @@ async function wrapMarkdownCodeBlocks(
     const summary = getCodeDrawerSummary(groups.info);
     const code = await formatMarkdownCodeBlock(groups.code, groups.info);
     const codeBlockHtml = renderCodeBlockHtml(code, groups.info);
-    const codeBlockSource =
-      (await options.saveCodeBlockContent?.({
-        html: codeBlockHtml,
-        info: groups.info,
-      })) ?? "";
+    const { saveCodeBlockContent } = options;
+    const codeBlockSource = saveCodeBlockContent
+      ? await saveCodeBlockContent({ html: codeBlockHtml, info: groups.info })
+      : "";
 
     result += content.slice(lastIndex, match.index);
     result += `${prefix}<ArticleCodeDrawer label={${escapeJsString(summary)}} src={${escapeJsString(codeBlockSource)}} />`;
@@ -418,7 +434,7 @@ function parseArticleMdxFrontmatter(source: string): {
 } {
   const match = /^---\n(?<frontmatter>[\s\S]*?)\n---\n?(?<body>[\s\S]*)$/u.exec(source);
 
-  if (match?.groups === undefined) {
+  if (!match || !match.groups) {
     return { body: source, frontmatter: {} };
   }
 
@@ -451,18 +467,18 @@ function slugify(text: string): string {
   return text
     .trim()
     .toLowerCase()
-    .replace(/\s+/gu, "-")
-    .replace(/[^\w\\-]+/gu, "")
-    .replace(/\\-\\-+/gu, "-");
+    .replaceAll(/\s+/gu, "-")
+    .replaceAll(/[^\w\\-]+/gu, "")
+    .replaceAll(/\\-\\-+/gu, "-");
 }
 
 function getAnchorLinks(content: string): string {
   return stripMarkdownCodeBlocks(content)
     .split("\n")
-    .flatMap((line: string): Array<string> => {
+    .flatMap((line: string): string[] => {
       const match = /^(?<level>#{2,3})\s+(?<title>.+)$/u.exec(line);
 
-      if (match?.groups === undefined) {
+      if (!match || !match.groups) {
         return [];
       }
 
@@ -516,10 +532,10 @@ function addArticleContents(source: string): string {
     return source;
   }
 
-  const title = frontmatter.title;
+  const { title } = frontmatter;
   const titlePattern =
     typeof title === "string" && title.length > 0
-      ? new RegExp(`^#\\s+${title.replace(/[.*+?^${}()|[\]\\]/gu, "\\$&")}\\s*$`, "mu")
+      ? new RegExp(`^#\\s+${title.replaceAll(/[.*+?^${}()|[\]\\]/gu, String.raw`\$&`)}\\s*$`, "mu")
       : /^#\s+.+$/mu;
   const titleMatch = titlePattern.exec(body);
 
@@ -558,7 +574,8 @@ function addArticleCodeDrawerImport(source: string): string {
 }
 
 function getBlogArticlePath(id: string): string | null {
-  return /\/src\/routes\/blog\/(?<path>[^/]+)\/index\.mdx(?:\?|$)/u.exec(id)?.groups?.path ?? null;
+  const match = /\/src\/routes\/blog\/(?<path>[^/]+)\/index\.mdx(?:\?|$)/u.exec(id);
+  return match && match.groups ? match.groups.path : null;
 }
 
 function renderCoverImageMarkup(coverAlt: string): string {
@@ -579,12 +596,17 @@ function getArticleAssetFileName(publicPath: string): string {
   return basename(publicPath);
 }
 
-async function generateCoverFrames(
-  root: string,
-  path: string,
-  cover: string,
-  glyphFrameOptions: GlyphRasterFrameOptions,
-): Promise<string> {
+async function generateCoverFrames({
+  root,
+  path,
+  cover,
+  glyphFrameOptions,
+}: {
+  root: string;
+  path: string;
+  cover: string;
+  glyphFrameOptions: GlyphRasterFrameOptions;
+}): Promise<string> {
   const framesPath = `/blog/${path}/cover.frames`;
   const coverFileName = getArticleAssetFileName(cover);
 
@@ -627,8 +649,8 @@ async function generateArticleGifFrames(
 async function generateArticlesMetadata(
   root: string,
   glyphFrameOptions: GlyphRasterFrameOptions,
-): Promise<Array<ArticleMetadata>> {
-  const results: Array<ArticleMetadata> = [];
+): Promise<ArticleMetadata[]> {
+  const results: ArticleMetadata[] = [];
 
   for (const { filePath, path } of readArticleFiles(root)) {
     const { content, data } = parseArticleMetadataFrontmatter(filePath);
@@ -640,17 +662,17 @@ async function generateArticlesMetadata(
     const date = new Date(data.date);
 
     if (Number.isNaN(date.getTime())) {
-      throw new Error(`${filePath} has an invalid date.`);
+      throw new TypeError(`${filePath} has an invalid date.`);
     }
 
     const articleContent = stripLeadingWikiMetadata(stripDuplicateTitle(content, data.title));
     const readTime = getReadTimeInMinutesFromWordCount(getMarkdownProseWordCount(articleContent));
-    const coverImageFramesPath = await generateCoverFrames(
-      root,
-      path,
-      data.cover,
+    const coverImageFramesPath = await generateCoverFrames({
+      cover: data.cover,
       glyphFrameOptions,
-    );
+      path,
+      root,
+    });
     await generateArticleGifFrames(root, path, glyphFrameOptions);
 
     results.push({
@@ -665,22 +687,25 @@ async function generateArticlesMetadata(
     });
   }
 
-  const sortedResults = results.sort((a, b): number => {
-    const dateA = new Date(a.date);
-    const dateB = new Date(b.date);
+  const sortedResults = [...results].sort((firstResult, secondResult): number => {
+    const firstDate = new Date(firstResult.date);
+    const secondDate = new Date(secondResult.date);
 
-    return dateB.getTime() - dateA.getTime();
+    return secondDate.getTime() - firstDate.getTime();
   });
   return sortedResults;
 }
 
 function articlesMetadataPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Plugin {
-  let config: ResolvedConfig;
-  let articlesMetadata: Promise<Array<ArticleMetadata>> | null = null;
+  let config: ResolvedConfig | null = null;
+  let articlesMetadata: Promise<ArticleMetadata[]> | null = null;
 
-  function ensureArticlesMetadata(): Promise<Array<ArticleMetadata>> {
+  function ensureArticlesMetadata(): Promise<ArticleMetadata[]> {
     if (articlesMetadata === null) {
-      articlesMetadata = (async (): Promise<Array<ArticleMetadata>> => {
+      articlesMetadata = (async (): Promise<ArticleMetadata[]> => {
+        if (!config) {
+          throw new Error("Vite config was not resolved before metadata generation.");
+        }
         await ensureArticleImages(config.root);
         return generateArticlesMetadata(config.root, glyphFrameOptions);
       })();
@@ -690,15 +715,11 @@ function articlesMetadataPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Plu
   }
 
   return {
-    name: "articles-metadata",
-    configResolved(resolvedConfig): void {
-      config = resolvedConfig;
-    },
-    resolveId(id): string | null {
-      return id === ARTICLES_METADATA_MODULE_ID ? RESOLVED_ARTICLES_METADATA_MODULE_ID : null;
-    },
     async buildStart(): Promise<void> {
       await ensureArticlesMetadata();
+    },
+    configResolved(resolvedConfig): void {
+      config = resolvedConfig;
     },
     async load(id): Promise<string | null> {
       if (id !== RESOLVED_ARTICLES_METADATA_MODULE_ID) {
@@ -709,16 +730,20 @@ function articlesMetadataPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Plu
 
       return `export default ${JSON.stringify(metadata)};`;
     },
+    name: "articles-metadata",
+    resolveId(id): string | null {
+      return id === ARTICLES_METADATA_MODULE_ID ? RESOLVED_ARTICLES_METADATA_MODULE_ID : null;
+    },
   };
 }
 
 function articleCodeDrawerMdxPlugin(): Plugin {
   return {
-    name: "article-code-drawer-mdx",
-    enforce: "pre",
     buildStart(): void {
       cleanGeneratedArticleCodeBlocks();
     },
+    enforce: "pre",
+    name: "article-code-drawer-mdx",
     async transform(source, id): Promise<string | null> {
       const articlePath = getBlogArticlePath(id);
 
@@ -742,7 +767,7 @@ function articleCodeDrawerMdxPlugin(): Plugin {
   };
 }
 
-function articleContentRendererPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Array<Plugin> {
+function articleContentRendererPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Plugin[] {
   return [articlesMetadataPlugin(glyphFrameOptions), articleCodeDrawerMdxPlugin()];
 }
 

@@ -1,5 +1,4 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$, useStyles$ } from "@builder.io/qwik";
+import { type QwikJSX, component$, useStyles$ } from "@builder.io/qwik";
 
 import { NavigationHeaderItems } from "src/components/navigation-header-items";
 import { NavigationHeaderName } from "src/components/navigation-header-name";

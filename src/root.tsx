@@ -5,11 +5,11 @@ import {
   useDocumentHead,
   useLocation,
 } from "@builder.io/qwik-city";
+import styles from "src/global.css?url";
 
 // Qwik will try to inline this file in production mode if the amount
-// of CSS is less than 10KB. If the file is larger than 10KB, it will
-// be loaded as a separate file.
-import "src/global.css";
+// Of CSS is less than 10KB. If the file is larger than 10KB, it will
+// Be loaded as a separate file.
 
 const RootHead = component$((): QwikJSX.Element => {
   const head = useDocumentHead();
@@ -23,8 +23,8 @@ const RootHead = component$((): QwikJSX.Element => {
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
       {head.meta.map(
-        ({ key, ...props }): QwikJSX.Element => (
-          <meta key={key} {...props} />
+        (meta): QwikJSX.Element => (
+          <meta key={meta.key} {...meta} />
         ),
       )}
 
@@ -32,8 +32,8 @@ const RootHead = component$((): QwikJSX.Element => {
       <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 
       {head.links.map(
-        ({ key, ...props }): QwikJSX.Element => (
-          <link key={key} {...props} />
+        (link): QwikJSX.Element => (
+          <link key={link.key} {...link} />
         ),
       )}
 
@@ -42,6 +42,8 @@ const RootHead = component$((): QwikJSX.Element => {
           <style key={key} {...props} dangerouslySetInnerHTML={style} />
         ),
       )}
+
+      <link rel="stylesheet" href={styles} />
     </head>
   );
 });
@@ -50,9 +52,7 @@ const RootBody = component$((): QwikJSX.Element => {
   useOnWindow(
     "load",
     $((): void => {
-      console.info(
-        "Hello there! If you're looking for the source code, you can find it here: https://github.com/danielvaijk/vandijk.sh",
-      );
+      /* Empty */
     }),
   );
 
@@ -63,11 +63,11 @@ const RootBody = component$((): QwikJSX.Element => {
   );
 });
 
-export default component$((): QwikJSX.Element => {
-  return (
+export default component$(
+  (): QwikJSX.Element => (
     <QwikCityProvider>
       <RootHead />
       <RootBody />
     </QwikCityProvider>
-  );
-});
+  ),
+);

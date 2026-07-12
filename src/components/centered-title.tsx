@@ -1,5 +1,11 @@
-import type { PropFunction, QwikJSX } from "@builder.io/qwik";
-import { component$, useSignal, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
+import {
+  type PropFunction,
+  type QwikJSX,
+  component$,
+  useSignal,
+  useStylesScoped$,
+  useVisibleTask$,
+} from "@builder.io/qwik";
 import TypeIt, { type Options as TypeItOptions } from "typeit";
 
 import styles from "src/components/centered-title.css?inline";
@@ -23,18 +29,20 @@ export const CenteredTitle = component$<CenteredTitleProps>(
     useVisibleTask$(({ cleanup }): void => {
       const element = typedTitleElement.value;
 
-      if (!element) return;
+      if (!element) {
+        return;
+      }
 
       let isCleanedUp = false;
-      const shouldStartByDeletingTitle = typeTitle$ && typeTitleOptions?.startDelete === true;
+      const configuredOptions = typeTitleOptions ?? {};
+      const shouldStartByDeletingTitle = typeTitle$ && configuredOptions.startDelete === true;
       const options = typeTitle$
-        ? typeTitleOptions
-        : {
-            ...typeTitleOptions,
-            startDelay: typeTitleOptions?.startDelay ?? 0,
+        ? configuredOptions
+        : Object.assign(configuredOptions, {
+            startDelay: configuredOptions.startDelay ?? 0,
             startDelete: false,
             strings: [],
-          };
+          });
 
       if (shouldStartByDeletingTitle) {
         element.textContent = title;
@@ -47,14 +55,21 @@ export const CenteredTitle = component$<CenteredTitleProps>(
       }
 
       element.hidden = false;
-      staticTitleElement.value?.setAttribute("hidden", "");
+      const staticTitle = staticTitleElement.value;
+      if (staticTitle) {
+        staticTitle.setAttribute("hidden", "");
+      }
 
       const startTypeIt = (): void => {
-        if (!isCleanedUp) typeIt.go();
+        if (!isCleanedUp) {
+          typeIt.go();
+        }
       };
 
       if (typeTitle$) {
-        void typeTitle$(typeIt).then(startTypeIt);
+        typeTitle$(typeIt).then((): void => {
+          startTypeIt();
+        });
       } else {
         startTypeIt();
       }
@@ -62,7 +77,9 @@ export const CenteredTitle = component$<CenteredTitleProps>(
       cleanup((): void => {
         isCleanedUp = true;
         typeIt.destroy();
-        staticTitleElement.value?.removeAttribute("hidden");
+        if (staticTitle) {
+          staticTitle.removeAttribute("hidden");
+        }
         element.hidden = true;
         element.textContent = "";
       });

@@ -1,25 +1,30 @@
-export const FIELD_MODIFIER_SAMPLE_SIZE = 256;
-export const FIELD_MODIFIER_BRIGHTNESS_BOOST = 1;
-export const FIELD_MODIFIER_BRIGHTNESS_FLOOR = 0.07;
-export const FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT = 1;
-
 import { clamp, lerp, smoothstep } from "src/vfx/shared/math";
 
-export type GlyphFieldModifierRegion = {
+const FIELD_MODIFIER_SAMPLE_SIZE = 256;
+const FIELD_MODIFIER_BRIGHTNESS_BOOST = 1;
+const FIELD_MODIFIER_BRIGHTNESS_FLOOR = 0.07;
+const FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT = 1;
+
+interface GlyphFieldModifierRegion {
   blend: number;
   brightnessGrid?: Uint8Array;
   documentLeft: number;
   documentTop: number;
   height: number;
   width: number;
-};
+}
 
-export const applyGlyphFieldModifierBrightness = (
-  brightness: number,
-  worldX: number,
-  worldY: number,
-  regions: Iterable<GlyphFieldModifierRegion>,
-): number => {
+function applyGlyphFieldModifierBrightness({
+  brightness,
+  worldX,
+  worldY,
+  regions,
+}: {
+  brightness: number;
+  worldX: number;
+  worldY: number;
+  regions: Iterable<GlyphFieldModifierRegion>;
+}): number {
   let modifierBrightness = 0;
 
   for (const region of regions) {
@@ -39,10 +44,10 @@ export const applyGlyphFieldModifierBrightness = (
         continue;
       }
 
-      const u = clamp((worldX - region.documentLeft) / region.width, 0, 0.999999);
-      const v = clamp((worldY - region.documentTop) / region.height, 0, 0.999999);
-      const sampleX = u * (FIELD_MODIFIER_SAMPLE_SIZE - 1);
-      const sampleY = v * (FIELD_MODIFIER_SAMPLE_SIZE - 1);
+      const horizontalRatio = clamp((worldX - region.documentLeft) / region.width, 0, 0.999999);
+      const verticalRatio = clamp((worldY - region.documentTop) / region.height, 0, 0.999999);
+      const sampleX = horizontalRatio * (FIELD_MODIFIER_SAMPLE_SIZE - 1);
+      const sampleY = verticalRatio * (FIELD_MODIFIER_SAMPLE_SIZE - 1);
       const left = Math.floor(sampleX);
       const top = Math.floor(sampleY);
       const right = Math.min(FIELD_MODIFIER_SAMPLE_SIZE - 1, left + 1);
@@ -77,4 +82,13 @@ export const applyGlyphFieldModifierBrightness = (
     brightness +
     Math.min(1, modifierBrightness * FIELD_MODIFIER_BRIGHTNESS_BOOST) * (1 - brightness)
   );
+}
+
+export {
+  applyGlyphFieldModifierBrightness,
+  FIELD_MODIFIER_BRIGHTNESS_BOOST,
+  FIELD_MODIFIER_BRIGHTNESS_FLOOR,
+  FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT,
+  FIELD_MODIFIER_SAMPLE_SIZE,
+  type GlyphFieldModifierRegion,
 };

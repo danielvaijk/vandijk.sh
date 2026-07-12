@@ -1,7 +1,12 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { $, component$, useSignal, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
-import type { DocumentHeadValue } from "@builder.io/qwik-city";
-import { type DocumentHead, useNavigate } from "@builder.io/qwik-city";
+import {
+  $,
+  type QwikJSX,
+  component$,
+  useSignal,
+  useStylesScoped$,
+  useVisibleTask$,
+} from "@builder.io/qwik";
+import { type DocumentHead, type DocumentHeadValue, useNavigate } from "@builder.io/qwik-city";
 import type TypeIt from "typeit";
 
 import { CenteredTitle } from "src/components/centered-title";
@@ -15,19 +20,19 @@ export default component$((): QwikJSX.Element => {
   useStylesScoped$(styles);
 
   useVisibleTask$(({ cleanup }): void => {
-    const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in window;
+    const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in globalThis;
     continuePrompt.value = hasTouch ? "tap to continue" : "press any key to continue";
 
-    const continueToBlog = (): void => {
-      void navigate("/blog/");
+    const continueToBlog = async (): Promise<void> => {
+      await navigate("/blog/");
     };
 
-    window.addEventListener("keydown", continueToBlog, { capture: true });
-    window.addEventListener("touchstart", continueToBlog, { capture: true });
+    globalThis.addEventListener("keydown", continueToBlog, { capture: true });
+    globalThis.addEventListener("touchstart", continueToBlog, { capture: true });
 
     cleanup(() => {
-      window.removeEventListener("keydown", continueToBlog, { capture: true });
-      window.removeEventListener("touchstart", continueToBlog, { capture: true });
+      globalThis.removeEventListener("keydown", continueToBlog, { capture: true });
+      globalThis.removeEventListener("touchstart", continueToBlog, { capture: true });
     });
   });
 
@@ -60,7 +65,7 @@ export default component$((): QwikJSX.Element => {
             .type("Daniel", { instant: true })
             .pause(300)
             .type(".")
-            .pause(10000);
+            .pause(10_000);
         })}
         typeTitleOptions={{ loop: true, startDelay: 6000, startDelete: true }}
       />

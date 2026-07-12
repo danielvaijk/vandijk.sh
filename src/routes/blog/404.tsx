@@ -1,5 +1,4 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$, useStylesScoped$ } from "@builder.io/qwik";
+import { type QwikJSX, component$, useStylesScoped$ } from "@builder.io/qwik";
 
 import { CenteredTitle } from "src/components/centered-title";
 import { GlyphRaster } from "src/components/glyph-raster";

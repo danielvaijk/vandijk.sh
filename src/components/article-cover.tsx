@@ -1,5 +1,4 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$ } from "@builder.io/qwik";
+import { type QwikJSX, component$ } from "@builder.io/qwik";
 
 import { GlyphRaster } from "src/components/glyph-raster";
 
@@ -9,13 +8,11 @@ interface ArticleCoverProps {
 }
 
 export const ArticleCover = component$(
-  ({ alt, framesPath }: ArticleCoverProps): QwikJSX.Element => {
-    return (
-      <div class="article-cover-glyph-raster">
-        <GlyphRaster layout="fill" source={{ type: "frames", url: framesPath }} />
+  ({ alt, framesPath }: ArticleCoverProps): QwikJSX.Element => (
+    <div class="article-cover-glyph-raster">
+      <GlyphRaster layout="fill" source={{ type: "frames", url: framesPath }} />
 
-        <figure aria-label={alt} role="img" />
-      </div>
-    );
-  },
+      <figure aria-label={alt} />
+    </div>
+  ),
 );

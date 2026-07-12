@@ -11,7 +11,6 @@ declare module "virtual:articles" {
   }
 
   const articles: ArticleMetadata[];
+
   export default articles;
 }
-
-export type VirtualArticlesModuleMarker = never;

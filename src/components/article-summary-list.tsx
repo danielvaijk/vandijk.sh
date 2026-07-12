@@ -1,11 +1,10 @@
-import type { QwikJSX } from "@builder.io/qwik";
-import { component$, useStylesScoped$ } from "@builder.io/qwik";
+import { type QwikJSX, component$, useStylesScoped$ } from "@builder.io/qwik";
 
 import { ArticleSummaryItem, type ArticleSummaryProps } from "src/components/article-summary-item";
 import styles from "src/components/article-summary-list.css?inline";
 
 interface ArticleSummaryListProps {
-  articles: Array<ArticleSummaryProps>;
+  articles: ArticleSummaryProps[];
 }
 
 export const ArticleSummaryList = component$<ArticleSummaryListProps>(
@@ -15,8 +14,27 @@ export const ArticleSummaryList = component$<ArticleSummaryListProps>(
     return (
       <ul class="article-summary-list">
         {articles.map(
-          ({ path, ...rest }): QwikJSX.Element => (
-            <ArticleSummaryItem key={path} path={path} {...rest} />
+          ({
+            coverImageFramesPath,
+            coverImageMarkup,
+            date,
+            description,
+            path,
+            readTime,
+            title,
+            topic,
+          }): QwikJSX.Element => (
+            <ArticleSummaryItem
+              key={path}
+              coverImageFramesPath={coverImageFramesPath}
+              coverImageMarkup={coverImageMarkup}
+              date={date}
+              description={description}
+              path={path}
+              readTime={readTime}
+              title={title}
+              topic={topic}
+            />
           ),
         )}
       </ul>
