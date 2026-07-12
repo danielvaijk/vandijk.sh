@@ -28,6 +28,11 @@ interface FrameModifierBrightnessGrids {
   grids: Uint8Array;
 }
 
+interface StreamFrameModifierBrightnessGridsParams {
+  onFrame?: (frame: number, grids: FrameModifierBrightnessGrids) => void;
+  source: GlyphRasterFrameSource;
+}
+
 interface SourceAdapter {
   defaultFps?: number;
   frameCount?: number;
@@ -117,16 +122,13 @@ function parseSourceHeader(raw: Uint8Array, sourceUrl: string): ParsedFrameSourc
   };
 }
 
-async function loadFrameSource(source: GlyphRasterFrameSource): Promise<ParsedFrameSource> {
-  const response = await fetch(source.url);
-
-  if (!response.ok) {
-    throw new Error(`Unable to load character animation frames from ${source.url}.`);
+function parseFrameSourceHeader(raw: Uint8Array, sourceUrl: string): ParsedSourceHeader {
+  const headerEnd = raw.indexOf(10);
+  if (headerEnd === -1) {
+    throw new Error(`Unable to parse character animation frames from ${sourceUrl}.`);
   }
 
-  const bytes = new Uint8Array(await response.arrayBuffer());
-
-  return parseSourceHeader(bytes, source.url);
+  return JSON.parse(new TextDecoder().decode(raw.subarray(0, headerEnd))) as ParsedSourceHeader;
 }
 
 function sampleFrameBrightness({
@@ -172,11 +174,165 @@ function createNoiseAdapter(): SourceAdapter {
   };
 }
 
-async function createFrameModifierBrightnessGrids(
-  source: GlyphRasterFrameSource,
-): Promise<FrameModifierBrightnessGrids> {
-  const frameSource = await loadFrameSource(source);
+async function createFrameModifierBrightnessGrids({
+  onFrame,
+  source,
+}: StreamFrameModifierBrightnessGridsParams): Promise<FrameModifierBrightnessGrids> {
+  const response = await fetch(source.url);
+
+  if (!response.ok) {
+    throw new Error(`Unable to load character animation frames from ${source.url}.`);
+  }
+
+  const reader = response.body?.getReader();
+  if (!reader) {
+    const bytes = new Uint8Array(await response.arrayBuffer());
+    const frameSource = parseSourceHeader(bytes, source.url);
+    const sampledFrameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
+    const grids = new Uint8Array(frameSource.frameCount * sampledFrameSize);
+
+    for (let frame = 0; frame < frameSource.frameCount; frame += 1) {
+      const sampledFrameOffset = frame * sampledFrameSize;
+      for (let row = 0; row < FIELD_MODIFIER_SAMPLE_SIZE; row += 1) {
+        for (let col = 0; col < FIELD_MODIFIER_SAMPLE_SIZE; col += 1) {
+          grids[sampledFrameOffset + row * FIELD_MODIFIER_SAMPLE_SIZE + col] =
+            sampleFrameBrightness({
+              cellColumnIndex: col,
+              cellRowIndex: row,
+              frame,
+              frameSource,
+            });
+        }
+      }
+    }
+
+    const result = {
+      aspectRatio: frameSource.aspectRatio,
+      defaultFps: frameSource.defaultFps,
+      frameCount: frameSource.frameCount,
+      grids,
+    };
+    setCachedValue({
+      cache: frameBrightnessCache,
+      key: [
+        source.url,
+        "modifier",
+        frameSource.cols,
+        frameSource.rows,
+        frameSource.frameCount,
+        FIELD_MODIFIER_SAMPLE_SIZE,
+      ].join(":"),
+      maxSize: MAX_FRAME_BRIGHTNESS_CACHE_SIZE,
+      value: grids,
+    });
+    onFrame?.(0, result);
+    return result;
+  }
+
+  let headerBytes = new Uint8Array();
+  let frameBytes = new Uint8Array();
+  let frameSource: Omit<ParsedFrameSource, "frames"> | null = null;
+  let grids: Uint8Array | null = null;
+  let frame = 0;
   const sampledFrameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
+  const appendBytes = (current: Uint8Array, next: Uint8Array): Uint8Array => {
+    const combined = new Uint8Array(current.length + next.length);
+    combined.set(current);
+    combined.set(next, current.length);
+    return combined;
+  };
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) {
+      break;
+    }
+
+    let remaining = value;
+    if (!frameSource) {
+      headerBytes = appendBytes(headerBytes, remaining);
+      const headerEnd = headerBytes.indexOf(10);
+      if (headerEnd === -1) {
+        continue;
+      }
+
+      const header = parseFrameSourceHeader(headerBytes, source.url);
+      const frameSize = header.cols * header.rows;
+      frameSource = {
+        aspectRatio:
+          ((header.cols / GLYPH_HORIZONTAL_SCALE) * NOISE_CELL_WIDTH) /
+          (header.rows * NOISE_CELL_HEIGHT),
+        cols: header.cols,
+        defaultFps: header.fps ?? DEFAULT_FRAME_RATE,
+        frameCount: header.n_frames,
+        frameSize,
+        rows: header.rows,
+      };
+      const cacheKey = [
+        source.url,
+        "modifier",
+        frameSource.cols,
+        frameSource.rows,
+        frameSource.frameCount,
+        FIELD_MODIFIER_SAMPLE_SIZE,
+      ].join(":");
+      const cachedGrids = getCachedValue(frameBrightnessCache, cacheKey);
+      if (cachedGrids) {
+        const result = {
+          aspectRatio: frameSource.aspectRatio,
+          defaultFps: frameSource.defaultFps,
+          frameCount: frameSource.frameCount,
+          grids: cachedGrids,
+        };
+        await reader.cancel();
+        onFrame?.(0, result);
+        return result;
+      }
+      grids = new Uint8Array(frameSource.frameCount * sampledFrameSize);
+      remaining = headerBytes.subarray(headerEnd + 1);
+      headerBytes = new Uint8Array();
+    }
+
+    frameBytes = appendBytes(frameBytes, remaining);
+    while (
+      frameSource &&
+      grids &&
+      frameBytes.length >= frameSource.frameSize &&
+      frame < frameSource.frameCount
+    ) {
+      const sourceFrame = frameBytes.subarray(0, frameSource.frameSize);
+      const sampledFrameOffset = frame * sampledFrameSize;
+
+      for (let row = 0; row < FIELD_MODIFIER_SAMPLE_SIZE; row += 1) {
+        const sourceRow = Math.min(
+          frameSource.rows - 1,
+          Math.floor(((row + 0.5) * frameSource.rows) / FIELD_MODIFIER_SAMPLE_SIZE),
+        );
+        for (let col = 0; col < FIELD_MODIFIER_SAMPLE_SIZE; col += 1) {
+          const sourceCol = Math.min(
+            frameSource.cols - 1,
+            Math.floor(((col + 0.5) * frameSource.cols) / FIELD_MODIFIER_SAMPLE_SIZE),
+          );
+          grids[sampledFrameOffset + row * FIELD_MODIFIER_SAMPLE_SIZE + col] =
+            sourceFrame[sourceRow * frameSource.cols + sourceCol] ?? 0;
+        }
+      }
+
+      onFrame?.(frame, {
+        aspectRatio: frameSource.aspectRatio,
+        defaultFps: frameSource.defaultFps,
+        frameCount: frameSource.frameCount,
+        grids,
+      });
+      frame += 1;
+      frameBytes = frameBytes.subarray(frameSource.frameSize);
+    }
+  }
+
+  if (!frameSource || !grids || frame !== frameSource.frameCount) {
+    throw new Error(`Unable to load all character animation frames from ${source.url}.`);
+  }
+
   const cacheKey = [
     source.url,
     "modifier",
@@ -185,33 +341,6 @@ async function createFrameModifierBrightnessGrids(
     frameSource.frameCount,
     FIELD_MODIFIER_SAMPLE_SIZE,
   ].join(":");
-  const cachedGrids = getCachedValue(frameBrightnessCache, cacheKey);
-  if (cachedGrids) {
-    return {
-      aspectRatio: frameSource.aspectRatio,
-      defaultFps: frameSource.defaultFps,
-      frameCount: frameSource.frameCount,
-      grids: cachedGrids,
-    };
-  }
-
-  const grids = new Uint8Array(frameSource.frameCount * sampledFrameSize);
-
-  for (let frame = 0; frame < frameSource.frameCount; frame += 1) {
-    const sampledFrameOffset = frame * sampledFrameSize;
-
-    for (let row = 0; row < FIELD_MODIFIER_SAMPLE_SIZE; row += 1) {
-      for (let col = 0; col < FIELD_MODIFIER_SAMPLE_SIZE; col += 1) {
-        const value = sampleFrameBrightness({
-          cellColumnIndex: col,
-          cellRowIndex: row,
-          frame,
-          frameSource,
-        });
-        grids[sampledFrameOffset + row * FIELD_MODIFIER_SAMPLE_SIZE + col] = value;
-      }
-    }
-  }
 
   setCachedValue({
     cache: frameBrightnessCache,

@@ -38,6 +38,7 @@ import {
 import { type GlyphEntropyMode, createWebGlGlyphRenderer } from "src/vfx/glyph-raster/webgl";
 import { noiseVisualBrightness } from "src/vfx/solar-noise/cpu";
 import {
+  type FrameModifierBrightnessGrids,
   type GlyphRasterSource,
   createFrameModifierBrightnessGrids,
   createNoiseAdapter,
@@ -335,49 +336,75 @@ export const GlyphRaster = component$(
         glyphFieldModifierRegions.set(rasterId, region);
         onRegionChanged();
         onRegionBlendChanged();
-        createFrameModifierBrightnessGrids(resolvedSource)
-          .then(({ aspectRatio, defaultFps, frameCount, grids }) => {
+        let availableFrameCount = 0;
+        let isFrameLoadComplete = false;
+        const showFirstFrame = ({ aspectRatio, grids }: FrameModifierBrightnessGrids): void => {
+          if (isCleanedUp) {
+            return;
+          }
+
+          frameAspectRatio = aspectRatio;
+          element.style.setProperty("--glyph-raster-frame-aspect", String(aspectRatio));
+          onRegionChanged();
+          region.brightnessGrid = grids.subarray(0, FIELD_MODIFIER_SAMPLE_SIZE ** 2);
+          markGlyphFieldModifierRegionsChanged();
+          scheduleActiveGlyphRasters();
+        };
+        const startProgressivePlayback = ({
+          defaultFps,
+          frameCount,
+          grids,
+        }: Pick<FrameModifierBrightnessGrids, "defaultFps" | "frameCount" | "grids">): void => {
+          if (activeRaster || frameCount <= 1) {
+            return;
+          }
+
+          const frameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
+          const frameRate = clamp(defaultFps, MIN_FRAME_RATE, MAX_FRAME_RATE);
+          let currentFrame = 0;
+          let lastFrameAt = 0;
+
+          activeRaster = {
+            canRender: () => isDocumentVisible && isRasterVisible,
+            render: (time: number): void => {
+              if (lastFrameAt !== 0 && time - lastFrameAt < 1000 / frameRate) {
+                return;
+              }
+
+              const hasNextFrame = currentFrame < availableFrameCount - 1;
+              if (!hasNextFrame && !isFrameLoadComplete) {
+                return;
+              }
+
+              currentFrame = hasNextFrame ? currentFrame + 1 : 0;
+              const frameOffset = currentFrame * frameSize;
+              region.brightnessGrid = grids.subarray(frameOffset, frameOffset + frameSize);
+              markGlyphFieldModifierRegionsChanged();
+              lastFrameAt = time;
+            },
+          };
+          addActiveGlyphRaster(activeRaster);
+          scheduleActiveGlyphRasters();
+        };
+        createFrameModifierBrightnessGrids({
+          onFrame: (frame, frameGrids): void => {
+            availableFrameCount = Math.max(availableFrameCount, frame + 1);
+            if (frame === 0) {
+              showFirstFrame(frameGrids);
+            }
+            startProgressivePlayback(frameGrids);
+            scheduleActiveGlyphRasters();
+          },
+          source: resolvedSource,
+        })
+          .then(({ defaultFps, frameCount, grids }) => {
             if (isCleanedUp) {
               return;
             }
 
-            frameAspectRatio = aspectRatio;
-            element.style.setProperty("--glyph-raster-frame-aspect", String(aspectRatio));
-            onRegionChanged();
-
-            const frameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
-            const frameRate = clamp(defaultFps, MIN_FRAME_RATE, MAX_FRAME_RATE);
-            region.brightnessGrid = grids.subarray(0, frameSize);
-            markGlyphFieldModifierRegionsChanged();
-            scheduleActiveGlyphRasters();
-
-            if (frameCount <= 1) {
-              return;
-            }
-
-            let framePosition = 0;
-            let lastFrameAt = 0;
-
-            activeRaster = {
-              canRender: () => isDocumentVisible && isRasterVisible,
-              render: (time: number): void => {
-                if (lastFrameAt !== 0 && time - lastFrameAt < 1000 / frameRate) {
-                  return;
-                }
-
-                const elapsedMilliseconds =
-                  lastFrameAt === 0 ? 1000 / frameRate : time - lastFrameAt;
-                const elapsedFrames = (elapsedMilliseconds / 1000) * frameRate;
-                const currentFrame = Math.floor(framePosition) % frameCount;
-                const frameOffset = currentFrame * frameSize;
-
-                region.brightnessGrid = grids.subarray(frameOffset, frameOffset + frameSize);
-                markGlyphFieldModifierRegionsChanged();
-                framePosition = (framePosition + elapsedFrames) % frameCount;
-                lastFrameAt = time;
-              },
-            };
-            addActiveGlyphRaster(activeRaster);
+            availableFrameCount = frameCount;
+            isFrameLoadComplete = true;
+            startProgressivePlayback({ defaultFps, frameCount, grids });
             scheduleActiveGlyphRasters();
           })
           .catch(() => {
