@@ -4,7 +4,7 @@ import { useLocation } from "@builder.io/qwik-city";
 
 import { GlyphRaster } from "src/components/glyph-raster";
 import { GlyphTextReveal } from "src/components/glyph-text-reveal";
-import { NavigationHeader } from "src/components/navigation/navigation-header";
+import { NavigationHeader } from "src/components/navigation-header";
 import styles from "src/routes/layout.css?inline";
 
 export default component$((): QwikJSX.Element => {

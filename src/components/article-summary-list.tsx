@@ -1,11 +1,8 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 
-import {
-  ArticleSummaryItem,
-  type ArticleSummaryProps,
-} from "src/components/articles/article-summary-item";
-import styles from "src/components/articles/article-summary-list.css?inline";
+import { ArticleSummaryItem, type ArticleSummaryProps } from "src/components/article-summary-item";
+import styles from "src/components/article-summary-list.css?inline";
 
 interface ArticleSummaryListProps {
   articles: Array<ArticleSummaryProps>;

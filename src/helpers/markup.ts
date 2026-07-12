@@ -348,7 +348,7 @@ opengraph:
 ---
 
 import { GlyphRaster } from "src/components/glyph-raster";
-import { ArticleCodeDrawer } from "src/components/articles/article-code-drawer";
+import { ArticleCodeDrawer } from "src/components/article-code-drawer";
 
 export default function Layout({ children: content }) {
   return <article>{content}</article>;

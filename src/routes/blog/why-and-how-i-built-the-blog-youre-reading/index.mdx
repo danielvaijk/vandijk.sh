@@ -9,8 +9,8 @@ summary: "Blog post: Why (and How) I Built The Blog You’re Reading."
 toc: []
 ---
 
-import { ArticleCover } from "src/components/articles/article-cover";
-import { ArticleGlyphImage } from "src/components/articles/article-glyph-image";
+import { ArticleCover } from "src/components/article-cover";
+import { ArticleGlyphImage } from "src/components/article-glyph-image";
 import { WorldMap, WorldMapPoint } from "src/components/world-map";
 
 export default function Layout({ children: content }) {
@@ -1420,7 +1420,7 @@ And now we just need to access the loaded data in the listing page:
 ```tsx
 import { component$ } from "@builder.io/qwik";
 
-import { ArticleSummaryList } from "~/components/articles/article-summary-list";
+import { ArticleSummaryList } from "~/components/article-summary-list";
 import { CenteredTitle } from "~/components/centered-title";
 
 /* ... code from previous snippet ... */
@@ -1765,7 +1765,7 @@ With the plugin enabled, it was then time to select a theme. I ended up going fo
 import { component$, useStyles$ } from "@builder.io/qwik";
 
 import stylesForLayout from "./layout.css?inline";
-import stylesForCodeHighlights from "../../styles/code.css?inline";
+import stylesForCodeHighlights from "./code.css?inline";
 
 export default component$(() => {
   useStyles$(stylesForLayout);
@@ -2559,7 +2559,7 @@ It’s just an array of article metadata items. With the `articles.json` file on
 ```tsx
 import { component$, useStylesScoped$ } from "@builder.io/qwik";
 
-import { ArticleSummaryList } from "~/components/articles/article-summary-list";
+import { ArticleSummaryList } from "~/components/article-summary-list";
 import { CenteredTitle } from "~/components/centered-title";
 
 import styles from "./index.css?inline";

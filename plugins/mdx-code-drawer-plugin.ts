@@ -13,7 +13,7 @@ import {
 import { formatDateAsString } from "../src/utilities/time";
 
 const ARTICLE_CODE_DRAWER_IMPORT =
-  'import { ArticleCodeDrawer } from "src/components/articles/article-code-drawer";';
+  'import { ArticleCodeDrawer } from "src/components/article-code-drawer";';
 const ARTICLES_PUBLIC_DIRECTORY = "./public/blog";
 const MARKDOWN_CODE_BLOCK_REGEX =
   /(^|\n)[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|$)/u;

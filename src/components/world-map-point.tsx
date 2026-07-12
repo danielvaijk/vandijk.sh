@@ -1,7 +1,7 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useContext } from "@builder.io/qwik";
 
-import { WorldMapContext } from "src/components/world-map/context";
+import { WorldMapContext } from "src/components/world-map-context";
 
 interface WorldMapPointProps {
   delay: number;

@@ -5,7 +5,8 @@ import { useLocation, type DocumentHead } from "@builder.io/qwik-city";
 
 import { createPageMetaTags } from "src/helpers/meta";
 import stylesForLayout from "src/routes/blog/layout.css?inline";
-import stylesForCodeHighlights from "src/styles/base/code.css?inline";
+import stylesForFooter from "src/routes/blog/footer.css?inline";
+import stylesForCodeHighlights from "src/routes/blog/code.css?inline";
 
 interface ArticleFrontmatter {
   cover?: unknown;
@@ -67,6 +68,7 @@ function createArticleMetaTags({
 
 export default component$((): QwikJSX.Element => {
   useStyles$(stylesForLayout);
+  useStyles$(stylesForFooter);
   useStyles$(stylesForCodeHighlights);
 
   const { url } = useLocation();

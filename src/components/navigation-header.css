@@ -1,5 +1,3 @@
-@import "../media.css";
-
 header {
   position: relative;
   z-index: 1;
@@ -24,7 +22,7 @@ header {
       margin: 0;
       font-size: 1.6rem;
 
-      @media (--desktop) {
+      @media (width >= 46rem) {
         font-size: 2rem;
       }
     }
