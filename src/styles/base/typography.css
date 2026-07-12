@@ -1,4 +1,4 @@
-@use "src/styles/abstracts/mixins";
+@import "../media.css";
 
 a {
   color: var(--link-color);
@@ -7,7 +7,7 @@ a {
 
 a,
 .clickable {
-  @include mixins.hover-capable {
+  @media (--hover-capable) {
     transition: opacity 0.6s ease;
 
     &:hover {
@@ -27,15 +27,16 @@ h6 {
 }
 
 h1 {
-  @include mixins.responsive(font-size, 1.8rem, 2.5rem);
+  display: block;
+  margin: 0 auto;
+  max-width: calc(var(--glyph-cell-width) * var(--text-narrow-glyph-columns));
+  font-size: 1.8rem;
+  line-height: 1.1;
+  text-align: center;
+  font-weight: 200;
 
-  & {
-    display: block;
-    margin: 0 auto;
-    max-width: calc(var(--glyph-cell-width) * var(--text-narrow-glyph-columns));
-    line-height: 1.1;
-    text-align: center;
-    font-weight: 200;
+  @media (--desktop) {
+    font-size: 2.5rem;
   }
 }
 

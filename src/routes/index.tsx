@@ -7,7 +7,7 @@ import type TypeIt from "typeit";
 import { CenteredTitle } from "src/components/centered-title";
 import { GlyphRaster } from "src/components/glyph-raster";
 import { createPageMetaTags } from "src/helpers/meta";
-import styles from "src/routes/index.scss?inline";
+import styles from "src/routes/index.css?inline";
 
 export default component$((): QwikJSX.Element => {
   const continuePrompt = useSignal("press any key to continue");

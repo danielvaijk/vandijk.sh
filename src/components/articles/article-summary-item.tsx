@@ -3,7 +3,7 @@ import { component$, useStylesScoped$ } from "@builder.io/qwik";
 import { Link } from "@builder.io/qwik-city";
 
 import { GlyphRaster } from "src/components/glyph-raster";
-import styles from "src/components/articles/article-summary-item.scss?inline";
+import styles from "src/components/articles/article-summary-item.css?inline";
 import { formatDateAsString } from "src/utilities/time";
 
 export interface ArticleSummaryProps {

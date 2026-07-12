@@ -4,7 +4,7 @@ import type { DocumentHead } from "@builder.io/qwik-city";
 
 import { CenteredTitle } from "src/components/centered-title";
 import { GlyphRaster } from "src/components/glyph-raster";
-import styles from "src/routes/404.scss?inline";
+import styles from "src/routes/404.css?inline";
 
 export default component$((): QwikJSX.Element => {
   useStylesScoped$(styles);

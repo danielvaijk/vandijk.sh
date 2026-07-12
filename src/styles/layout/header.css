@@ -1,4 +1,4 @@
-@use "src/styles/abstracts/mixins";
+@import "../media.css";
 
 header {
   position: relative;
@@ -21,10 +21,11 @@ header {
     color: inherit;
 
     > h2 {
-      @include mixins.responsive(font-size, 1.6rem, 2rem);
+      margin: 0;
+      font-size: 1.6rem;
 
-      & {
-        margin: 0;
+      @media (--desktop) {
+        font-size: 2rem;
       }
     }
   }

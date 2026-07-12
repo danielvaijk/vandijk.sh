@@ -1,4 +1,4 @@
-@use "src/styles/abstracts/mixins";
+@import "../../styles/media.css";
 
 .article-summary {
   &:not(:last-child) {
@@ -28,7 +28,7 @@
       > .glyph-raster-region {
         opacity: 1;
 
-        @include mixins.hover-capable {
+        @media (--hover-capable) {
           transition: opacity 0.6s ease;
         }
       }
@@ -52,7 +52,7 @@
         height: 100%;
       }
 
-      @media (min-width: 46rem) {
+      @media (--desktop) {
         --article-summary-cover-glyph-rows: 23;
       }
     }
@@ -61,7 +61,7 @@
       opacity: 0.6;
     }
 
-    @include mixins.hover-capable {
+    @media (--hover-capable) {
       &:hover > .article-summary-cover-image > .glyph-raster-region {
         opacity: 0.6;
       }
@@ -83,7 +83,14 @@
       }
 
       > p {
-        @include mixins.justify-text;
+        text-align: justify;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+        hyphens: auto;
+
+        @media print {
+          hyphens: unset;
+        }
       }
 
       > .article-summary-content-read-info {

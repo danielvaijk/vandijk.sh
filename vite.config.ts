@@ -7,6 +7,17 @@ import { articleCodeDrawerMdxPlugin } from "./src/scripts/mdx-code-drawer-plugin
 
 export default defineConfig((): UserConfig => {
   return {
+    css: {
+      transformer: "lightningcss",
+      lightningcss: {
+        drafts: {
+          customMedia: true,
+        },
+      },
+    },
+    build: {
+      cssMinify: "lightningcss",
+    },
     plugins: [
       articleCodeDrawerMdxPlugin(),
       qwikCity({

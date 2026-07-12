@@ -1,7 +1,7 @@
 import type { QwikJSX } from "@builder.io/qwik";
 import { component$, useId, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
 
-import styles from "src/components/glyph-raster.scss?inline";
+import styles from "src/components/glyph-raster.css?inline";
 
 type GlyphRasterLayout = "fill" | "fixed";
 type GlyphRasterFrameFit = "contain" | "cover";

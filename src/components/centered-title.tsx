@@ -2,7 +2,7 @@ import type { PropFunction, QwikJSX } from "@builder.io/qwik";
 import { component$, useSignal, useStylesScoped$, useVisibleTask$ } from "@builder.io/qwik";
 import TypeIt, { type Options as TypeItOptions } from "typeit";
 
-import styles from "src/components/centered-title.scss?inline";
+import styles from "src/components/centered-title.css?inline";
 
 interface CenteredTitleProps {
   subtitle: string;

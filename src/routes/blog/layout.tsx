@@ -4,8 +4,8 @@ import type { DocumentHeadProps, DocumentHeadValue, DocumentMeta } from "@builde
 import { useLocation, type DocumentHead } from "@builder.io/qwik-city";
 
 import { createPageMetaTags } from "src/helpers/meta";
-import stylesForLayout from "src/routes/blog/layout.scss?inline";
-import stylesForCodeHighlights from "src/styles/base/code.scss?inline";
+import stylesForLayout from "src/routes/blog/layout.css?inline";
+import stylesForCodeHighlights from "src/styles/base/code.css?inline";
 
 interface ArticleFrontmatter {
   cover?: unknown;

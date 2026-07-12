@@ -1,4 +1,4 @@
-@use "src/styles/abstracts/mixins";
+@import "../styles/media.css";
 
 .centered-title {
   height: 100%;
@@ -13,17 +13,26 @@
   > h2 {
     margin: 0;
     min-height: calc(var(--glyph-cell-height) * 3);
+    font-size: 1.6rem;
 
     --ti-cursor-font-family: var(--font-family-global);
     --ti-cursor-font-weight: 400;
+    --ti-cursor-font-size: 1.2rem;
     --ti-cursor-color: currentColor;
 
-    @include mixins.responsive(font-size, 1.6rem, 2rem);
-    @include mixins.responsive(--ti-cursor-font-size, 1.2rem, 1.4rem);
+    @media (--desktop) {
+      font-size: 2rem;
+
+      --ti-cursor-font-size: 1.4rem;
+    }
   }
 
   > .centered-title-subtitle {
     display: block;
-    @include mixins.responsive(font-size, 0.875rem, 1rem);
+    font-size: 0.875rem;
+
+    @media (--desktop) {
+      font-size: 1rem;
+    }
   }
 }

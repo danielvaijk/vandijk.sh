@@ -1,11 +1,16 @@
-@use "src/styles/abstracts/mixins";
+@import "../../styles/media.css";
 
 article {
   width: 100%;
   max-width: calc(var(--glyph-cell-width) * var(--article-glyph-columns));
-  @include mixins.responsive(font-size, 1rem, 1.125rem);
-  @include mixins.responsive(line-height, 1.32, 1.28);
+  font-size: 1rem;
+  line-height: 1.32;
   padding: 0 0 var(--glyph-space-y);
+
+  @media (--desktop) {
+    font-size: 1.125rem;
+    line-height: 1.28;
+  }
 
   .article-cover-glyph-raster {
     --article-media-glyph-rows: 38;
@@ -33,7 +38,7 @@ article {
       }
     }
 
-    @media (min-width: 46rem) {
+    @media (--desktop) {
       --article-media-glyph-rows: 30;
     }
   }
@@ -56,16 +61,16 @@ article {
       margin: 0;
     }
 
-    @media (min-width: 46rem) {
+    @media (--desktop) {
       --article-media-glyph-rows: 36;
     }
   }
 
   img {
-    display: block; // Removes any extra white space below the image.
+    display: block; /* Removes any extra white space below the image. */
     width: 100%;
     max-width: 100%;
-    height: auto; // Let the browser calculate the height to maintain aspect ratio.
+    height: auto; /* Let the browser calculate the height to maintain aspect ratio. */
   }
 
   > figure {
@@ -153,24 +158,32 @@ article {
       margin: var(--glyph-space-y) auto calc(var(--glyph-space-y) * 5) auto;
       max-width: calc(var(--glyph-cell-width) * var(--text-narrow-glyph-columns));
       line-height: 1.1;
-      text-align: center;
-      @include mixins.responsive(font-size, 1rem, 1.25rem);
+      font-size: 1rem;
       font-style: italic;
+      text-align: center;
+
+      @media (--desktop) {
+        font-size: 1.25rem;
+      }
     }
   }
 
   p {
-    @include mixins.responsive(
-      margin-block-start,
-      calc(var(--glyph-space-y) * 1.75),
-      var(--glyph-space-y)
-    );
-    @include mixins.responsive(
-      margin-block-end,
-      calc(var(--glyph-space-y) * 1.75),
-      var(--glyph-space-y)
-    );
-    @include mixins.justify-text;
+    margin-block-start: calc(var(--glyph-space-y) * 1.75);
+    margin-block-end: calc(var(--glyph-space-y) * 1.75);
+    text-align: justify;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    hyphens: auto;
+
+    @media (--desktop) {
+      margin-block-start: var(--glyph-space-y);
+      margin-block-end: var(--glyph-space-y);
+    }
+
+    @media print {
+      hyphens: unset;
+    }
   }
 
   .article-code-drawer {
@@ -253,33 +266,37 @@ article {
 
   ul,
   ol {
-    @include mixins.responsive(
-      margin-block-start,
-      calc(var(--glyph-space-y) * 1.75),
-      var(--glyph-space-y)
-    );
-    @include mixins.responsive(
-      margin-block-end,
-      calc(var(--glyph-space-y) * 1.75),
-      var(--glyph-space-y)
-    );
+    margin-block-start: calc(var(--glyph-space-y) * 1.75);
+    margin-block-end: calc(var(--glyph-space-y) * 1.75);
+
+    @media (--desktop) {
+      margin-block-start: var(--glyph-space-y);
+      margin-block-end: var(--glyph-space-y);
+    }
 
     li + li {
       margin-top: calc(var(--glyph-space-y) * 0.75);
     }
 
     li {
-      @include mixins.justify-text;
+      text-align: justify;
+      word-wrap: break-word;
+      overflow-wrap: break-word;
+      hyphens: auto;
+
+      @media print {
+        hyphens: unset;
+      }
     }
   }
 
   li > ul,
   li > ol {
-    @include mixins.responsive(
-      margin-block-start,
-      calc(var(--glyph-space-y) * 0.75),
-      var(--glyph-space-y)
-    );
+    margin-block-start: calc(var(--glyph-space-y) * 0.75);
     margin-block-end: 0;
+
+    @media (--desktop) {
+      margin-block-start: var(--glyph-space-y);
+    }
   }
 }

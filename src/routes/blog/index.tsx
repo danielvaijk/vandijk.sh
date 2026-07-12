@@ -4,7 +4,7 @@ import { component$, useStylesScoped$ } from "@builder.io/qwik";
 import { ArticleSummaryList } from "src/components/articles/article-summary-list";
 import { CenteredTitle } from "src/components/centered-title";
 import articles from "src/media/articles.json";
-import styles from "src/routes/blog/index.scss?inline";
+import styles from "src/routes/blog/index.css?inline";
 
 export default component$((): QwikJSX.Element => {
   useStylesScoped$(styles);
