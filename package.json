@@ -14,9 +14,9 @@
     "fmt": "oxfmt --write .",
     "fmt.check": "oxfmt --check .",
     "lint": "oxlint src adapters plugins vite.config.ts",
-    "preinstall": "bun -e \"import { execSync } from 'node:child_process'; import { existsSync } from 'node:fs'; if (existsSync('.git')) { execSync('git config core.hooksPath scripts/hooks', { stdio: 'inherit' }); }\"",
+    "preinstall": "bun -e \"import { execSync } from 'node:child_process'; import { existsSync } from 'node:fs'; if (existsSync('.git')) { execSync('git config core.hooksPath hooks', { stdio: 'inherit' }); }\"",
     "preview": "PREVIEW_BUILD=true qwik build preview && vite preview --open",
-    "setup": "bun -e \"import { execSync } from 'node:child_process'; execSync('git config core.hooksPath scripts/hooks', { stdio: 'inherit' })\"",
+    "setup": "bun -e \"import { execSync } from 'node:child_process'; execSync('git config core.hooksPath hooks', { stdio: 'inherit' })\"",
     "start": "vite --open --mode ssr",
     "test": "bun test --pass-with-no-tests",
     "qwik": "qwik"

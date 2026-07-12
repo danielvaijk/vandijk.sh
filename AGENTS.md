@@ -10,9 +10,9 @@
 ## Setup
 
 - Run `bun install` after cloning.
-- `preinstall` runs `git config core.hooksPath scripts/hooks` to register the custom hook directory.
-- The pre-commit hook is `scripts/hooks/pre-commit` and is a Bun TypeScript script.
-- The commit message hook is `scripts/hooks/commit-msg` and is a Bun TypeScript script.
+- `preinstall` runs `git config core.hooksPath hooks` to register the custom hook directory.
+- The pre-commit hook is `hooks/pre-commit` and is a Bun TypeScript script.
+- The commit message hook is `hooks/commit-msg` and is a Bun TypeScript script.
 
 ## Checks
 
@@ -22,7 +22,7 @@
   - `bun run build`
   - `bun run lint`
   - `bun run test`
-- Commit message format is validated in `scripts/hooks/commit-msg` using Conventional Commit format without components (`type: summary`, e.g. `feat: ...`)
+- Commit message format is validated in `hooks/commit-msg` using Conventional Commit format without components (`type: summary`, e.g. `feat: ...`)
 
 ## Blog Articles
 
