@@ -1,0 +1,57 @@
+#!/usr/bin/env bun
+import { existsSync, readFileSync } from "node:fs";
+
+const commitMessagePath = process.argv.at(2);
+
+if (commitMessagePath === undefined) {
+  console.error("Could not read commit message path. Aborting commit.");
+  process.exit(1);
+}
+
+const isMergeCommit = existsSync(".git/MERGE_HEAD");
+
+const ALLOWED_COMMIT_TYPES = [
+  "build",
+  "chore",
+  "ci",
+  "docs",
+  "feat",
+  "fix",
+  "perf",
+  "refactor",
+  "revert",
+  "style",
+  "test",
+];
+const CONVENTIONAL_COMMIT_PATTERN = new RegExp(
+  `^(?:${ALLOWED_COMMIT_TYPES.join("|")})(!?)?:\\s.+$`,
+);
+
+if (!isMergeCommit) {
+  const commitMessage = readFileSync(commitMessagePath, "utf8")
+    .split(/\r?\n/)
+    .find((line) => {
+      const trimmedLine = line.trim();
+      return trimmedLine.length > 0 && !trimmedLine.startsWith("#");
+    });
+
+  if (commitMessage === undefined) {
+    console.error(
+      "Commit message is empty. Use Conventional Commit format: <type>[:!]: <summary>.",
+    );
+    process.exit(1);
+  }
+
+  if (!CONVENTIONAL_COMMIT_PATTERN.test(commitMessage)) {
+    console.error(
+      [
+        "Commit message must use conventional commit format without components.",
+        "Accepted format: <type>[:!]: <description>",
+        `Allowed types: ${ALLOWED_COMMIT_TYPES.join(", ")}`,
+        "Example: feat: add commit message validation",
+        "Examples that are rejected: feat(components): ...",
+      ].join("\n"),
+    );
+    process.exit(1);
+  }
+}

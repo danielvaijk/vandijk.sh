@@ -12,6 +12,7 @@
 - Run `bun install` after cloning.
 - `preinstall` runs `bun scripts/setup.ts`, which sets `core.hooksPath` to `scripts/hooks`.
 - The pre-commit hook is `scripts/hooks/pre-commit` and is a Bun TypeScript script.
+- The commit message hook is `scripts/hooks/commit-msg` and is a Bun TypeScript script.
 
 ## Checks
 
@@ -21,6 +22,7 @@
   - `bun run build`
   - `bun run lint`
   - `bun run test`
+- Commit message format is validated in `scripts/hooks/commit-msg` using Conventional Commit format without components (`type: summary`, e.g. `feat: ...`)
 
 ## Blog Articles
 
