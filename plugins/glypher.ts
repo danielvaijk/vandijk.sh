@@ -1,12 +1,12 @@
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
-import { dirname } from "node:path";
+import { dirname, extname, join, resolve } from "node:path";
 
 import sharp, { type Sharp } from "sharp";
+import type { Plugin, ResolvedConfig } from "vite";
 
 type GlyphFrameSource = {
-  fps: number;
   output: string;
-  rows: number;
   source: string;
 };
 
@@ -25,12 +25,18 @@ const MIN_CONTRAST_RANGE = 0.003;
 const SHADOW_PERCENTILE = 0.02;
 const HIGHLIGHT_PERCENTILE = 0.98;
 const DITHER_MATRIX = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
+const SITE_GLYPH_SOURCE_DIRECTORY = "src/media";
+const SITE_GLYPH_PUBLIC_DIRECTORY = "public";
+const SITE_GLYPH_SOURCE_EXTENSIONS = [".gif"];
+const SITE_GLYPH_SOURCE_FILE_EXTENSIONS = new Set([".mdx", ".ts", ".tsx"]);
+const SITE_GLYPH_FRAME_URL_REGEX = /["'`]\/(?<name>[\w-]+)\.frames["'`]/gu;
 
-function getFrameDimensions(width: number, height: number, rows: number): FrameDimensions {
+function getFrameDimensions(width: number, height: number): FrameDimensions {
   if (width <= 0 || height <= 0) {
     throw new Error(`Invalid glyph frame source dimensions: ${width}x${height}.`);
   }
 
+  const rows = height;
   const aspectRatio = width / height;
   const cols = Math.max(
     1,
@@ -217,7 +223,7 @@ function processRawFrames(
   return processedFrames;
 }
 
-async function getImageDimensions(source: string, rows: number): Promise<FrameDimensions> {
+async function getImageDimensions(source: string): Promise<FrameDimensions> {
   const metadata = await sharp(source, { animated: true }).metadata();
   const height = metadata.pageHeight ?? metadata.height;
 
@@ -225,76 +231,46 @@ async function getImageDimensions(source: string, rows: number): Promise<FrameDi
     throw new Error(`Could not read image dimensions for ${source}.`);
   }
 
-  return getFrameDimensions(metadata.width, height, rows);
+  return getFrameDimensions(metadata.width, height);
 }
 
-function sampleProcessedFrames({
-  delays,
-  dimensions,
-  fps,
-  processedFrames,
-}: {
-  delays?: number[];
-  dimensions: FrameDimensions;
-  fps: number;
-  processedFrames: Buffer;
-}): Buffer {
+function getFrameRate(
+  delays: number[] | undefined,
+  processedFrames: Buffer,
+  dimensions: FrameDimensions,
+): number {
   const frameSize = dimensions.cols * dimensions.rows;
   const sourceFrameCount = processedFrames.length / frameSize;
 
   if (sourceFrameCount <= 1 || delays === undefined || delays.length !== sourceFrameCount) {
-    return processedFrames;
+    return 1;
   }
 
   const totalDuration = delays.reduce((total, delay): number => total + delay, 0);
-  const outputFrameCount = Math.max(1, Math.round((totalDuration / 1000) * fps));
 
-  if (outputFrameCount === sourceFrameCount) {
-    return processedFrames;
+  if (totalDuration <= 0) {
+    return 1;
   }
 
-  const sampledFrames = Buffer.alloc(outputFrameCount * frameSize);
-  const frameDuration = 1000 / fps;
-  let sourceFrameIndex = 0;
-  let sourceFrameEnd = delays[0];
-
-  for (let outputFrameIndex = 0; outputFrameIndex < outputFrameCount; outputFrameIndex += 1) {
-    const outputTime = outputFrameIndex * frameDuration;
-
-    while (sourceFrameIndex < sourceFrameCount - 1 && outputTime >= sourceFrameEnd) {
-      sourceFrameIndex += 1;
-      sourceFrameEnd += delays[sourceFrameIndex];
-    }
-
-    processedFrames.copy(
-      sampledFrames,
-      outputFrameIndex * frameSize,
-      sourceFrameIndex * frameSize,
-      (sourceFrameIndex + 1) * frameSize,
-    );
-  }
-
-  return sampledFrames;
+  return sourceFrameCount / (totalDuration / 1000);
 }
 
-async function readImageFrame(
+async function readImageFrames(
   image: Sharp,
   dimensions: FrameDimensions,
-  fps: number,
-): Promise<Buffer> {
+): Promise<{ fps: number; rawFrames: Buffer }> {
   const metadata = await image.metadata();
   const { data } = await image
     .resize(dimensions.cols, dimensions.rows, { fit: "fill", kernel: sharp.kernel.lanczos3 })
     .ensureAlpha()
     .raw()
     .toBuffer({ resolveWithObject: true });
+  const rawFrames = processRawFrames(data, dimensions, 4);
 
-  return sampleProcessedFrames({
-    delays: metadata.delay,
-    dimensions,
-    fps,
-    processedFrames: processRawFrames(data, dimensions, 4),
-  });
+  return {
+    fps: getFrameRate(metadata.delay, rawFrames, dimensions),
+    rawFrames,
+  };
 }
 
 function createFramesFile(fps: number, dimensions: FrameDimensions, rawFrames: Buffer): Buffer {
@@ -318,35 +294,27 @@ function createFramesFile(fps: number, dimensions: FrameDimensions, rawFrames: B
   return Buffer.concat([header, rawFrames]);
 }
 
-async function createImageGlyphFrames({
-  fps,
-  image,
-  rows,
-}: {
-  fps: number;
-  image: Sharp;
-  rows: number;
-}): Promise<Buffer> {
+async function createImageGlyphFrames({ image }: { image: Sharp }): Promise<Buffer> {
   const metadata = await image.metadata();
+  const height = metadata.pageHeight ?? metadata.height;
 
-  if (!metadata.width || !metadata.height) {
+  if (!metadata.width || !height) {
     throw new Error("Could not read image dimensions for glyph frames.");
   }
 
-  const dimensions = getFrameDimensions(metadata.width, metadata.height, rows);
-  const rawFrames = await readImageFrame(image.clone(), dimensions, fps);
+  const dimensions = getFrameDimensions(metadata.width, height);
+  const { fps, rawFrames } = await readImageFrames(image.clone(), dimensions);
 
   return createFramesFile(fps, dimensions, rawFrames);
 }
 
 async function generateGlyphFrameSource(source: GlyphFrameSource): Promise<void> {
-  const dimensions = await getImageDimensions(source.source, source.rows);
-  const rawFrames = await readImageFrame(
+  const dimensions = await getImageDimensions(source.source);
+  const { fps, rawFrames } = await readImageFrames(
     sharp(source.source, { animated: true }),
     dimensions,
-    source.fps,
   );
-  const framesFile = createFramesFile(source.fps, dimensions, rawFrames);
+  const framesFile = createFramesFile(fps, dimensions, rawFrames);
 
   await mkdir(dirname(source.output), { recursive: true });
   await writeFile(source.output, framesFile);
@@ -357,5 +325,79 @@ async function generateGlyphFrameSource(source: GlyphFrameSource): Promise<void>
   );
 }
 
-export { createImageGlyphFrames, generateGlyphFrameSource };
+function readSourceFiles(directory: string): Array<string> {
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entity): Array<string> => {
+    const entry = join(directory, entity.name);
+
+    if (entity.isDirectory()) {
+      return readSourceFiles(entry);
+    }
+
+    if (!entity.isFile() || !SITE_GLYPH_SOURCE_FILE_EXTENSIONS.has(extname(entity.name))) {
+      return [];
+    }
+
+    return [entry];
+  });
+}
+
+function getSiteGlyphFrameNames(root: string): Array<string> {
+  const sourceDirectory = resolve(root, "src");
+  const names = new Set<string>();
+
+  for (const sourceFile of readSourceFiles(sourceDirectory)) {
+    const source = readFileSync(sourceFile, "utf-8");
+
+    for (const match of source.matchAll(SITE_GLYPH_FRAME_URL_REGEX)) {
+      const name = match.groups?.name;
+
+      if (typeof name === "string") {
+        names.add(name);
+      }
+    }
+  }
+
+  return Array.from(names).sort();
+}
+
+function resolveSiteGlyphFrameSource(root: string, name: string): GlyphFrameSource | null {
+  for (const extension of SITE_GLYPH_SOURCE_EXTENSIONS) {
+    const source = resolve(root, SITE_GLYPH_SOURCE_DIRECTORY, `${name}${extension}`);
+
+    if (existsSync(source)) {
+      return {
+        output: resolve(root, SITE_GLYPH_PUBLIC_DIRECTORY, `${name}.frames`),
+        source,
+      };
+    }
+  }
+
+  return null;
+}
+
+function resolveSiteGlyphFrameSources(root: string): Array<GlyphFrameSource> {
+  return getSiteGlyphFrameNames(root).flatMap((name): Array<GlyphFrameSource> => {
+    const source = resolveSiteGlyphFrameSource(root, name);
+
+    return source === null ? [] : [source];
+  });
+}
+
+function glyperPlugin(): Plugin {
+  let config: ResolvedConfig;
+
+  return {
+    name: "glyph-frames",
+    configResolved(resolvedConfig): void {
+      config = resolvedConfig;
+    },
+    async buildStart(): Promise<void> {
+      for (const source of resolveSiteGlyphFrameSources(config.root)) {
+        await generateGlyphFrameSource(source);
+      }
+    },
+  };
+}
+
+export { createImageGlyphFrames, generateGlyphFrameSource, glyperPlugin };
 export type { GlyphFrameSource };

@@ -3,7 +3,9 @@ import { qwikCity } from "@builder.io/qwik-city/vite";
 import { defineConfig, type UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-import { articleCodeDrawerMdxPlugin } from "./plugins/mdx-code-drawer-plugin";
+import { articlePlugin } from "./plugins/article";
+import { glyperPlugin } from "./plugins/glypher";
+import { imagePlugin } from "./plugins/image";
 
 export default defineConfig((): UserConfig => {
   return {
@@ -19,7 +21,9 @@ export default defineConfig((): UserConfig => {
       cssMinify: "lightningcss",
     },
     plugins: [
-      articleCodeDrawerMdxPlugin(),
+      imagePlugin(),
+      articlePlugin(),
+      glyperPlugin(),
       qwikCity({
         mdxPlugins: {
           rehypeAutolinkHeadings: false,
