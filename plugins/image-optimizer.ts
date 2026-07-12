@@ -465,7 +465,7 @@ function getArticleImageMarkup(
   return articleImageManifest.get(publicPath)?.markup(alt, isPriority, includeFigure) ?? null;
 }
 
-function imagePlugin(): Plugin {
+function imageOptimizerPlugin(): Plugin {
   let config: ResolvedConfig;
 
   return {
@@ -537,7 +537,7 @@ export {
   createSourceSetFromImageVariants,
   ensureArticleImages,
   getArticleImageMarkup,
-  imagePlugin,
+  imageOptimizerPlugin,
   serializeSourceSet,
   saveImage,
 };

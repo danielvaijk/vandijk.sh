@@ -4,6 +4,7 @@ import { dirname, extname, join, resolve } from "node:path";
 
 import sharp, { type Sharp } from "sharp";
 import type { Plugin, ResolvedConfig } from "vite";
+import type { GlyphRasterFrameOptions } from "../src/vfx/glyph-raster/frame-options";
 
 type GlyphFrameSource = {
   output: string;
@@ -15,9 +16,6 @@ type FrameDimensions = {
   rows: number;
 };
 
-const GLYPH_CELL_WIDTH = 8;
-const GLYPH_CELL_HEIGHT = 14;
-const GLYPH_HORIZONTAL_SCALE = 1.09;
 const DITHER_MATRIX_SIZE = 4;
 const DITHER_BYTE_SPREAD = 0.75;
 const DETAIL_SHARPEN_AMOUNT = 0.72;
@@ -31,7 +29,11 @@ const SITE_GLYPH_SOURCE_EXTENSIONS = [".gif"];
 const SITE_GLYPH_SOURCE_FILE_EXTENSIONS = new Set([".mdx", ".ts", ".tsx"]);
 const SITE_GLYPH_FRAME_URL_REGEX = /["'`]\/(?<name>[\w-]+)\.frames["'`]/gu;
 
-function getFrameDimensions(width: number, height: number): FrameDimensions {
+function getFrameDimensions(
+  width: number,
+  height: number,
+  options: GlyphRasterFrameOptions,
+): FrameDimensions {
   if (width <= 0 || height <= 0) {
     throw new Error(`Invalid glyph frame source dimensions: ${width}x${height}.`);
   }
@@ -41,7 +43,7 @@ function getFrameDimensions(width: number, height: number): FrameDimensions {
   const cols = Math.max(
     1,
     Math.round(
-      (aspectRatio * rows * GLYPH_CELL_HEIGHT * GLYPH_HORIZONTAL_SCALE) / GLYPH_CELL_WIDTH,
+      (aspectRatio * rows * options.cellHeight * options.horizontalScale) / options.cellWidth,
     ),
   );
 
@@ -223,7 +225,10 @@ function processRawFrames(
   return processedFrames;
 }
 
-async function getImageDimensions(source: string): Promise<FrameDimensions> {
+async function getImageDimensions(
+  source: string,
+  options: GlyphRasterFrameOptions,
+): Promise<FrameDimensions> {
   const metadata = await sharp(source, { animated: true }).metadata();
   const height = metadata.pageHeight ?? metadata.height;
 
@@ -231,7 +236,7 @@ async function getImageDimensions(source: string): Promise<FrameDimensions> {
     throw new Error(`Could not read image dimensions for ${source}.`);
   }
 
-  return getFrameDimensions(metadata.width, height);
+  return getFrameDimensions(metadata.width, height, options);
 }
 
 function getFrameRate(
@@ -294,22 +299,11 @@ function createFramesFile(fps: number, dimensions: FrameDimensions, rawFrames: B
   return Buffer.concat([header, rawFrames]);
 }
 
-async function createImageGlyphFrames({ image }: { image: Sharp }): Promise<Buffer> {
-  const metadata = await image.metadata();
-  const height = metadata.pageHeight ?? metadata.height;
-
-  if (!metadata.width || !height) {
-    throw new Error("Could not read image dimensions for glyph frames.");
-  }
-
-  const dimensions = getFrameDimensions(metadata.width, height);
-  const { fps, rawFrames } = await readImageFrames(image.clone(), dimensions);
-
-  return createFramesFile(fps, dimensions, rawFrames);
-}
-
-async function generateGlyphFrameSource(source: GlyphFrameSource): Promise<void> {
-  const dimensions = await getImageDimensions(source.source);
+async function generateGreyscaleFrameSource(
+  source: GlyphFrameSource,
+  options: GlyphRasterFrameOptions,
+): Promise<void> {
+  const dimensions = await getImageDimensions(source.source, options);
   const { fps, rawFrames } = await readImageFrames(
     sharp(source.source, { animated: true }),
     dimensions,
@@ -383,7 +377,7 @@ function resolveSiteGlyphFrameSources(root: string): Array<GlyphFrameSource> {
   });
 }
 
-function glyperPlugin(): Plugin {
+function frameGreyscaleSamplerPlugin(options: GlyphRasterFrameOptions): Plugin {
   let config: ResolvedConfig;
 
   return {
@@ -393,11 +387,11 @@ function glyperPlugin(): Plugin {
     },
     async buildStart(): Promise<void> {
       for (const source of resolveSiteGlyphFrameSources(config.root)) {
-        await generateGlyphFrameSource(source);
+        await generateGreyscaleFrameSource(source, options);
       }
     },
   };
 }
 
-export { createImageGlyphFrames, generateGlyphFrameSource, glyperPlugin };
+export { frameGreyscaleSamplerPlugin, generateGreyscaleFrameSource };
 export type { GlyphFrameSource };

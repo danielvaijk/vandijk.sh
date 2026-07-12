@@ -8,8 +8,9 @@ import { refractor } from "refractor";
 import tsx from "refractor/tsx";
 import type { Plugin, ResolvedConfig } from "vite";
 
-import { generateGlyphFrameSource } from "./glypher";
-import { ensureArticleImages } from "./image";
+import type { GlyphRasterFrameOptions } from "../src/vfx/glyph-raster/frame-options";
+import { generateGreyscaleFrameSource } from "./frame-greyscale-sampler";
+import { ensureArticleImages } from "./image-optimizer";
 
 interface ArticleMetadataFrontmatter {
   cover: string;
@@ -578,19 +579,31 @@ function getArticleAssetFileName(publicPath: string): string {
   return basename(publicPath);
 }
 
-async function generateCoverFrames(root: string, path: string, cover: string): Promise<string> {
+async function generateCoverFrames(
+  root: string,
+  path: string,
+  cover: string,
+  glyphFrameOptions: GlyphRasterFrameOptions,
+): Promise<string> {
   const framesPath = `/blog/${path}/cover.frames`;
   const coverFileName = getArticleAssetFileName(cover);
 
-  await generateGlyphFrameSource({
-    output: resolve(root, "public", framesPath.replace(/^\//u, "")),
-    source: join(getArticleAssetsDirectory(root, path), coverFileName),
-  });
+  await generateGreyscaleFrameSource(
+    {
+      output: resolve(root, "public", framesPath.replace(/^\//u, "")),
+      source: join(getArticleAssetsDirectory(root, path), coverFileName),
+    },
+    glyphFrameOptions,
+  );
 
   return framesPath;
 }
 
-async function generateArticleGifFrames(root: string, path: string): Promise<void> {
+async function generateArticleGifFrames(
+  root: string,
+  path: string,
+  glyphFrameOptions: GlyphRasterFrameOptions,
+): Promise<void> {
   const articleAssetsDirectory = getArticleAssetsDirectory(root, path);
   const articlePublicAssetsDirectory = getArticlePublicAssetsDirectory(root, path);
 
@@ -607,14 +620,14 @@ async function generateArticleGifFrames(root: string, path: string): Promise<voi
     const { name } = parse(entity.name);
     const output = join(articlePublicAssetsDirectory, `${name}.frames`);
 
-    await generateGlyphFrameSource({
-      output,
-      source,
-    });
+    await generateGreyscaleFrameSource({ output, source }, glyphFrameOptions);
   }
 }
 
-async function generateArticlesMetadata(root: string): Promise<Array<ArticleMetadata>> {
+async function generateArticlesMetadata(
+  root: string,
+  glyphFrameOptions: GlyphRasterFrameOptions,
+): Promise<Array<ArticleMetadata>> {
   const results: Array<ArticleMetadata> = [];
 
   for (const { filePath, path } of readArticleFiles(root)) {
@@ -632,8 +645,13 @@ async function generateArticlesMetadata(root: string): Promise<Array<ArticleMeta
 
     const articleContent = stripLeadingWikiMetadata(stripDuplicateTitle(content, data.title));
     const readTime = getReadTimeInMinutesFromWordCount(getMarkdownProseWordCount(articleContent));
-    const coverImageFramesPath = await generateCoverFrames(root, path, data.cover);
-    await generateArticleGifFrames(root, path);
+    const coverImageFramesPath = await generateCoverFrames(
+      root,
+      path,
+      data.cover,
+      glyphFrameOptions,
+    );
+    await generateArticleGifFrames(root, path, glyphFrameOptions);
 
     results.push({
       coverImageFramesPath,
@@ -656,7 +674,7 @@ async function generateArticlesMetadata(root: string): Promise<Array<ArticleMeta
   return sortedResults;
 }
 
-function articlesMetadataPlugin(): Plugin {
+function articlesMetadataPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Plugin {
   let config: ResolvedConfig;
   let articlesMetadata: Promise<Array<ArticleMetadata>> | null = null;
 
@@ -664,7 +682,7 @@ function articlesMetadataPlugin(): Plugin {
     if (articlesMetadata === null) {
       articlesMetadata = (async (): Promise<Array<ArticleMetadata>> => {
         await ensureArticleImages(config.root);
-        return generateArticlesMetadata(config.root);
+        return generateArticlesMetadata(config.root, glyphFrameOptions);
       })();
     }
 
@@ -724,8 +742,8 @@ function articleCodeDrawerMdxPlugin(): Plugin {
   };
 }
 
-function articlePlugin(): Array<Plugin> {
-  return [articlesMetadataPlugin(), articleCodeDrawerMdxPlugin()];
+function articleContentRendererPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Array<Plugin> {
+  return [articlesMetadataPlugin(glyphFrameOptions), articleCodeDrawerMdxPlugin()];
 }
 
-export { articlePlugin, wrapMarkdownCodeBlocks };
+export { articleContentRendererPlugin, wrapMarkdownCodeBlocks };

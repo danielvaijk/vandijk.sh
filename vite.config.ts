@@ -3,9 +3,10 @@ import { qwikCity } from "@builder.io/qwik-city/vite";
 import { defineConfig, type UserConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-import { articlePlugin } from "./plugins/article";
-import { glyperPlugin } from "./plugins/glypher";
-import { imagePlugin } from "./plugins/image";
+import { articleContentRendererPlugin } from "./plugins/article-content-renderer";
+import { frameGreyscaleSamplerPlugin } from "./plugins/frame-greyscale-sampler";
+import { imageOptimizerPlugin } from "./plugins/image-optimizer";
+import { GLYPH_RASTER_FRAME_OPTIONS } from "./src/vfx/glyph-raster/frame-options";
 
 export default defineConfig((): UserConfig => {
   return {
@@ -21,9 +22,9 @@ export default defineConfig((): UserConfig => {
       cssMinify: "lightningcss",
     },
     plugins: [
-      imagePlugin(),
-      articlePlugin(),
-      glyperPlugin(),
+      imageOptimizerPlugin(),
+      articleContentRendererPlugin(GLYPH_RASTER_FRAME_OPTIONS),
+      frameGreyscaleSamplerPlugin(GLYPH_RASTER_FRAME_OPTIONS),
       qwikCity({
         mdxPlugins: {
           rehypeAutolinkHeadings: false,
