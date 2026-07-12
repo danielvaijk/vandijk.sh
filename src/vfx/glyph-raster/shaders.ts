@@ -1,5 +1,3 @@
-import frameFragmentSource from "src/vfx/glyph-raster/shaders/glyph-raster-frame.frag.glsl?raw";
-import frameVertexSource from "src/vfx/glyph-raster/shaders/glyph-raster-frame.vert.glsl?raw";
 import proceduralFragmentSource from "src/vfx/glyph-raster/shaders/glyph-raster-procedural.frag.glsl?raw";
 import proceduralVertexSource from "src/vfx/glyph-raster/shaders/glyph-raster-procedural.vert.glsl?raw";
 import solarNoiseSource from "src/vfx/solar-noise/shaders/solar-noise.glsl?raw";
@@ -11,7 +9,6 @@ interface GlyphRasterShaderOptions {
   fieldModifierSampleSize: number;
   maxFieldModifierRegions: number;
   noiseVisualWhitePoint: number;
-  usesGpuNoise: boolean;
 }
 
 interface GlyphRasterShaderSources {
@@ -28,7 +25,7 @@ function withShaderDefines(
     fieldModifierSampleSize,
     maxFieldModifierRegions,
     noiseVisualWhitePoint,
-  }: Omit<GlyphRasterShaderOptions, "usesGpuNoise">,
+  }: GlyphRasterShaderOptions,
 ): string {
   const defines = [
     `#define GLYPH_FIELD_MODIFIER_BRIGHTNESS_BOOST ${fieldModifierBrightnessBoost.toFixed(1)}`,
@@ -47,23 +44,14 @@ function withShaderDefines(
 function createGlyphRasterShaderSources(
   options: GlyphRasterShaderOptions,
 ): GlyphRasterShaderSources {
-  const { usesGpuNoise } = options;
-  const shaderOptions: Omit<GlyphRasterShaderOptions, "usesGpuNoise"> = {
-    fieldModifierBrightnessBoost: options.fieldModifierBrightnessBoost,
-    fieldModifierBrightnessFloor: options.fieldModifierBrightnessFloor,
-    fieldModifierBrightnessWhitePoint: options.fieldModifierBrightnessWhitePoint,
-    fieldModifierSampleSize: options.fieldModifierSampleSize,
-    maxFieldModifierRegions: options.maxFieldModifierRegions,
-    noiseVisualWhitePoint: options.noiseVisualWhitePoint,
-  };
-  const vertexSource = usesGpuNoise
-    ? proceduralVertexSource.replace("// SOLAR_NOISE_PLACEHOLDER", solarNoiseSource)
-    : frameVertexSource;
-  const fragmentSource = usesGpuNoise ? proceduralFragmentSource : frameFragmentSource;
+  const vertexSource = proceduralVertexSource.replace(
+    "// SOLAR_NOISE_PLACEHOLDER",
+    solarNoiseSource,
+  );
 
   return {
-    fragmentSource: withShaderDefines(fragmentSource, shaderOptions),
-    vertexSource: withShaderDefines(vertexSource, shaderOptions),
+    fragmentSource: withShaderDefines(proceduralFragmentSource, options),
+    vertexSource: withShaderDefines(vertexSource, options),
   };
 }
 

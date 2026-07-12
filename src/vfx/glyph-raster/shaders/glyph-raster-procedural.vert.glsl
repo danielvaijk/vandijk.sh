@@ -1,15 +1,11 @@
 #version 300 es
 in vec2 a_corner;
 in vec2 a_position;
-in float a_entropy_position;
-in float a_entropy_rate;
-in float a_entropy_scale;
 
 uniform float u_entropy_seed;
 uniform float u_glyph_count;
 uniform float u_noise_seed;
 uniform float u_source_time;
-uniform float u_entropy_sample_time;
 uniform float u_glyph_frame_rate;
 uniform float u_visual_range;
 uniform sampler2D u_field_modifier_brightness;
@@ -38,6 +34,45 @@ float glyphBrightnessEntropy(float brightness) {
 
 float glyphProceduralEntropyBrightness(float brightness) {
   return smoothstep(0.22, 0.78, brightness);
+}
+
+float glyphEntropyEvent(vec2 cell, float tick) {
+  return hash(vec3(cell, tick + u_entropy_seed));
+}
+
+float glyphEntropyEpoch(vec2 cell, float brightness) {
+  // Candidate events run at the brightest cell's maximum churn rate. Each
+  // Cell accepts a deterministic subset based on its current brightness, so
+  // Glyph entropy remains stateless and entirely GPU-driven.
+  const float max_entropy_rate = 0.3304;
+  const int event_search_size = 32;
+  float entropy_scale =
+    0.82 + hash(vec3(cell, u_entropy_seed + 17.0)) * 0.36;
+  float entropy_rate = glyphBrightnessEntropy(
+    glyphProceduralEntropyBrightness(brightness)
+  );
+  float event_probability = clamp(
+    entropy_rate * entropy_scale / max_entropy_rate,
+    0.0,
+    1.0
+  );
+  float candidate_tick = floor(
+    u_source_time * 0.001 * u_glyph_frame_rate * max_entropy_rate
+  );
+  float epoch =
+    floor(candidate_tick / float(event_search_size)) *
+      float(event_search_size) -
+    float(event_search_size);
+
+  for (int offset = 0; offset < event_search_size; offset += 1) {
+    float tick = candidate_tick - float(offset);
+    if (glyphEntropyEvent(cell, tick) < event_probability) {
+      epoch = tick;
+      break;
+    }
+  }
+
+  return epoch;
 }
 
 float glyphFieldModifierSample(int index, vec2 modifier_uv) {
@@ -118,16 +153,7 @@ void main() {
     world
   );
 
-  float entropy_position =
-    a_entropy_position +
-    max(u_source_time - u_entropy_sample_time, 0.0) *
-      0.001 *
-      u_glyph_frame_rate *
-      a_entropy_rate *
-      a_entropy_scale;
-
-  float phase = hash(vec3(world_cell, u_entropy_seed));
-  float epoch = floor(entropy_position + phase);
+  float epoch = glyphEntropyEpoch(world_cell, color_brightness);
   float glyph_index = floor(
     hash(vec3(world_cell, epoch + u_entropy_seed)) * u_glyph_count
   );

@@ -1,7 +1,11 @@
 import { createGlyphRasterShaderSources } from "src/vfx/glyph-raster/shaders";
-import { clamp } from "src/vfx/shared/math";
-
-type GlyphEntropyMode = "cpu" | "shader";
+import {
+  FIELD_MODIFIER_SAMPLE_SIZE,
+  GLYPH_CELL_PADDING_RATIO,
+  GLYPH_FONT_FAMILY,
+  GLYPH_RASTER_SHADER_OPTIONS,
+  MAX_FIELD_MODIFIER_REGIONS,
+} from "src/vfx/glyph-raster/config";
 
 interface GlyphRenderSize {
   cssHeight: number;
@@ -20,28 +24,15 @@ interface GlyphFieldModifierRegion {
 
 interface GlyphRenderState {
   backgroundColor: string;
-  brightnessValues: Float32Array;
   cellHeight: number;
   cellWidth: number;
-  changedGlyphCount: number;
-  changedGlyphIndices: Uint32Array;
   colors: string[];
   cols: number;
-  entropySampleTime: number;
-  gpuNoiseSeed?: number;
-  glyphCharacters: string[];
-  glyphEntropyPositions: Float32Array;
-  glyphEntropyRates: Float32Array;
-  glyphEntropyScales: Float32Array;
-  glyphIndices: Uint16Array;
   glyphFrameRate: number;
   offsetX: number;
   offsetY: number;
   rows: number;
-  entropyMode: GlyphEntropyMode;
   fieldModifierRegionsVersion: number;
-  shouldUpdateBrightness: boolean;
-  shouldUploadEntropy: boolean;
   sourceTime: number;
   gridOriginX: number;
   gridOriginY: number;
@@ -51,21 +42,11 @@ interface GlyphRenderState {
 interface GlyphRenderer {
   draw: (state: GlyphRenderState) => void;
   resize: (size: GlyphRenderSize) => void;
-  supportsShaderEntropy: boolean;
-  usesGpuGlyphSelection: boolean;
 }
 
-const GLYPH_FONT_FAMILY = 'Charter, "Bitstream Charter", "Sitka Text", Cambria, serif';
-const FIELD_MODIFIER_BRIGHTNESS_BOOST = 1;
-const FIELD_MODIFIER_BRIGHTNESS_FLOOR = 0.07;
-const FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT = 1;
-const FIELD_MODIFIER_SAMPLE_SIZE = 256;
-const MAX_FIELD_MODIFIER_REGIONS = 8;
-const NOISE_VISUAL_WHITE_POINT = 0.63;
 const MAX_GLYPH_ATLAS_CACHE_SIZE = 8;
 const MAX_GLYPH_DRAW_METRICS_CACHE_SIZE = 512;
 const MAX_PARSED_COLOR_CACHE_SIZE = 32;
-const GLYPH_CELL_PADDING_RATIO = 0.08;
 const GLYPH_QUAD_CORNERS = new Float32Array([0, 0, 1, 0, 0, 1, 1, 1]);
 
 const glyphAtlasCache = new Map<
@@ -348,16 +329,18 @@ function createWebGlGlyphRenderer({
   cellHeight,
   cellWidth,
   characters,
+  entropySeed,
   fontSize,
   gpuNoiseSeed,
   fieldModifierRegions,
-  }: {
+}: {
   canvas: HTMLCanvasElement;
   cellHeight: number;
   cellWidth: number;
   characters: string[];
+  entropySeed: number;
   fontSize: number;
-  gpuNoiseSeed?: number;
+  gpuNoiseSeed: number;
   fieldModifierRegions: ReadonlyMap<string, GlyphFieldModifierRegion>;
 }): GlyphRenderer | null {
   const gl = canvas.getContext("webgl2", {
@@ -371,16 +354,9 @@ function createWebGlGlyphRenderer({
     return null;
   }
 
-  const usesGpuNoise = typeof gpuNoiseSeed !== "undefined";
-  const { fragmentSource, vertexSource } = createGlyphRasterShaderSources({
-    fieldModifierBrightnessBoost: FIELD_MODIFIER_BRIGHTNESS_BOOST,
-    fieldModifierBrightnessFloor: FIELD_MODIFIER_BRIGHTNESS_FLOOR,
-    fieldModifierBrightnessWhitePoint: FIELD_MODIFIER_BRIGHTNESS_WHITE_POINT,
-    fieldModifierSampleSize: FIELD_MODIFIER_SAMPLE_SIZE,
-    maxFieldModifierRegions: MAX_FIELD_MODIFIER_REGIONS,
-    noiseVisualWhitePoint: NOISE_VISUAL_WHITE_POINT,
-    usesGpuNoise,
-  });
+  const { fragmentSource, vertexSource } = createGlyphRasterShaderSources(
+    GLYPH_RASTER_SHADER_OPTIONS,
+  );
 
   const program = createProgram(gl, vertexSource, fragmentSource);
   if (!program) {
@@ -390,104 +366,62 @@ function createWebGlGlyphRenderer({
   const vertexArray = gl.createVertexArray();
   const cornerBuffer = gl.createBuffer();
   const positionBuffer = gl.createBuffer();
-  const brightnessUvBuffer = gl.createBuffer();
-  const entropyPositionBuffer = gl.createBuffer();
-  const entropyRateBuffer = gl.createBuffer();
-  const entropyScaleBuffer = gl.createBuffer();
   const atlasTexture = gl.createTexture();
-  const brightnessTexture = gl.createTexture();
   const fieldModifierBrightnessTexture = gl.createTexture();
   const paletteTexture = gl.createTexture();
   const cornerLocation = gl.getAttribLocation(program, "a_corner");
   const positionLocation = gl.getAttribLocation(program, "a_position");
-  const brightnessUvLocation = gl.getAttribLocation(program, "a_brightness_uv");
-  const entropyPositionLocation = gl.getAttribLocation(program, "a_entropy_position");
-  const entropyRateLocation = gl.getAttribLocation(program, "a_entropy_rate");
-  const entropyScaleLocation = gl.getAttribLocation(program, "a_entropy_scale");
   const atlasGridLocation = gl.getUniformLocation(program, "u_atlas_grid");
-  const brightnessSizeLocation = gl.getUniformLocation(program, "u_brightness_size");
   const canvasSizeLocation = gl.getUniformLocation(program, "u_canvas_size");
   const cellSizeLocation = gl.getUniformLocation(program, "u_cell_size");
-  const gridOriginLocation = usesGpuNoise ? gl.getUniformLocation(program, "u_grid_origin") : null;
+  const gridOriginLocation = gl.getUniformLocation(program, "u_grid_origin");
   const atlasLocation = gl.getUniformLocation(program, "u_atlas");
-  const brightnessLocation = gl.getUniformLocation(program, "u_brightness");
-  const fieldModifierBrightnessLocation = usesGpuNoise
-    ? gl.getUniformLocation(program, "u_field_modifier_brightness")
-    : null;
-  const fieldModifierCountLocation = usesGpuNoise
-    ? gl.getUniformLocation(program, "u_field_modifier_count")
-    : null;
-  const fieldModifierRectsLocation = usesGpuNoise
-    ? gl.getUniformLocation(program, "u_field_modifier_rects[0]")
-    : null;
-  const fieldModifierBlendsLocation = usesGpuNoise
-    ? gl.getUniformLocation(program, "u_field_modifier_blends[0]")
-    : null;
+  const fieldModifierBrightnessLocation = gl.getUniformLocation(
+    program,
+    "u_field_modifier_brightness",
+  );
+  const fieldModifierCountLocation = gl.getUniformLocation(program, "u_field_modifier_count");
+  const fieldModifierRectsLocation = gl.getUniformLocation(program, "u_field_modifier_rects[0]");
+  const fieldModifierBlendsLocation = gl.getUniformLocation(program, "u_field_modifier_blends[0]");
   const paletteLocation = gl.getUniformLocation(program, "u_palette");
   const colorCountLocation = gl.getUniformLocation(program, "u_color_count");
   const entropySeedLocation = gl.getUniformLocation(program, "u_entropy_seed");
   const glyphCountLocation = gl.getUniformLocation(program, "u_glyph_count");
-  const noiseSeedLocation = usesGpuNoise ? gl.getUniformLocation(program, "u_noise_seed") : null;
-  const visualRangeLocation = usesGpuNoise
-    ? gl.getUniformLocation(program, "u_visual_range")
-    : null;
+  const noiseSeedLocation = gl.getUniformLocation(program, "u_noise_seed");
+  const visualRangeLocation = gl.getUniformLocation(program, "u_visual_range");
   const sourceTimeLocation = gl.getUniformLocation(program, "u_source_time");
-  const entropySampleTimeLocation = usesGpuNoise
-    ? gl.getUniformLocation(program, "u_entropy_sample_time")
-    : null;
   const glyphFrameRateLocation = gl.getUniformLocation(program, "u_glyph_frame_rate");
-  const shaderEntropyLocation = usesGpuNoise
-    ? null
-    : gl.getUniformLocation(program, "u_shader_entropy");
 
   if (
     !vertexArray ||
     !cornerBuffer ||
     !positionBuffer ||
-    !brightnessUvBuffer ||
-    !entropyPositionBuffer ||
-    !entropyRateBuffer ||
-    !entropyScaleBuffer ||
     !atlasTexture ||
-    !brightnessTexture ||
     !fieldModifierBrightnessTexture ||
     !paletteTexture ||
     cornerLocation < 0 ||
     positionLocation < 0 ||
-    (!usesGpuNoise && brightnessUvLocation < 0) ||
-    entropyPositionLocation < 0 ||
-    entropyRateLocation < 0 ||
-    entropyScaleLocation < 0 ||
     !atlasGridLocation ||
-    (!usesGpuNoise && !brightnessSizeLocation) ||
     !canvasSizeLocation ||
     !cellSizeLocation ||
     !atlasLocation ||
-    (!usesGpuNoise && !brightnessLocation) ||
-    (usesGpuNoise &&
-      (!fieldModifierBrightnessLocation ||
-        !fieldModifierCountLocation ||
-        !fieldModifierBlendsLocation ||
-        !fieldModifierRectsLocation ||
-        !gridOriginLocation ||
-        !visualRangeLocation)) ||
+    !fieldModifierBrightnessLocation ||
+    !fieldModifierCountLocation ||
+    !fieldModifierBlendsLocation ||
+    !fieldModifierRectsLocation ||
+    !gridOriginLocation ||
+    !visualRangeLocation ||
     !paletteLocation ||
     !colorCountLocation ||
     !entropySeedLocation ||
     !glyphCountLocation ||
     !sourceTimeLocation ||
     !glyphFrameRateLocation ||
-    (usesGpuNoise && (!noiseSeedLocation || !entropySampleTimeLocation)) ||
-    (!usesGpuNoise && !shaderEntropyLocation)
+    !noiseSeedLocation
   ) {
     return null;
   }
 
-  let brightnessUvs = new Float32Array();
-  let brightnessBytes = new Uint8Array();
-  let lastBrightnessTextureHeight = 0;
-  let lastBrightnessTextureWidth = 0;
-  let lastEntropyBufferLength = 0;
   let positions = new Float32Array();
   let lastPixelRatio = 0;
   let lastColorsKey = "";
@@ -500,8 +434,6 @@ function createWebGlGlyphRenderer({
   const fieldModifierBlends = new Float32Array(MAX_FIELD_MODIFIER_REGIONS);
   const atlasCols = Math.ceil(Math.sqrt(characters.length));
   const atlasRows = Math.ceil(characters.length / atlasCols);
-  const entropySeed = Math.random() * 100_000;
-
   gl.useProgram(program);
   gl.bindVertexArray(vertexArray);
 
@@ -515,35 +447,8 @@ function createWebGlGlyphRenderer({
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   gl.vertexAttribDivisor(positionLocation, 1);
 
-  if (brightnessUvLocation >= 0) {
-    gl.bindBuffer(gl.ARRAY_BUFFER, brightnessUvBuffer);
-    gl.enableVertexAttribArray(brightnessUvLocation);
-    gl.vertexAttribPointer(brightnessUvLocation, 2, gl.FLOAT, false, 0, 0);
-    gl.vertexAttribDivisor(brightnessUvLocation, 1);
-  }
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, entropyPositionBuffer);
-  gl.enableVertexAttribArray(entropyPositionLocation);
-  gl.vertexAttribPointer(entropyPositionLocation, 1, gl.FLOAT, false, 0, 0);
-  gl.vertexAttribDivisor(entropyPositionLocation, 1);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, entropyRateBuffer);
-  gl.enableVertexAttribArray(entropyRateLocation);
-  gl.vertexAttribPointer(entropyRateLocation, 1, gl.FLOAT, false, 0, 0);
-  gl.vertexAttribDivisor(entropyRateLocation, 1);
-
-  gl.bindBuffer(gl.ARRAY_BUFFER, entropyScaleBuffer);
-  gl.enableVertexAttribArray(entropyScaleLocation);
-  gl.vertexAttribPointer(entropyScaleLocation, 1, gl.FLOAT, false, 0, 0);
-  gl.vertexAttribDivisor(entropyScaleLocation, 1);
-
   gl.uniform1i(atlasLocation, 0);
-  if (brightnessLocation) {
-    gl.uniform1i(brightnessLocation, 2);
-  }
-  if (fieldModifierBrightnessLocation) {
-    gl.uniform1i(fieldModifierBrightnessLocation, 3);
-  }
+  gl.uniform1i(fieldModifierBrightnessLocation, 3);
   gl.uniform1i(paletteLocation, 1);
   gl.uniform1f(entropySeedLocation, entropySeed);
   gl.uniform1f(glyphCountLocation, characters.length);
@@ -599,47 +504,8 @@ function createWebGlGlyphRenderer({
     gl.uniform1i(colorCountLocation, colors.length);
   };
 
-  const uploadBrightness = (brightnessValues: Float32Array, cols: number, rows: number): void => {
-    const didResize = cols !== lastBrightnessTextureWidth || rows !== lastBrightnessTextureHeight;
-
-    if (brightnessBytes.length !== brightnessValues.length) {
-      brightnessBytes = new Uint8Array(brightnessValues.length);
-    }
-
-    for (let index = 0; index < brightnessValues.length; index += 1) {
-      brightnessBytes[index] = Math.round(clamp(brightnessValues[index], 0, 1) * 255);
-    }
-
-    gl.activeTexture(gl.TEXTURE2);
-    gl.bindTexture(gl.TEXTURE_2D, brightnessTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-
-    if (didResize) {
-      lastBrightnessTextureWidth = cols;
-      lastBrightnessTextureHeight = rows;
-      gl.texImage2D(
-        gl.TEXTURE_2D,
-        0,
-        gl.R8,
-        cols,
-        rows,
-        0,
-        gl.RED,
-        gl.UNSIGNED_BYTE,
-        brightnessBytes,
-      );
-      return;
-    }
-
-    gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, cols, rows, gl.RED, gl.UNSIGNED_BYTE, brightnessBytes);
-  };
-
   const uploadFieldModifiers = (fieldModifierRegionsVersion: number): void => {
     if (
-      !usesGpuNoise ||
       !fieldModifierCountLocation ||
       !fieldModifierBlendsLocation ||
       !fieldModifierRectsLocation ||
@@ -702,49 +568,18 @@ function createWebGlGlyphRenderer({
     );
   };
 
-  const uploadEntropyPositions = (entropyValues: Float32Array, usage: number): void => {
-    gl.bindBuffer(gl.ARRAY_BUFFER, entropyPositionBuffer);
-
-    if (entropyValues.length !== lastEntropyBufferLength) {
-      lastEntropyBufferLength = entropyValues.length;
-      gl.bufferData(gl.ARRAY_BUFFER, entropyValues, usage);
-      return;
-    }
-
-    gl.bufferSubData(gl.ARRAY_BUFFER, 0, entropyValues);
-  };
-
-  const uploadEntropyRates = (entropyRates: Float32Array): void => {
-    gl.bindBuffer(gl.ARRAY_BUFFER, entropyRateBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, entropyRates, gl.DYNAMIC_DRAW);
-  };
-
-  const uploadEntropyScales = (entropyScales: Float32Array): void => {
-    gl.bindBuffer(gl.ARRAY_BUFFER, entropyScaleBuffer);
-    gl.bufferData(gl.ARRAY_BUFFER, entropyScales, gl.STATIC_DRAW);
-  };
-
   return {
     draw: ({
       backgroundColor,
-      brightnessValues,
       cellHeight,
       cellWidth,
       colors,
       cols,
-      entropySampleTime,
-      gpuNoiseSeed: stateGpuNoiseSeed,
       offsetX,
       offsetY,
-      glyphEntropyPositions,
-      glyphEntropyRates,
-      glyphEntropyScales,
       glyphFrameRate,
       rows,
-      entropyMode,
       fieldModifierRegionsVersion,
-      shouldUpdateBrightness,
-      shouldUploadEntropy,
       sourceTime,
       gridOriginX,
       gridOriginY,
@@ -754,7 +589,6 @@ function createWebGlGlyphRenderer({
       const didResize = positions.length !== cellCount * 2;
 
       if (didResize) {
-        brightnessUvs = new Float32Array(cellCount * 2);
         positions = new Float32Array(cellCount * 2);
         lastPositionKey = "";
       }
@@ -767,7 +601,6 @@ function createWebGlGlyphRenderer({
 
       const positionKey = [cols, rows, offsetX, offsetY, cellWidth, cellHeight].join(":");
       const shouldUploadPositions = positionKey !== lastPositionKey;
-      const shouldUploadBrightness = didResize || shouldUpdateBrightness;
       if (shouldUploadPositions) {
         lastPositionKey = positionKey;
       }
@@ -778,8 +611,6 @@ function createWebGlGlyphRenderer({
             const index = row * cols + col;
             const positionIndex = index * 2;
 
-            brightnessUvs[positionIndex] = (col + 0.5) / cols;
-            brightnessUvs[positionIndex + 1] = (row + 0.5) / rows;
             positions[positionIndex] = offsetX + col * cellWidth;
             positions[positionIndex + 1] = offsetY + row * cellHeight;
           }
@@ -791,60 +622,17 @@ function createWebGlGlyphRenderer({
       gl.clear(gl.COLOR_BUFFER_BIT);
       gl.useProgram(program);
       gl.bindVertexArray(vertexArray);
-      gl.uniform2f(brightnessSizeLocation, cols, rows);
       gl.uniform2f(cellSizeLocation, cellWidth, cellHeight);
-
-      if (
-        usesGpuNoise &&
-        noiseSeedLocation &&
-        sourceTimeLocation &&
-        entropySampleTimeLocation &&
-        glyphFrameRateLocation &&
-        visualRangeLocation
-      ) {
-        gl.uniform1f(noiseSeedLocation, stateGpuNoiseSeed ?? 0);
-        gl.uniform1f(sourceTimeLocation, sourceTime);
-        gl.uniform1f(entropySampleTimeLocation, entropySampleTime);
-        gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
-        gl.uniform1f(visualRangeLocation, visualRange);
-        gl.uniform2f(gridOriginLocation, gridOriginX, gridOriginY);
-        uploadFieldModifiers(fieldModifierRegionsVersion);
-      } else if (
-        !usesGpuNoise &&
-        sourceTimeLocation &&
-        glyphFrameRateLocation &&
-        shaderEntropyLocation
-      ) {
-        gl.uniform1f(sourceTimeLocation, sourceTime);
-        gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
-        gl.uniform1f(shaderEntropyLocation, entropyMode === "shader" ? 1 : 0);
-      }
-
-      if (shouldUploadPositions || shouldUploadEntropy) {
-        uploadEntropyScales(glyphEntropyScales);
-      }
-
-      if (shouldUploadPositions || shouldUpdateBrightness || shouldUploadEntropy) {
-        uploadEntropyRates(glyphEntropyRates);
-      }
-
-      if (usesGpuNoise) {
-        if (shouldUpdateBrightness || shouldUploadEntropy) {
-          uploadEntropyPositions(glyphEntropyPositions, gl.DYNAMIC_DRAW);
-        }
-      } else if (shouldUploadPositions || entropyMode === "cpu") {
-        uploadEntropyPositions(glyphEntropyPositions, gl.DYNAMIC_DRAW);
-      }
+      gl.uniform1f(noiseSeedLocation, gpuNoiseSeed);
+      gl.uniform1f(sourceTimeLocation, sourceTime);
+      gl.uniform1f(glyphFrameRateLocation, glyphFrameRate);
+      gl.uniform1f(visualRangeLocation, visualRange);
+      gl.uniform2f(gridOriginLocation, gridOriginX, gridOriginY);
+      uploadFieldModifiers(fieldModifierRegionsVersion);
 
       if (shouldUploadPositions) {
-        gl.bindBuffer(gl.ARRAY_BUFFER, brightnessUvBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, brightnessUvs, gl.STATIC_DRAW);
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, positions, gl.DYNAMIC_DRAW);
-      }
-
-      if (!usesGpuNoise && shouldUploadBrightness) {
-        uploadBrightness(brightnessValues, cols, rows);
       }
 
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cellCount);
@@ -861,16 +649,8 @@ function createWebGlGlyphRenderer({
         uploadAtlas(pixelRatio);
       }
     },
-    supportsShaderEntropy: true,
-    usesGpuGlyphSelection: true,
   };
 }
 
 export { createWebGlGlyphRenderer };
-export type {
-  GlyphEntropyMode,
-  GlyphFieldModifierRegion,
-  GlyphRenderSize,
-  GlyphRenderState,
-  GlyphRenderer,
-};
+export type { GlyphFieldModifierRegion, GlyphRenderSize, GlyphRenderState, GlyphRenderer };

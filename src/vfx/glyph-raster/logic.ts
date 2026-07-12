@@ -1,4 +1,4 @@
-import { clamp, lerp, smoothstep } from "src/vfx/shared/math";
+import { clamp } from "src/vfx/shared/math";
 import type { GlyphRasterSource } from "src/vfx/glyph-raster/source";
 
 export type GlyphRasterLayout = "fill" | "fixed";
@@ -21,9 +21,7 @@ const NOISE_FONT_SIZE = 13;
 const DEFAULT_FRAME_RATE = 18;
 const MIN_FRAME_RATE = 1;
 const MAX_FRAME_RATE = 60;
-const PROCEDURAL_ENTROPY_SAMPLE_RATE = 9;
 const PROCEDURAL_VISUAL_SAMPLE_RATE = 30;
-const GLYPH_ENTROPY_RATE_EASE_SECONDS = 0.35;
 const DOCUMENT_ANCHOR_OVERSCAN = 2.5;
 const DOCUMENT_ANCHOR_EDGE_MARGIN = 0.35;
 const MIN_GLYPH_CELL_SCALE = 1;
@@ -83,40 +81,10 @@ function resolveGlyphGrid({
   };
 }
 
-function shiftGridRows(values: Float32Array, cols: number, deltaRows: number): void {
-  const offset = Math.abs(deltaRows) * cols;
-
-  if (deltaRows > 0) {
-    values.copyWithin(0, offset);
-  } else {
-    values.copyWithin(offset, 0, values.length - offset);
-  }
-}
-
 function quantizeTime(time: number, sampleRate: number): number {
   const interval = 1000 / sampleRate;
 
   return Math.floor(time / interval) * interval;
-}
-
-function entropyRateForBrightness(brightness: number): number {
-  const entropyBrightness = smoothstep(0.22, 0.78, brightness);
-
-  return 0.04 + smoothstep(0.08, 0.92, entropyBrightness) * 0.24;
-}
-
-function easeEntropyRate(
-  currentRate: number,
-  targetRate: number,
-  elapsedMilliseconds: number,
-): number {
-  const amount = 1 - Math.exp(-(elapsedMilliseconds / 1000) / GLYPH_ENTROPY_RATE_EASE_SECONDS);
-
-  return lerp(currentRate, targetRate, amount);
-}
-
-function shouldRefreshCharacter(entropyRate: number): boolean {
-  return Math.random() < entropyRate;
 }
 
 export {
@@ -134,15 +102,10 @@ export {
   NOISE_CELL_WIDTH,
   NOISE_COLORS,
   NOISE_FONT_SIZE,
-  PROCEDURAL_ENTROPY_SAMPLE_RATE,
   PROCEDURAL_VISUAL_SAMPLE_RATE,
   resolveGlyphGrid,
   resolvePreset,
   quantizeTime,
-  easeEntropyRate,
-  shiftGridRows,
-  shouldRefreshCharacter,
-  entropyRateForBrightness,
 };
 
 export type { GlyphRasterPreset };

@@ -1,5 +1,3 @@
-import { solarSurfaceBrightness } from "src/vfx/solar-noise/cpu";
-
 interface GlyphRasterFrameSource {
   type: "frames";
   url: string;
@@ -31,14 +29,6 @@ interface FrameModifierBrightnessGrids {
 interface StreamFrameModifierBrightnessGridsParams {
   onFrame?: (frame: number, grids: FrameModifierBrightnessGrids) => void;
   source: GlyphRasterFrameSource;
-}
-
-interface SourceAdapter {
-  defaultFps?: number;
-  frameCount?: number;
-  getBrightness: (col: number, row: number, cols: number, rows: number, time: number, frame: number) => number;
-  gpuNoiseSeed?: number;
-  resize?: (cols: number, rows: number) => void;
 }
 
 interface ParsedSourceHeader {
@@ -156,22 +146,6 @@ function resolveSource(source: GlyphRasterSource | undefined): GlyphRasterSource
   }
 
   return { type: "procedural-noise" };
-}
-
-function createNoiseAdapter(): SourceAdapter {
-  const seed = Math.floor(Math.random() * 0xFF_FF_FF_FF);
-
-  return {
-    defaultFps: DEFAULT_FRAME_RATE,
-    getBrightness: (col, row, _cols, _rows, time): number =>
-      solarSurfaceBrightness({
-        columnIndex: col,
-        noiseSeed: seed,
-        rowIndex: row,
-        time,
-      }),
-    gpuNoiseSeed: seed,
-  };
 }
 
 async function createFrameModifierBrightnessGrids({
@@ -359,13 +333,11 @@ async function createFrameModifierBrightnessGrids({
 
 export {
   createFrameModifierBrightnessGrids,
-  createNoiseAdapter,
   resolveSource,
   FIELD_MODIFIER_SAMPLE_SIZE,
   parseSourceHeader,
   setCachedValue,
   getCachedValue,
-  type SourceAdapter,
   type GlyphRasterFrameSource,
   type GlyphRasterNoiseSource,
   type GlyphRasterSource,
