@@ -9,7 +9,7 @@ import tsx from "refractor/tsx";
 import type { Plugin, ResolvedConfig } from "vite";
 
 import { generateGlyphFrameSource } from "./glypher";
-import { ensureArticleImages, getArticleImageMarkup } from "./image";
+import { ensureArticleImages } from "./image";
 
 interface ArticleMetadataFrontmatter {
   cover: string;
@@ -30,7 +30,6 @@ interface ArticleMdxFrontmatter {
 interface ArticleMetadata {
   coverImageFramesPath: string;
   coverImageMarkup: string;
-  coverImagePublicPath: string;
   date: string;
   description: string;
   path: string;
@@ -53,8 +52,8 @@ const ARTICLE_CODE_DRAWER_IMPORT =
 const ARTICLES_METADATA_MODULE_ID = "virtual:articles";
 const RESOLVED_ARTICLES_METADATA_MODULE_ID = `\0${ARTICLES_METADATA_MODULE_ID}`;
 const ARTICLES_DIRECTORY = "src/routes/blog";
-const ARTICLE_MEDIA_DIRECTORY = "src/media/blog";
 const ARTICLE_PUBLIC_ASSETS_DIRECTORY = "public/blog";
+const ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME = "assets";
 const ARTICLES_PUBLIC_DIRECTORY = "./public/blog";
 const CODE_BLOCK_PRINT_WIDTH = 80;
 const CODE_BLOCK_LANGUAGE_FILE_EXTENSIONS: Record<string, string> = {
@@ -561,21 +560,14 @@ function getBlogArticlePath(id: string): string | null {
   return /\/src\/routes\/blog\/(?<path>[^/]+)\/index\.mdx(?:\?|$)/u.exec(id)?.groups?.path ?? null;
 }
 
-function renderCoverImageMarkup(cover: string, coverAlt: string): string {
+function renderCoverImageMarkup(coverAlt: string): string {
   const alt = getCaptionAltText(coverAlt);
-  const optimizedMarkup = getArticleImageMarkup(cover, alt, true);
 
-  if (optimizedMarkup !== null) {
-    return optimizedMarkup;
-  }
-
-  return `<figure>
-<img src="${cover}" alt="${alt}" loading="lazy" decoding="async" />
-</figure>`;
+  return `<figure aria-label="${escapeHtmlText(alt)}" role="img"></figure>`;
 }
 
 function getArticleAssetsDirectory(root: string, path: string): string {
-  return resolve(root, ARTICLE_MEDIA_DIRECTORY, path);
+  return resolve(root, ARTICLES_DIRECTORY, path, ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME);
 }
 
 function getArticlePublicAssetsDirectory(root: string, path: string): string {
@@ -645,8 +637,7 @@ async function generateArticlesMetadata(root: string): Promise<Array<ArticleMeta
 
     results.push({
       coverImageFramesPath,
-      coverImageMarkup: renderCoverImageMarkup(data.cover, data.coverAlt),
-      coverImagePublicPath: data.cover,
+      coverImageMarkup: renderCoverImageMarkup(data.coverAlt),
       date: date.toISOString(),
       description: data.description,
       path,

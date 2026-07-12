@@ -8,7 +8,6 @@ import styles from "src/components/article-summary-item.css?inline";
 export interface ArticleSummaryProps {
   coverImageFramesPath?: string;
   coverImageMarkup: string;
-  coverImagePublicPath: string;
   date: string;
   description: string;
   path: string;

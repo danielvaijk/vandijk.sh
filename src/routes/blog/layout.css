@@ -298,3 +298,7 @@ article {
     }
   }
 }
+
+footer {
+  padding: var(--glyph-space-y) 0;
+}

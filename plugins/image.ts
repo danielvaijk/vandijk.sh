@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
-import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
-import { basename, extname, join, parse, resolve } from "node:path";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync } from "node:fs";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { basename, extname, join, posix, resolve } from "node:path";
 
 import sharp, { type Sharp } from "sharp";
 import type { Plugin, ResolvedConfig } from "vite";
@@ -41,20 +41,20 @@ interface ImageSourceSet {
 interface ArticleImageManifestEntry {
   defaultSource: string;
   height: number;
-  markup: (alt: string, isPriority?: boolean) => string;
+  markup: (alt: string, isPriority?: boolean, includeFigure?: boolean) => string;
   type: string;
   width: number;
 }
 
 const ARTICLES_DIRECTORY = "src/routes/blog";
-const ARTICLE_MEDIA_DIRECTORY = "src/media/blog";
 const ARTICLE_PUBLIC_ASSETS_DIRECTORY = "public/blog";
+const ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME = "assets";
 const ARTICLE_IMAGE_EXTENSIONS = new Set([".avif", ".jpeg", ".jpg", ".png", ".svg", ".webp"]);
 const ARTICLE_GENERATED_ONLY_EXTENSIONS = new Set([".gif"]);
 const ARTICLE_MARKDOWN_IMAGE_REGEX =
   /!\[(?<alt>[^\]]*)\]\((?<src>\/blog\/[^)\s]+\.(?:avif|jpe?g|png|svg|webp))\)/giu;
-const ARTICLE_COVER_SOURCE_REGEX =
-  /(<ArticleCover\b[\s\S]*?\bsrc=")(?<src>\/blog\/[^"]+\.(?:avif|jpe?g|png|svg|webp))("[\s\S]*?\/>)/giu;
+const ARTICLE_HTML_IMAGE_REGEX =
+  /<img\b(?<attributes>[^>]*?\bsrc="(?<src>\/blog\/[^"]+\.(?:avif|jpe?g|png|svg|webp))"[^>]*?\balt="(?<alt>[^"]*)"[^>]*)\/?>/giu;
 const IS_CF_BUILD = Boolean(process.env.CF_PAGES);
 
 const MIN_EFFORT_WEBP = 0;
@@ -66,15 +66,11 @@ const articleImageManifest = new Map<string, ArticleImageManifestEntry>();
 const articleImageBuilds = new Map<string, Promise<void>>();
 
 function getArticleAssetsDirectory(root: string, path: string): string {
-  return resolve(root, ARTICLE_MEDIA_DIRECTORY, path);
+  return resolve(root, ARTICLES_DIRECTORY, path, ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME);
 }
 
 function getArticlePublicAssetsDirectory(root: string, path: string): string {
   return resolve(root, ARTICLE_PUBLIC_ASSETS_DIRECTORY, path);
-}
-
-function getArticlePublicPath(path: string, fileName: string): string {
-  return `/blog/${path}/${fileName}`;
 }
 
 function getArticleSourcePath(root: string, publicPath: string): string | null {
@@ -123,6 +119,35 @@ function readArticlePaths(root: string): Array<string> {
   return readdirSync(articlesDirectory, { withFileTypes: true }).flatMap(
     (entity): Array<string> => (entity.isDirectory() ? [entity.name] : []),
   );
+}
+
+function readArticleImagePublicPaths(root: string, path: string): Array<string> {
+  const filePath = resolve(root, ARTICLES_DIRECTORY, path, "index.mdx");
+
+  if (!existsSync(filePath)) {
+    return [];
+  }
+
+  const publicPaths = new Set<string>();
+  const source = readFileSync(filePath, "utf-8");
+
+  for (const match of source.matchAll(ARTICLE_MARKDOWN_IMAGE_REGEX)) {
+    const publicPath = match.groups?.src;
+
+    if (typeof publicPath === "string" && publicPath.startsWith(`/blog/${path}/`)) {
+      publicPaths.add(publicPath);
+    }
+  }
+
+  for (const match of source.matchAll(ARTICLE_HTML_IMAGE_REGEX)) {
+    const publicPath = match.groups?.src;
+
+    if (typeof publicPath === "string" && publicPath.startsWith(`/blog/${path}/`)) {
+      publicPaths.add(publicPath);
+    }
+  }
+
+  return Array.from(publicPaths);
 }
 
 function warnOnUnexpectedArticleCoverAspectRatio({ height, width }: ImageMetadata): void {
@@ -262,13 +287,19 @@ async function createImageVariants(
   return variants;
 }
 
-async function saveImage({ metadata, output }: ProcessedImage): Promise<string> {
+async function saveImage(
+  { metadata, output }: ProcessedImage,
+  publicDirectory = "/",
+): Promise<string> {
   const { format, width } = metadata;
   const contentHash = createHash("sha256").update(output).digest("hex");
 
   const fileName = `${contentHash}-${width}.${format}`;
-  const publicPath = `/assets/${fileName}`;
+  const normalizedPublicDirectory = `/${publicDirectory.replace(/^\/+|\/+$/gu, "")}`;
+  const publicPath =
+    normalizedPublicDirectory === "/" ? `/${fileName}` : `${normalizedPublicDirectory}/${fileName}`;
 
+  await mkdir(join("public", normalizedPublicDirectory), { recursive: true });
   await writeFile(join("public", publicPath.replace(/^\//u, "")), output);
 
   return publicPath;
@@ -276,12 +307,13 @@ async function saveImage({ metadata, output }: ProcessedImage): Promise<string> 
 
 async function createSourceSetFromImageVariants(
   variants: Array<ProcessedImage>,
+  publicDirectory = "/",
 ): Promise<Array<ImageSourceSet>> {
   const imageSources = [];
 
   for (const variant of variants) {
     const variantSize = `${variant.metadata.width}w`;
-    const variantPath = await saveImage(variant);
+    const variantPath = await saveImage(variant, publicDirectory);
 
     imageSources.push({ path: variantPath, size: variantSize });
   }
@@ -297,6 +329,7 @@ function renderImageMarkup({
   alt,
   avifSourceSet: avifSources = [],
   height,
+  includeFigure = true,
   isPriority = false,
   publicPath,
   webpSourceSet: webpSources = [],
@@ -305,6 +338,7 @@ function renderImageMarkup({
   alt: string;
   avifSourceSet?: Array<ImageSourceSet>;
   height: number;
+  includeFigure?: boolean;
   isPriority?: boolean;
   publicPath: string;
   webpSourceSet?: Array<ImageSourceSet>;
@@ -319,22 +353,22 @@ function renderImageMarkup({
   const img = `<img ${src} ${widthAttribute} ${heightAttribute} ${altAttribute} ${decoding} ${loading} />`;
 
   if (avifSources.length + webpSources.length === 0) {
-    return ["<figure>", img, "</figure>"].join("\n");
+    return includeFigure ? ["<figure>", img, "</figure>"].join("\n") : img;
   }
 
   const sizes = `sizes="(max-width: 46rem) 90vw, 46rem"`;
   const avifSourceSet = `srcset="${serializeSourceSet(avifSources)}"`;
   const webpSourceSet = `srcset="${serializeSourceSet(webpSources)}"`;
 
-  return [
-    "<figure>",
+  const picture = [
     "<picture>",
     `<source type="image/avif" ${sizes} ${avifSourceSet} />`,
     `<source type="image/webp" ${sizes} ${webpSourceSet} />`,
     img,
     "</picture>",
-    "</figure>",
   ].join("\n");
+
+  return includeFigure ? ["<figure>", picture, "</figure>"].join("\n") : picture;
 }
 
 async function processArticleImage(root: string, publicPath: string): Promise<void> {
@@ -351,8 +385,8 @@ async function processArticleImage(root: string, publicPath: string): Promise<vo
     articleImageManifest.set(publicPath, {
       defaultSource: publicPath,
       height,
-      markup: (alt, isPriority = false): string =>
-        renderImageMarkup({ alt, height, isPriority, publicPath, width }),
+      markup: (alt, isPriority = false, includeFigure = true): string =>
+        renderImageMarkup({ alt, height, includeFigure, isPriority, publicPath, width }),
       type: format,
       width,
     });
@@ -361,18 +395,26 @@ async function processArticleImage(root: string, publicPath: string): Promise<vo
 
   const avifVariants = await createImageVariants(image, ImageFormat.AVIF);
   const webpVariants = await createImageVariants(image, ImageFormat.WEBP);
-  const avifSourceSet = await createSourceSetFromImageVariants(avifVariants);
-  const webpSourceSet = await createSourceSetFromImageVariants(webpVariants);
+  const variantPublicDirectory = posix.dirname(publicPath);
+  const avifSourceSet = await createSourceSetFromImageVariants(
+    avifVariants,
+    variantPublicDirectory,
+  );
+  const webpSourceSet = await createSourceSetFromImageVariants(
+    webpVariants,
+    variantPublicDirectory,
+  );
   const defaultSource = webpSourceSet[0]?.path ?? publicPath;
 
   articleImageManifest.set(publicPath, {
     defaultSource,
     height,
-    markup: (alt, isPriority = false): string =>
+    markup: (alt, isPriority = false, includeFigure = true): string =>
       renderImageMarkup({
         alt,
         avifSourceSet,
         height,
+        includeFigure,
         isPriority,
         publicPath: defaultSource,
         webpSourceSet,
@@ -387,22 +429,16 @@ async function processArticleImages(root: string): Promise<void> {
   articleImageManifest.clear();
 
   for (const articlePath of readArticlePaths(root)) {
-    const sourceDirectory = getArticleAssetsDirectory(root, articlePath);
-
     prepareArticlePublicAssets(root, articlePath);
 
-    if (!existsSync(sourceDirectory)) {
-      continue;
-    }
+    for (const publicPath of readArticleImagePublicPaths(root, articlePath)) {
+      const extension = extname(publicPath).toLowerCase();
 
-    for (const entity of readdirSync(sourceDirectory, { withFileTypes: true })) {
-      const extension = parse(entity.name).ext.toLowerCase();
-
-      if (!entity.isFile() || !ARTICLE_IMAGE_EXTENSIONS.has(extension)) {
+      if (!ARTICLE_IMAGE_EXTENSIONS.has(extension)) {
         continue;
       }
 
-      await processArticleImage(root, getArticlePublicPath(articlePath, entity.name));
+      await processArticleImage(root, publicPath);
     }
   }
 }
@@ -420,12 +456,13 @@ function ensureArticleImages(root: string): Promise<void> {
   return build;
 }
 
-function getArticleImageMarkup(publicPath: string, alt: string, isPriority = false): string | null {
-  return articleImageManifest.get(publicPath)?.markup(alt, isPriority) ?? null;
-}
-
-function getArticleImageDefaultSource(publicPath: string): string | null {
-  return articleImageManifest.get(publicPath)?.defaultSource ?? null;
+function getArticleImageMarkup(
+  publicPath: string,
+  alt: string,
+  isPriority = false,
+  includeFigure = true,
+): string | null {
+  return articleImageManifest.get(publicPath)?.markup(alt, isPriority, includeFigure) ?? null;
 }
 
 function imagePlugin(): Plugin {
@@ -467,22 +504,24 @@ function imagePlugin(): Plugin {
           },
         )
         .replace(
-          ARTICLE_COVER_SOURCE_REGEX,
+          ARTICLE_HTML_IMAGE_REGEX,
           (
             match: string,
-            prefix: string,
+            _attributes: string,
             _src: string,
-            suffix: string,
+            _alt: string,
             _offset: number,
             _input: string,
             groups?: {
+              alt?: string;
               src?: string;
             },
           ): string => {
-            const defaultSource =
-              groups?.src === undefined ? null : getArticleImageDefaultSource(groups.src);
+            if (groups?.src === undefined || groups.alt === undefined) {
+              return match;
+            }
 
-            return defaultSource === null ? match : `${prefix}${defaultSource}${suffix}`;
+            return getArticleImageMarkup(groups.src, groups.alt, false, false) ?? match;
           },
         );
     },
@@ -497,7 +536,6 @@ export {
   createImageVariants,
   createSourceSetFromImageVariants,
   ensureArticleImages,
-  getArticleImageDefaultSource,
   getArticleImageMarkup,
   imagePlugin,
   serializeSourceSet,

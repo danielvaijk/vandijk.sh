@@ -13,10 +13,9 @@ node_modules
 .env
 
 # Generated
-public/assets/*
-!public/assets/.gitkeep
+public/[0-9a-f]*-[0-9]*.avif
+public/[0-9a-f]*-[0-9]*.webp
 public/blog/*
-!public/blog/.gitkeep
 *.frames
 
 # Cloudflare
