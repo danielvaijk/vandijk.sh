@@ -33,6 +33,18 @@ interface ArticleMdxFrontmatter {
   topic?: string;
 }
 
+interface ArticleMetadata {
+  coverImageFramesPath: string;
+  coverImageMarkup: string;
+  coverImagePublicPath: string;
+  date: string;
+  description: string;
+  path: string;
+  readTime: number;
+  title: string;
+  topic: string;
+}
+
 interface CodeBlockContent {
   html: string;
   info: string;
@@ -44,8 +56,8 @@ interface WrapMarkdownCodeBlocksOptions {
 
 const ARTICLE_CODE_DRAWER_IMPORT =
   'import { ArticleCodeDrawer } from "src/components/article-code-drawer";';
-const ARTICLE_METADATA_DIRECTORY = "src/media";
-const ARTICLES_METADATA_FILE_PATH = `${ARTICLE_METADATA_DIRECTORY}/articles.json`;
+const ARTICLES_METADATA_MODULE_ID = "virtual:articles";
+const RESOLVED_ARTICLES_METADATA_MODULE_ID = `\0${ARTICLES_METADATA_MODULE_ID}`;
 const ARTICLES_DIRECTORY = "src/routes/blog";
 const ARTICLE_PUBLIC_ASSETS_DIRECTORY = "public/blog";
 const ARTICLE_SOURCE_ASSETS_DIRECTORY_NAME = "assets";
@@ -518,8 +530,8 @@ async function generateArticleGifFrames(root: string, path: string): Promise<voi
   }
 }
 
-async function generateArticlesMetadata(root: string): Promise<void> {
-  const results = [];
+async function generateArticlesMetadata(root: string): Promise<Array<ArticleMetadata>> {
+  const results: Array<ArticleMetadata> = [];
 
   for (const { filePath, path } of readArticleFiles(root)) {
     const { content, data } = parseArticleMetadataFrontmatter(filePath);
@@ -558,27 +570,43 @@ async function generateArticlesMetadata(root: string): Promise<void> {
 
     return dateB.getTime() - dateA.getTime();
   });
-  const serializedResults = `${JSON.stringify(sortedResults, null, 2)}\n`;
-  const metadataDirectory = resolve(root, ARTICLE_METADATA_DIRECTORY);
-
-  if (!existsSync(metadataDirectory)) {
-    mkdirSync(metadataDirectory);
-  }
-
-  writeFileSync(resolve(root, ARTICLES_METADATA_FILE_PATH), serializedResults);
+  return sortedResults;
 }
 
 function articlesMetadataPlugin(): Plugin {
   let config: ResolvedConfig;
+  let articlesMetadata: Promise<Array<ArticleMetadata>> | null = null;
+
+  function ensureArticlesMetadata(): Promise<Array<ArticleMetadata>> {
+    if (articlesMetadata === null) {
+      articlesMetadata = (async (): Promise<Array<ArticleMetadata>> => {
+        await ensureArticleImages(config.root);
+        return generateArticlesMetadata(config.root);
+      })();
+    }
+
+    return articlesMetadata;
+  }
 
   return {
     name: "articles-metadata",
     configResolved(resolvedConfig): void {
       config = resolvedConfig;
     },
+    resolveId(id): string | null {
+      return id === ARTICLES_METADATA_MODULE_ID ? RESOLVED_ARTICLES_METADATA_MODULE_ID : null;
+    },
     async buildStart(): Promise<void> {
-      await ensureArticleImages(config.root);
-      await generateArticlesMetadata(config.root);
+      await ensureArticlesMetadata();
+    },
+    async load(id): Promise<string | null> {
+      if (id !== RESOLVED_ARTICLES_METADATA_MODULE_ID) {
+        return null;
+      }
+
+      const metadata = await ensureArticlesMetadata();
+
+      return `export default ${JSON.stringify(metadata)};`;
     },
   };
 }

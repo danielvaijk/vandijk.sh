@@ -19,7 +19,5 @@ public/blog/*
 !public/blog/.gitkeep
 *.frames
 
-src/media/articles.json
-
 # Cloudflare
 functions/**/*.js
