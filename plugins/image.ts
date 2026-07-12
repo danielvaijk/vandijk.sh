@@ -6,8 +6,6 @@ import { basename, extname, join, parse, resolve } from "node:path";
 import sharp, { type Sharp } from "sharp";
 import type { Plugin, ResolvedConfig } from "vite";
 
-import { joinPathNames } from "../src/utilities/url";
-
 enum ImageFormat {
   AVIF = "avif",
   GIF = "gif",
@@ -271,7 +269,7 @@ async function saveImage({ metadata, output }: ProcessedImage): Promise<string> 
   const fileName = `${contentHash}-${width}.${format}`;
   const publicPath = `/assets/${fileName}`;
 
-  await writeFile(joinPathNames("./public", publicPath), output);
+  await writeFile(join("public", publicPath.replace(/^\//u, "")), output);
 
   return publicPath;
 }

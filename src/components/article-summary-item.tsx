@@ -4,7 +4,6 @@ import { Link } from "@builder.io/qwik-city";
 
 import { GlyphRaster } from "src/components/glyph-raster";
 import styles from "src/components/article-summary-item.css?inline";
-import { formatDateAsString } from "src/utilities/time";
 
 export interface ArticleSummaryProps {
   coverImageFramesPath?: string;
@@ -32,7 +31,11 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
     const { scopeId } = useStylesScoped$(styles);
 
     const dateParsed = new Date(date);
-    const dateFormatted = formatDateAsString(dateParsed);
+    const dateFormatted = new Intl.DateTimeFormat("en-US", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    }).format(dateParsed);
 
     // Qwik will not automatically add the scoped styles to injected HTML,
     // so as a workaround we manually insert it as a class name to any

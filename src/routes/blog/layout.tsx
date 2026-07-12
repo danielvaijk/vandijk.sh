@@ -3,7 +3,6 @@ import { component$, Slot, useStyles$ } from "@builder.io/qwik";
 import type { DocumentHeadProps, DocumentHeadValue, DocumentMeta } from "@builder.io/qwik-city";
 import { useLocation, type DocumentHead } from "@builder.io/qwik-city";
 
-import { createPageMetaTags } from "src/helpers/meta";
 import stylesForLayout from "src/routes/blog/layout.css?inline";
 import stylesForFooter from "src/routes/blog/footer.css?inline";
 import stylesForCodeHighlights from "src/routes/blog/code.css?inline";
@@ -125,7 +124,14 @@ export const head: DocumentHead = (props: DocumentHeadProps): DocumentHeadValue 
   const description =
     "I explore and write about a wide range of engineering topics and challenges.";
 
-  const meta = createPageMetaTags({ description, title });
+  const meta = [
+    { content: description, name: "description" },
+    { content: title, property: "og:title" },
+    { content: description, property: "og:description" },
+    { content: "website", property: "og:type" },
+    { content: "en_US", property: "og:locale" },
+    { content: "Daniel van Dijk", property: "og:site_name" },
+  ];
 
   return { meta, title };
 };

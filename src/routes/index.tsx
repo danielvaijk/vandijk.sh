@@ -6,7 +6,6 @@ import type TypeIt from "typeit";
 
 import { CenteredTitle } from "src/components/centered-title";
 import { GlyphRaster } from "src/components/glyph-raster";
-import { createPageMetaTags } from "src/helpers/meta";
 import styles from "src/routes/index.css?inline";
 
 export default component$((): QwikJSX.Element => {
@@ -74,7 +73,14 @@ export const head: DocumentHead = (): DocumentHeadValue => {
   const description = "Full-stack Software Engineer, Game Developer, and Writer.";
 
   return {
-    meta: createPageMetaTags({ description, title }),
+    meta: [
+      { content: description, name: "description" },
+      { content: title, property: "og:title" },
+      { content: description, property: "og:description" },
+      { content: "website", property: "og:type" },
+      { content: "en_US", property: "og:locale" },
+      { content: "Daniel van Dijk", property: "og:site_name" },
+    ],
     title,
   };
 };
