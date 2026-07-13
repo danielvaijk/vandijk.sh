@@ -54,6 +54,16 @@ interface ArticleMetadata {
   topic: string;
 }
 
+interface ArticleContentRenderer {
+  ensureGeneratedGlyphFrames: () => Promise<void>;
+  plugins: Plugin[];
+}
+
+interface ArticlesMetadataPlugin {
+  ensureArticlesMetadata: () => Promise<ArticleMetadata[]>;
+  plugin: Plugin;
+}
+
 interface CodeBlockContent {
   html: string;
   info: string;
@@ -696,7 +706,9 @@ async function generateArticlesMetadata(
   return sortedResults;
 }
 
-function articlesMetadataPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Plugin {
+function articlesMetadataPlugin(
+  glyphFrameOptions: GlyphRasterFrameOptions,
+): ArticlesMetadataPlugin {
   let config: ResolvedConfig | null = null;
   let articlesMetadata: Promise<ArticleMetadata[]> | null = null;
 
@@ -715,24 +727,27 @@ function articlesMetadataPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Plu
   }
 
   return {
-    async buildStart(): Promise<void> {
-      await ensureArticlesMetadata();
-    },
-    configResolved(resolvedConfig): void {
-      config = resolvedConfig;
-    },
-    async load(id): Promise<string | null> {
-      if (id !== RESOLVED_ARTICLES_METADATA_MODULE_ID) {
-        return null;
-      }
+    ensureArticlesMetadata,
+    plugin: {
+      async buildStart(): Promise<void> {
+        await ensureArticlesMetadata();
+      },
+      configResolved(resolvedConfig): void {
+        config = resolvedConfig;
+      },
+      async load(id): Promise<string | null> {
+        if (id !== RESOLVED_ARTICLES_METADATA_MODULE_ID) {
+          return null;
+        }
 
-      const metadata = await ensureArticlesMetadata();
+        const metadata = await ensureArticlesMetadata();
 
-      return `export default ${JSON.stringify(metadata)};`;
-    },
-    name: "articles-metadata",
-    resolveId(id): string | null {
-      return id === ARTICLES_METADATA_MODULE_ID ? RESOLVED_ARTICLES_METADATA_MODULE_ID : null;
+        return `export default ${JSON.stringify(metadata)};`;
+      },
+      name: "articles-metadata",
+      resolveId(id): string | null {
+        return id === ARTICLES_METADATA_MODULE_ID ? RESOLVED_ARTICLES_METADATA_MODULE_ID : null;
+      },
     },
   };
 }
@@ -767,8 +782,17 @@ function articleCodeDrawerMdxPlugin(): Plugin {
   };
 }
 
-function articleContentRendererPlugin(glyphFrameOptions: GlyphRasterFrameOptions): Plugin[] {
-  return [articlesMetadataPlugin(glyphFrameOptions), articleCodeDrawerMdxPlugin()];
+function articleContentRendererPlugin(
+  glyphFrameOptions: GlyphRasterFrameOptions,
+): ArticleContentRenderer {
+  const { ensureArticlesMetadata, plugin } = articlesMetadataPlugin(glyphFrameOptions);
+
+  return {
+    ensureGeneratedGlyphFrames: async (): Promise<void> => {
+      await ensureArticlesMetadata();
+    },
+    plugins: [plugin, articleCodeDrawerMdxPlugin()],
+  };
 }
 
 export { articleContentRendererPlugin, wrapMarkdownCodeBlocks };

@@ -16,6 +16,18 @@ interface FrameDimensions {
   rows: number;
 }
 
+interface GlyphFramePoster {
+  aspectRatio: number;
+  cols: number;
+  data: string;
+  rows: number;
+}
+
+interface GlyphFrameHeader {
+  cols: number;
+  rows: number;
+}
+
 const DITHER_MATRIX_SIZE = 4;
 const DITHER_BYTE_SPREAD = 0.75;
 const DETAIL_SHARPEN_AMOUNT = 0.72;
@@ -28,6 +40,9 @@ const SITE_GLYPH_SOURCE_DIRECTORY = "src/routes/assets";
 const SITE_GLYPH_SOURCE_EXTENSIONS = [".gif"];
 const SITE_GLYPH_SOURCE_FILE_EXTENSIONS = new Set([".mdx", ".ts", ".tsx"]);
 const SITE_GLYPH_FRAME_URL_REGEX = /["'`]\/(?<name>[\w-]+)\.frames["'`]/gu;
+const GLYPH_FRAME_POSTER_SAMPLE_SIZE = 128;
+const GLYPH_FRAME_POSTERS_MODULE_ID = "virtual:glyph-frame-posters";
+const RESOLVED_GLYPH_FRAME_POSTERS_MODULE_ID = `\0${GLYPH_FRAME_POSTERS_MODULE_ID}`;
 
 function getFrameDimensions(
   width: number,
@@ -313,6 +328,75 @@ function createFramesFile(fps: number, dimensions: FrameDimensions, rawFrames: B
   return Buffer.concat([header, rawFrames]);
 }
 
+function createGlyphFramePoster(
+  source: Buffer,
+  options: GlyphRasterFrameOptions,
+): GlyphFramePoster {
+  const headerEnd = source.indexOf(10);
+  if (headerEnd === -1) {
+    throw new Error("Unable to parse glyph frame poster source.");
+  }
+
+  const header = JSON.parse(source.subarray(0, headerEnd).toString("utf8")) as GlyphFrameHeader;
+  const frame = source.subarray(headerEnd + 1, headerEnd + 1 + header.cols * header.rows);
+  if (frame.length !== header.cols * header.rows) {
+    throw new Error("Glyph frame poster source does not contain a complete first frame.");
+  }
+
+  const cols = GLYPH_FRAME_POSTER_SAMPLE_SIZE;
+  const rows = GLYPH_FRAME_POSTER_SAMPLE_SIZE;
+  const poster = Buffer.alloc(cols * rows);
+
+  for (let row = 0; row < rows; row += 1) {
+    const sourceRow = Math.min(header.rows - 1, Math.floor(((row + 0.5) * header.rows) / rows));
+
+    for (let col = 0; col < cols; col += 1) {
+      const sourceCol = Math.min(header.cols - 1, Math.floor(((col + 0.5) * header.cols) / cols));
+      poster[row * cols + col] = frame[sourceRow * header.cols + sourceCol];
+    }
+  }
+
+  return {
+    aspectRatio:
+      ((header.cols / options.horizontalScale) * options.cellWidth) /
+      (header.rows * options.cellHeight),
+    cols,
+    data: poster.toString("base64"),
+    rows,
+  };
+}
+
+function readGlyphFrameFiles(directory: string): string[] {
+  if (!existsSync(directory)) {
+    return [];
+  }
+
+  return readdirSync(directory, { withFileTypes: true }).flatMap((entity): string[] => {
+    const entry = path.join(directory, entity.name);
+
+    if (entity.isDirectory()) {
+      return readGlyphFrameFiles(entry);
+    }
+
+    return entity.isFile() && path.extname(entity.name) === ".frames" ? [entry] : [];
+  });
+}
+
+function createGlyphFramePostersManifest(
+  root: string,
+  options: GlyphRasterFrameOptions,
+): Record<string, GlyphFramePoster> {
+  const publicDirectory = path.resolve(root, SITE_GLYPH_PUBLIC_DIRECTORY);
+
+  return Object.fromEntries(
+    readGlyphFrameFiles(publicDirectory).map((file): [string, GlyphFramePoster] => {
+      const publicPath = `/${path.relative(publicDirectory, file).split(path.sep).join("/")}`;
+
+      return [publicPath, createGlyphFramePoster(readFileSync(file), options)];
+    }),
+  );
+}
+
 async function generateGreyscaleFrameSource(
   source: GlyphFrameSource,
   options: GlyphRasterFrameOptions,
@@ -386,7 +470,10 @@ function resolveSiteGlyphFrameSources(root: string): GlyphFrameSource[] {
   });
 }
 
-function frameGreyscaleSamplerPlugin(options: GlyphRasterFrameOptions): Plugin {
+function frameGreyscaleSamplerPlugin(
+  options: GlyphRasterFrameOptions,
+  ensureGeneratedGlyphFrames: () => Promise<void> = (): Promise<void> => Promise.resolve(),
+): Plugin {
   let config: ResolvedConfig | null = null;
 
   return {
@@ -394,6 +481,7 @@ function frameGreyscaleSamplerPlugin(options: GlyphRasterFrameOptions): Plugin {
       if (!config) {
         throw new Error("Vite config was not resolved before build start.");
       }
+      await ensureGeneratedGlyphFrames();
       for (const source of resolveSiteGlyphFrameSources(config.root)) {
         await generateGreyscaleFrameSource(source, options);
       }
@@ -401,7 +489,21 @@ function frameGreyscaleSamplerPlugin(options: GlyphRasterFrameOptions): Plugin {
     configResolved(resolvedConfig): void {
       config = resolvedConfig;
     },
+    async load(id): Promise<string | null> {
+      if (id !== RESOLVED_GLYPH_FRAME_POSTERS_MODULE_ID) {
+        return null;
+      }
+      if (!config) {
+        throw new Error("Vite config was not resolved before loading glyph frame posters.");
+      }
+      await ensureGeneratedGlyphFrames();
+
+      return `export default ${JSON.stringify(createGlyphFramePostersManifest(config.root, options))};`;
+    },
     name: "glyph-frames",
+    resolveId(id): string | null {
+      return id === GLYPH_FRAME_POSTERS_MODULE_ID ? RESOLVED_GLYPH_FRAME_POSTERS_MODULE_ID : null;
+    },
   };
 }
 

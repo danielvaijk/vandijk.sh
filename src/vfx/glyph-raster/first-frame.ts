@@ -4,6 +4,7 @@ import {
   GLYPH_FONT_FAMILY,
   GLYPH_RASTER_SHADER_OPTIONS,
   MAX_FIELD_MODIFIER_REGIONS,
+  PROCEDURAL_LAYOUT_SAMPLE_RATE,
 } from "src/vfx/glyph-raster/config";
 import { createGlyphRasterShaderSources } from "src/vfx/glyph-raster/shaders";
 
@@ -22,14 +23,50 @@ interface InitialGlyphFrameOptions {
   frameRate: number;
   gpuNoiseSeed: number;
   glyphCellPaddingRatio: number;
+  layoutSampleRate: number;
   maxFieldModifierRegions: number;
   maxGridCells: number;
+  modifierPosters: Record<string, InitialGlyphModifierPoster>;
   vertexSource: string;
   visualRange: number;
 }
 
 interface InitialFrameCanvas extends HTMLCanvasElement {
   __disposeGlyphInitialFrame?: () => void;
+}
+
+interface InitialGlyphModifierOptions {
+  blend: number;
+  elementId: string;
+  sourceUrl: string;
+}
+
+interface InitialGlyphModifierPoster {
+  cols: number;
+  data: string;
+  rows: number;
+}
+
+interface InitialGlyphModifier {
+  blend: number;
+  brightnessGrid: Uint8Array;
+  documentLeft: number;
+  documentTop: number;
+  elementId: string;
+  height: number;
+  width: number;
+}
+
+interface InitialGlyphFrameState {
+  disposed: boolean;
+  modifiers: InitialGlyphModifier[];
+  posters: Record<string, InitialGlyphModifierPoster>;
+  registerModifier: (modifier: InitialGlyphModifierOptions) => void;
+}
+
+interface InitialGlyphFrameGlobal {
+  __glyphInitialFrame?: InitialGlyphFrameState;
+  __glyphInitialFrameQueue?: InitialGlyphModifierOptions[];
 }
 
 function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
@@ -301,13 +338,202 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     const red = Number.parseInt(options.backgroundColor.slice(1, 3), 16) / 255;
     const green = Number.parseInt(options.backgroundColor.slice(3, 5), 16) / 255;
     const blue = Number.parseInt(options.backgroundColor.slice(5, 7), 16) / 255;
-    gl.clearColor(red, green, blue, 1);
-    gl.clear(gl.COLOR_BUFFER_BIT);
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cellCount);
+    const modifierBrightness = new Uint8Array(
+      options.fieldModifierSampleSize ** 2 * options.maxFieldModifierRegions,
+    );
+    const modifierBlends = new Float32Array(options.maxFieldModifierRegions);
+    const modifierRects = new Float32Array(options.maxFieldModifierRegions * 4);
+    const initialFrameGlobal = globalThis as typeof globalThis & InitialGlyphFrameGlobal;
+    let layoutAnimationFrame = 0;
+    let lastLayoutSampleAt = 0;
+    const state: InitialGlyphFrameState = {
+      disposed: false,
+      modifiers: [],
+      posters: options.modifierPosters,
+      registerModifier: (): void => {
+        /* Assigned below. */
+      },
+    };
+    const renderFrame = (): void => {
+      gl.useProgram(program);
+      gl.bindVertexArray(vertexArray);
+      gl.clearColor(red, green, blue, 1);
+      gl.clear(gl.COLOR_BUFFER_BIT);
+      gl.enable(gl.BLEND);
+      gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+      gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cellCount);
+    };
+    const updateModifierBounds = (): boolean => {
+      let didChange = false;
+
+      for (const modifier of state.modifiers) {
+        const element = document.getElementById(modifier.elementId);
+        if (!element) {
+          continue;
+        }
+
+        const bounds = element.getBoundingClientRect();
+        const documentLeft = bounds.left + window.scrollX;
+        const documentTop = bounds.top + window.scrollY;
+        if (
+          modifier.documentLeft === documentLeft &&
+          modifier.documentTop === documentTop &&
+          modifier.width === bounds.width &&
+          modifier.height === bounds.height
+        ) {
+          continue;
+        }
+
+        modifier.documentLeft = documentLeft;
+        modifier.documentTop = documentTop;
+        modifier.width = bounds.width;
+        modifier.height = bounds.height;
+        didChange = true;
+      }
+
+      return didChange;
+    };
+    const uploadModifiers = (): void => {
+      modifierBrightness.fill(0);
+      modifierBlends.fill(0);
+      modifierRects.fill(0);
+
+      for (
+        let index = 0;
+        index < Math.min(state.modifiers.length, options.maxFieldModifierRegions);
+        index += 1
+      ) {
+        const modifier = state.modifiers[index];
+        const valueIndex = index * 4;
+        modifierRects[valueIndex] = modifier.documentLeft;
+        modifierRects[valueIndex + 1] = modifier.documentTop;
+        modifierRects[valueIndex + 2] = modifier.width;
+        modifierRects[valueIndex + 3] = modifier.height;
+        modifierBlends[index] = modifier.blend;
+        modifierBrightness.set(
+          modifier.brightnessGrid,
+          index * options.fieldModifierSampleSize ** 2,
+        );
+      }
+
+      gl.useProgram(program);
+      const countLocation = gl.getUniformLocation(program, "u_field_modifier_count");
+      const blendsLocation = gl.getUniformLocation(program, "u_field_modifier_blends[0]");
+      const rectsLocation = gl.getUniformLocation(program, "u_field_modifier_rects[0]");
+      if (countLocation) {
+        gl.uniform1i(
+          countLocation,
+          Math.min(state.modifiers.length, options.maxFieldModifierRegions),
+        );
+      }
+      if (blendsLocation) {
+        gl.uniform1fv(blendsLocation, modifierBlends);
+      }
+      if (rectsLocation) {
+        gl.uniform4fv(rectsLocation, modifierRects);
+      }
+      gl.activeTexture(gl.TEXTURE3);
+      gl.bindTexture(gl.TEXTURE_2D, fieldModifierTexture);
+      gl.texImage2D(
+        gl.TEXTURE_2D,
+        0,
+        gl.R8,
+        options.fieldModifierSampleSize,
+        options.fieldModifierSampleSize * options.maxFieldModifierRegions,
+        0,
+        gl.RED,
+        gl.UNSIGNED_BYTE,
+        modifierBrightness,
+      );
+      renderFrame();
+    };
+    const synchronizeModifierLayout = (time: number): void => {
+      if (state.disposed) {
+        return;
+      }
+
+      if (
+        document.readyState === "loading" ||
+        time - lastLayoutSampleAt >= 1000 / options.layoutSampleRate
+      ) {
+        lastLayoutSampleAt = time;
+        if (updateModifierBounds()) {
+          uploadModifiers();
+        }
+      }
+
+      layoutAnimationFrame = requestAnimationFrame(synchronizeModifierLayout);
+    };
+    state.registerModifier = (modifierOptions: InitialGlyphModifierOptions): void => {
+      const poster = state.posters[modifierOptions.sourceUrl];
+      if (!poster) {
+        return;
+      }
+
+      const encoded = atob(poster.data);
+      if (encoded.length < poster.cols * poster.rows) {
+        return;
+      }
+
+      const brightnessGrid = new Uint8Array(options.fieldModifierSampleSize ** 2);
+      for (let row = 0; row < options.fieldModifierSampleSize; row += 1) {
+        const sourceRow = Math.min(
+          poster.rows - 1,
+          Math.floor(((row + 0.5) * poster.rows) / options.fieldModifierSampleSize),
+        );
+        for (let col = 0; col < options.fieldModifierSampleSize; col += 1) {
+          const sourceCol = Math.min(
+            poster.cols - 1,
+            Math.floor(((col + 0.5) * poster.cols) / options.fieldModifierSampleSize),
+          );
+          brightnessGrid[row * options.fieldModifierSampleSize + col] = encoded.charCodeAt(
+            sourceRow * poster.cols + sourceCol,
+          );
+        }
+      }
+
+      const element = document.getElementById(modifierOptions.elementId);
+      const bounds = element?.getBoundingClientRect();
+      const opacity = element ? Number(getComputedStyle(element).opacity) : 1;
+      const modifier: InitialGlyphModifier = {
+        blend:
+          modifierOptions.blend *
+          (Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1),
+        brightnessGrid,
+        documentLeft: (bounds?.left ?? 0) + window.scrollX,
+        documentTop: (bounds?.top ?? 0) + window.scrollY,
+        elementId: modifierOptions.elementId,
+        height: bounds?.height ?? 0,
+        width: bounds?.width ?? 0,
+      };
+      const existingIndex = state.modifiers.findIndex(
+        (candidate) => candidate.elementId === modifier.elementId,
+      );
+      if (existingIndex === -1) {
+        state.modifiers.push(modifier);
+      } else {
+        state.modifiers[existingIndex] = modifier;
+      }
+
+      if (!state.disposed) {
+        uploadModifiers();
+        if (layoutAnimationFrame === 0) {
+          layoutAnimationFrame = requestAnimationFrame(synchronizeModifierLayout);
+        }
+      }
+      window.dispatchEvent(new CustomEvent("glyphinitialmodifier", { detail: modifier }));
+    };
+
+    initialFrameGlobal.__glyphInitialFrame = state;
+    renderFrame();
+    for (const modifier of initialFrameGlobal.__glyphInitialFrameQueue ?? []) {
+      state.registerModifier(modifier);
+    }
+    delete initialFrameGlobal.__glyphInitialFrameQueue;
     canvas.dataset.glyphInitialFrame = "";
     canvas.__disposeGlyphInitialFrame = (): void => {
+      state.disposed = true;
+      cancelAnimationFrame(layoutAnimationFrame);
       gl.deleteBuffer(cornerBuffer);
       gl.deleteBuffer(positionBuffer);
       gl.deleteTexture(atlasTexture);
@@ -330,6 +556,7 @@ function createInitialGlyphFrameScript(
     | "fontFamily"
     | "fragmentSource"
     | "glyphCellPaddingRatio"
+    | "layoutSampleRate"
     | "maxFieldModifierRegions"
     | "vertexSource"
   >,
@@ -341,6 +568,7 @@ function createInitialGlyphFrameScript(
     ...options,
     fieldModifierSampleSize: FIELD_MODIFIER_SAMPLE_SIZE,
     glyphCellPaddingRatio: GLYPH_CELL_PADDING_RATIO,
+    layoutSampleRate: PROCEDURAL_LAYOUT_SAMPLE_RATE,
     fontFamily: GLYPH_FONT_FAMILY,
     fragmentSource,
     maxFieldModifierRegions: MAX_FIELD_MODIFIER_REGIONS,
@@ -350,4 +578,10 @@ function createInitialGlyphFrameScript(
   return `(${drawInitialGlyphFrame.toString()})(${serializedOptions});`;
 }
 
-export { createInitialGlyphFrameScript };
+function createInitialGlyphModifierScript(options: InitialGlyphModifierOptions): string {
+  const serializedOptions = JSON.stringify(options).replaceAll("<", "\\u003c");
+
+  return `((scope,modifier)=>{const frame=scope.__glyphInitialFrame;if(frame){frame.registerModifier(modifier);}else{(scope.__glyphInitialFrameQueue??=[]).push(modifier);}})(globalThis,${serializedOptions});`;
+}
+
+export { createInitialGlyphFrameScript, createInitialGlyphModifierScript };

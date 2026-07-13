@@ -14,3 +14,16 @@ declare module "virtual:articles" {
 
   export default articles;
 }
+
+declare module "virtual:glyph-frame-posters" {
+  interface GlyphFramePoster {
+    aspectRatio: number;
+    cols: number;
+    data: string;
+    rows: number;
+  }
+
+  const posters: Record<string, GlyphFramePoster>;
+
+  export default posters;
+}

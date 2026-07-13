@@ -8,8 +8,10 @@ import { frameGreyscaleSamplerPlugin } from "./plugins/frame-greyscale-sampler";
 import { imageOptimizerPlugin } from "./plugins/image-optimizer";
 import { GLYPH_RASTER_FRAME_OPTIONS } from "./src/vfx/glyph-raster/frame-options";
 
-export default defineConfig(
-  (): UserConfig => ({
+export default defineConfig((): UserConfig => {
+  const articleContentRenderer = articleContentRendererPlugin(GLYPH_RASTER_FRAME_OPTIONS);
+
+  return {
     build: {
       cssMinify: "lightningcss",
     },
@@ -23,8 +25,11 @@ export default defineConfig(
     },
     plugins: [
       imageOptimizerPlugin(),
-      articleContentRendererPlugin(GLYPH_RASTER_FRAME_OPTIONS),
-      frameGreyscaleSamplerPlugin(GLYPH_RASTER_FRAME_OPTIONS),
+      ...articleContentRenderer.plugins,
+      frameGreyscaleSamplerPlugin(
+        GLYPH_RASTER_FRAME_OPTIONS,
+        articleContentRenderer.ensureGeneratedGlyphFrames,
+      ),
       qwikCity({
         mdxPlugins: {
           rehypeAutolinkHeadings: false,
@@ -35,5 +40,5 @@ export default defineConfig(
       qwikVite(),
       tsconfigPaths(),
     ],
-  }),
-);
+  };
+});

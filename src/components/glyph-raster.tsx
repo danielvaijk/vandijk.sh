@@ -9,6 +9,7 @@ import {
 import { isServer } from "@builder.io/qwik/build";
 
 import styles from "src/components/glyph-raster.css?inline";
+import glyphFramePosters from "virtual:glyph-frame-posters";
 
 import {
   DEFAULT_FRAME_RATE,
@@ -26,12 +27,16 @@ import {
   resolvePreset,
 } from "src/vfx/glyph-raster/logic";
 import { clamp } from "src/vfx/shared/math";
+import { PROCEDURAL_LAYOUT_SAMPLE_RATE } from "src/vfx/glyph-raster/config";
 import {
   FIELD_MODIFIER_SAMPLE_SIZE,
   type GlyphFieldModifierRegion as FieldGlyphFieldModifierRegion,
 } from "src/vfx/glyph-raster/field";
 import { createWebGlGlyphRenderer } from "src/vfx/glyph-raster/webgl";
-import { createInitialGlyphFrameScript } from "src/vfx/glyph-raster/first-frame";
+import {
+  createInitialGlyphFrameScript,
+  createInitialGlyphModifierScript,
+} from "src/vfx/glyph-raster/first-frame";
 import {
   type FrameModifierBrightnessGrids,
   type GlyphRasterSource,
@@ -56,12 +61,28 @@ type GlyphRasterAnchor = "auto" | "document" | "viewport";
 type GlyphInitialFrameCanvas = HTMLCanvasElement & {
   __disposeGlyphInitialFrame?: () => void;
 };
+type GlyphInitialModifier = {
+  blend: number;
+  brightnessGrid: Uint8Array;
+  documentLeft: number;
+  documentTop: number;
+  elementId: string;
+  height: number;
+  width: number;
+};
+type GlyphInitialFrameState = {
+  modifiers: GlyphInitialModifier[];
+};
+type GlyphInitialFrameGlobal = typeof globalThis & {
+  __glyphInitialFrame?: GlyphInitialFrameState;
+};
 
 export interface GlyphRasterProps {
   blend?: number;
   class?: string;
   frameFit?: GlyphRasterFrameFit;
   anchor?: GlyphRasterAnchor;
+  initialFrameSources?: string[];
   layout?: GlyphRasterLayout;
   opacity?: number;
   source?: GlyphRasterSource;
@@ -80,7 +101,11 @@ type GlyphFieldModifierRegion = FieldGlyphFieldModifierRegion & {
 
 const glyphFieldModifierRegions = new Map<string, GlyphFieldModifierRegion>();
 let glyphFieldModifierRegionsVersion = 0;
-const PROCEDURAL_LAYOUT_SAMPLE_RATE = 9;
+
+const getInitialGlyphModifier = (rasterId: string): GlyphInitialModifier | undefined =>
+  (globalThis as GlyphInitialFrameGlobal).__glyphInitialFrame?.modifiers.find(
+    (modifier) => modifier.elementId === rasterId,
+  );
 
 const readCssLength = (name: string, fallback: number): number => {
   const root = document.documentElement;
@@ -132,16 +157,25 @@ const markGlyphFieldModifierRegionsChanged = (): void => {
 const updateGlyphFieldModifierRegionBounds = (
   region: GlyphFieldModifierRegion,
   shouldMarkChanged = true,
-): void => {
+): boolean => {
   const rect = region.element.getBoundingClientRect();
+  const documentLeft = rect.left + window.scrollX;
+  const documentTop = rect.top + window.scrollY;
+  const changed =
+    Math.abs(region.documentLeft - documentLeft) > 0.01 ||
+    Math.abs(region.documentTop - documentTop) > 0.01 ||
+    Math.abs(region.width - rect.width) > 0.01 ||
+    Math.abs(region.height - rect.height) > 0.01;
 
-  region.documentLeft = rect.left + window.scrollX;
-  region.documentTop = rect.top + window.scrollY;
+  region.documentLeft = documentLeft;
+  region.documentTop = documentTop;
   region.width = rect.width;
   region.height = rect.height;
-  if (shouldMarkChanged) {
+  if (changed && shouldMarkChanged) {
     markGlyphFieldModifierRegionsChanged();
   }
+
+  return changed;
 };
 
 const updateGlyphFieldModifierRegionBlend = (region: GlyphFieldModifierRegion): boolean => {
@@ -163,6 +197,7 @@ export const GlyphRaster = component$(
     blend,
     class: className,
     frameFit = "contain",
+    initialFrameSources,
     layout,
     opacity,
     source,
@@ -177,6 +212,22 @@ export const GlyphRaster = component$(
     const entropySeed = Math.random() * 100_000;
     const style = `--glyph-raster-color: ${preset.backgroundColor};`;
     const classes = className ? `${className} ` : "";
+    const initialFramePoster =
+      isServer && resolvedSource.type === "frames"
+        ? glyphFramePosters[resolvedSource.url]
+        : undefined;
+    const initialModifierPosters =
+      isServer && resolvedSource.type === "procedural-noise"
+        ? Object.fromEntries(
+            (initialFrameSources ?? []).flatMap((sourceUrl) => {
+              const poster = glyphFramePosters[sourceUrl];
+
+              return poster
+                ? [[sourceUrl, { cols: poster.cols, data: poster.data, rows: poster.rows }]]
+                : [];
+            }),
+          )
+        : {};
     const initialFrameScript =
       isServer && resolvedSource.type === "procedural-noise"
         ? createInitialGlyphFrameScript({
@@ -191,9 +242,16 @@ export const GlyphRaster = component$(
             frameRate: DEFAULT_FRAME_RATE,
             gpuNoiseSeed: noiseSeed,
             maxGridCells: MAX_GLYPH_GRID_CELLS,
+            modifierPosters: initialModifierPosters,
             visualRange,
           })
-        : "";
+        : initialFramePoster && resolvedSource.type === "frames"
+          ? createInitialGlyphModifierScript({
+              blend: modifierBlend,
+              elementId: rasterId,
+              sourceUrl: resolvedSource.url,
+            })
+          : "";
 
     useStylesScoped$(styles);
 
@@ -206,6 +264,9 @@ export const GlyphRaster = component$(
         /* Empty */
       };
       let removeBlendObserver = (): void => {
+        /* Empty */
+      };
+      let removeInitialModifierListener = (): void => {
         /* Empty */
       };
       let removeVisibilityListener = (): void => {
@@ -223,6 +284,7 @@ export const GlyphRaster = component$(
         }
         removeResize();
         removeBlendObserver();
+        removeInitialModifierListener();
         removeVisibilityListener();
         removeVisibilityObserver();
       });
@@ -233,7 +295,10 @@ export const GlyphRaster = component$(
           return;
         }
 
-        let frameAspectRatio = 0;
+        const initialModifier = getInitialGlyphModifier(rasterId);
+        let frameAspectRatio = Number(
+          element.style.getPropertyValue("--glyph-raster-frame-aspect"),
+        );
         const readFrameFitBounds = (): {
           height: number;
           left: number;
@@ -307,6 +372,7 @@ export const GlyphRaster = component$(
         const region: GlyphFieldModifierRegion = {
           baseBlend: modifierBlend,
           blend: modifierBlend,
+          brightnessGrid: initialModifier?.brightnessGrid,
           documentLeft: 0,
           documentTop: 0,
           element,
@@ -510,6 +576,45 @@ export const GlyphRaster = component$(
         return;
       }
 
+      const adoptInitialModifier = (modifier: GlyphInitialModifier): void => {
+        const existingRegion = glyphFieldModifierRegions.get(modifier.elementId);
+        if (existingRegion) {
+          if (!existingRegion.brightnessGrid) {
+            existingRegion.brightnessGrid = modifier.brightnessGrid;
+            markGlyphFieldModifierRegionsChanged();
+          }
+          return;
+        }
+
+        const element = document.getElementById(modifier.elementId);
+        if (!element) {
+          return;
+        }
+
+        glyphFieldModifierRegions.set(modifier.elementId, {
+          baseBlend: modifier.blend,
+          blend: modifier.blend,
+          brightnessGrid: modifier.brightnessGrid,
+          documentLeft: modifier.documentLeft,
+          documentTop: modifier.documentTop,
+          element,
+          height: modifier.height,
+          width: modifier.width,
+        });
+        markGlyphFieldModifierRegionsChanged();
+      };
+      for (const modifier of (globalThis as GlyphInitialFrameGlobal).__glyphInitialFrame
+        ?.modifiers ?? []) {
+        adoptInitialModifier(modifier);
+      }
+      const onInitialModifier = (event: Event): void => {
+        adoptInitialModifier((event as CustomEvent<GlyphInitialModifier>).detail);
+        scheduleActiveGlyphRasters();
+      };
+      window.addEventListener("glyphinitialmodifier", onInitialModifier);
+      removeInitialModifierListener = () =>
+        window.removeEventListener("glyphinitialmodifier", onInitialModifier);
+
       let cols = 0;
       let rows = 0;
       let { cellHeight } = runtimePreset;
@@ -641,6 +746,14 @@ export const GlyphRaster = component$(
         if (usesDocumentAnchor && shouldUpdateLayout) {
           // Follow late document growth (images, fonts) at the sample cadence.
           lastLayoutSampleAt = time;
+          let didUpdateModifierBounds = false;
+          for (const region of glyphFieldModifierRegions.values()) {
+            didUpdateModifierBounds =
+              updateGlyphFieldModifierRegionBounds(region, false) || didUpdateModifierBounds;
+          }
+          if (didUpdateModifierBounds) {
+            markGlyphFieldModifierRegionsChanged();
+          }
           updateCanvasHeight();
           resize();
         }
@@ -761,20 +874,28 @@ export const GlyphRaster = component$(
     });
 
     if (resolvedSource.type === "frames") {
+      const initialAspectStyle = initialFramePoster
+        ? `--glyph-raster-frame-aspect: ${initialFramePoster.aspectRatio};`
+        : "";
       const regionStyle =
-        preset.layout === "fixed"
+        initialAspectStyle +
+        (preset.layout === "fixed"
           ? frameFit === "cover"
             ? "position: fixed; left: 50%; top: 50%; width: max(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))); height: calc(max(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))) / var(--glyph-raster-frame-aspect, 1)); transform: translate(-50%, -50%); transform-origin: center center; display: block; pointer-events: none;"
             : "position: fixed; left: 50%; top: 50%; width: min(100vw, calc(100vh * var(--glyph-raster-frame-aspect, 1))); height: min(100vh, calc(100vw / var(--glyph-raster-frame-aspect, 1))); transform: translate(-50%, -50%); transform-origin: center center; display: block; pointer-events: none;"
-          : "position: absolute; inset: 0; display: block; pointer-events: none;";
+          : "position: absolute; inset: 0; display: block; pointer-events: none;");
 
       return (
-        <span
-          id={rasterId}
-          class={`${classes}glyph-raster-region glyph-raster-region--${preset.layout} glyph-raster-region--${resolvedSource.type}`}
-          style={regionStyle}
-          aria-hidden="true"
-        />
+        <>
+          <span
+            id={rasterId}
+            class={`${classes}glyph-raster-region glyph-raster-region--${preset.layout} glyph-raster-region--${resolvedSource.type}`}
+            style={regionStyle}
+            aria-hidden="true"
+          />
+
+          {initialFrameScript && <script dangerouslySetInnerHTML={initialFrameScript} />}
+        </>
       );
     }
 
