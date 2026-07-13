@@ -1,3 +1,14 @@
+import {
+  GLYPH_FRAME_BRIGHTNESS_BITS,
+  GLYPH_FRAME_ENCODING,
+  GLYPH_FRAME_FORMAT_VERSION,
+  decodePredictiveGlyphFrames,
+  expandQuantizedGlyphFrame,
+  getPackedGlyphFrameSize,
+  tryDecodePredictiveGlyphFrame,
+  unpackQuantizedGlyphFrame,
+} from "src/vfx/glyph-raster/frame-codec";
+
 interface GlyphRasterFrameSource {
   type: "frames";
   url: string;
@@ -33,10 +44,13 @@ interface StreamFrameModifierBrightnessGridsParams {
 
 interface ParsedSourceHeader {
   aspect_ratio?: number;
+  bits: number;
   cols: number;
+  encoding: string;
   fps?: number;
   n_frames: number;
   rows: number;
+  version: number;
 }
 
 interface SetCachedValueParams<Value> {
@@ -60,6 +74,16 @@ const DEFAULT_FRAME_RATE = 18;
 const FIELD_MODIFIER_SAMPLE_SIZE = 256;
 const MAX_FRAME_BRIGHTNESS_CACHE_SIZE = 8;
 const frameBrightnessCache = new Map<string, Uint8Array>();
+
+function validateFrameSourceHeader(header: ParsedSourceHeader, sourceUrl: string): void {
+  if (
+    header.version !== GLYPH_FRAME_FORMAT_VERSION ||
+    header.bits !== GLYPH_FRAME_BRIGHTNESS_BITS ||
+    header.encoding !== GLYPH_FRAME_ENCODING
+  ) {
+    throw new Error(`Unsupported character animation frame format in ${sourceUrl}.`);
+  }
+}
 
 function resolveFrameAspectRatio(
   header: Pick<ParsedSourceHeader, "aspect_ratio" | "cols" | "rows">,
@@ -106,8 +130,14 @@ function parseSourceHeader(raw: Uint8Array, sourceUrl: string): ParsedFrameSourc
   const header = JSON.parse(
     new TextDecoder().decode(raw.subarray(0, headerEnd)),
   ) as ParsedSourceHeader;
-  const frames = raw.subarray(headerEnd + 1);
   const frameSize = header.cols * header.rows;
+  validateFrameSourceHeader(header, sourceUrl);
+  const payload = raw.subarray(headerEnd + 1);
+  const frames = decodePredictiveGlyphFrames(payload, frameSize, header.n_frames);
+
+  if (frames.length !== frameSize * header.n_frames) {
+    throw new Error(`Character animation frames from ${sourceUrl} ended before the final frame.`);
+  }
 
   return {
     aspectRatio: resolveFrameAspectRatio(header),
@@ -215,6 +245,7 @@ async function createFrameModifierBrightnessGrids({
   let frameBytes = new Uint8Array();
   let frameSource: Omit<ParsedFrameSource, "frames"> | null = null;
   let grids: Uint8Array | null = null;
+  let quantizedFrame: Uint8Array | null = null;
   let frame = 0;
   const sampledFrameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
   const appendBytes = (current: Uint8Array, next: Uint8Array): Uint8Array => {
@@ -240,6 +271,7 @@ async function createFrameModifierBrightnessGrids({
 
       const header = parseFrameSourceHeader(headerBytes, source.url);
       const frameSize = header.cols * header.rows;
+      validateFrameSourceHeader(header, source.url);
       frameSource = {
         aspectRatio: resolveFrameAspectRatio(header),
         cols: header.cols,
@@ -274,13 +306,37 @@ async function createFrameModifierBrightnessGrids({
     }
 
     frameBytes = appendBytes(frameBytes, remaining);
-    while (
-      frameSource &&
-      grids &&
-      frameBytes.length >= frameSource.frameSize &&
-      frame < frameSource.frameCount
-    ) {
-      const sourceFrame = frameBytes.subarray(0, frameSource.frameSize);
+    while (frameSource && grids && frame < frameSource.frameCount) {
+      let bytesRead: number;
+      let sourceFrame: Uint8Array;
+
+      if (frame === 0) {
+        const packedFrameSize = getPackedGlyphFrameSize(frameSource.frameSize);
+        if (frameBytes.length < packedFrameSize) {
+          break;
+        }
+
+        quantizedFrame = unpackQuantizedGlyphFrame(
+          frameBytes.subarray(0, packedFrameSize),
+          frameSource.frameSize,
+        );
+        bytesRead = packedFrameSize;
+      } else {
+        if (!quantizedFrame) {
+          throw new Error(`Unable to decode character animation frames from ${source.url}.`);
+        }
+
+        const decoded = tryDecodePredictiveGlyphFrame(frameBytes, quantizedFrame);
+        if (!decoded) {
+          break;
+        }
+
+        quantizedFrame = decoded.frame;
+        bytesRead = decoded.bytesRead;
+      }
+
+      sourceFrame = expandQuantizedGlyphFrame(quantizedFrame);
+
       const sampledFrameOffset = frame * sampledFrameSize;
 
       for (let row = 0; row < FIELD_MODIFIER_SAMPLE_SIZE; row += 1) {
@@ -305,11 +361,11 @@ async function createFrameModifierBrightnessGrids({
         grids,
       });
       frame += 1;
-      frameBytes = frameBytes.subarray(frameSource.frameSize);
+      frameBytes = frameBytes.subarray(bytesRead);
     }
   }
 
-  if (!frameSource || !grids || frame !== frameSource.frameCount) {
+  if (!frameSource || !grids || frame !== frameSource.frameCount || frameBytes.length !== 0) {
     throw new Error(`Unable to load all character animation frames from ${source.url}.`);
   }
 

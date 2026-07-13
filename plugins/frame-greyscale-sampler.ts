@@ -8,6 +8,13 @@ import type {
   GlyphRasterFrameGrid,
   GlyphRasterFrameOptions,
 } from "src/vfx/glyph-raster/frame-options";
+import {
+  GLYPH_FRAME_BRIGHTNESS_BITS,
+  GLYPH_FRAME_ENCODING,
+  GLYPH_FRAME_FORMAT_VERSION,
+  encodePredictiveGlyphFrames,
+  getPackedGlyphFrameSize,
+} from "../src/vfx/glyph-raster/frame-codec";
 
 interface GlyphFrameSource {
   grid: GlyphRasterFrameGrid;
@@ -30,8 +37,11 @@ interface GlyphFramePoster {
 
 interface GlyphFrameHeader {
   aspect_ratio?: number;
+  bits: number;
   cols: number;
+  encoding: string;
   rows: number;
+  version: number;
 }
 
 const DITHER_MATRIX_SIZE = 4;
@@ -325,17 +335,22 @@ function createFramesFile(fps: number, dimensions: FrameDimensions, rawFrames: B
     );
   }
 
+  const encoded = encodePredictiveGlyphFrames(rawFrames, frameSize);
+
   const header = Buffer.from(
     `${JSON.stringify({
       aspect_ratio: dimensions.aspectRatio,
+      bits: GLYPH_FRAME_BRIGHTNESS_BITS,
       cols: dimensions.cols,
+      encoding: GLYPH_FRAME_ENCODING,
       fps,
       n_frames: rawFrames.length / frameSize,
       rows: dimensions.rows,
+      version: GLYPH_FRAME_FORMAT_VERSION,
     })}\n`,
   );
 
-  return Buffer.concat([header, rawFrames]);
+  return Buffer.concat([header, encoded.payload]);
 }
 
 function createGlyphFramePoster(
@@ -348,8 +363,18 @@ function createGlyphFramePoster(
   }
 
   const header = JSON.parse(source.subarray(0, headerEnd).toString("utf8")) as GlyphFrameHeader;
-  const frame = source.subarray(headerEnd + 1, headerEnd + 1 + header.cols * header.rows);
-  if (frame.length !== header.cols * header.rows) {
+  const frameSize = header.cols * header.rows;
+  if (
+    header.version !== GLYPH_FRAME_FORMAT_VERSION ||
+    header.bits !== GLYPH_FRAME_BRIGHTNESS_BITS ||
+    header.encoding !== GLYPH_FRAME_ENCODING
+  ) {
+    throw new Error(`Unsupported glyph frame poster format version ${header.version}.`);
+  }
+
+  const encodedFrameSize = getPackedGlyphFrameSize(frameSize);
+  const frame = source.subarray(headerEnd + 1, headerEnd + 1 + encodedFrameSize);
+  if (frame.length !== encodedFrameSize) {
     throw new Error("Glyph frame poster source does not contain a complete first frame.");
   }
 

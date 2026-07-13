@@ -656,7 +656,9 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
       }
 
       const encoded = atob(poster.data);
-      if (encoded.length < poster.cols * poster.rows) {
+      const sourceCellCount = poster.cols * poster.rows;
+      const encodedCellCount = Math.ceil(sourceCellCount / 2);
+      if (encoded.length < encodedCellCount) {
         return;
       }
 
@@ -671,9 +673,10 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
             poster.cols - 1,
             Math.floor(((col + 0.5) * poster.cols) / options.fieldModifierSampleSize),
           );
-          brightnessGrid[row * options.fieldModifierSampleSize + col] = encoded.charCodeAt(
-            sourceRow * poster.cols + sourceCol,
-          );
+          const sourceIndex = sourceRow * poster.cols + sourceCol;
+          const encodedValue = encoded.charCodeAt(sourceIndex >> 1);
+          brightnessGrid[row * options.fieldModifierSampleSize + col] =
+            ((sourceIndex % 2 === 0 ? encodedValue & 15 : encodedValue >> 4) * 255) / 15;
         }
       }
 
