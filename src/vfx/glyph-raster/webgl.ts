@@ -8,8 +8,11 @@ import {
 } from "src/vfx/glyph-raster/config";
 
 interface GlyphRenderSize {
+  cellHeight: number;
+  cellWidth: number;
   cssHeight: number;
   cssWidth: number;
+  fontSize: number;
   pixelRatio: number;
 }
 
@@ -423,6 +426,9 @@ function createWebGlGlyphRenderer({
   }
 
   let positions = new Float32Array();
+  let atlasCellHeight = cellHeight;
+  let atlasCellWidth = cellWidth;
+  let atlasFontSize = fontSize;
   let lastPixelRatio = 0;
   let lastColorsKey = "";
   let lastFieldModifierVersion = -1;
@@ -458,7 +464,13 @@ function createWebGlGlyphRenderer({
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
   const uploadAtlas = (pixelRatio: number): void => {
-    const atlas = createGlyphAtlas({ cellHeight, cellWidth, characters, fontSize, pixelRatio });
+    const atlas = createGlyphAtlas({
+      cellHeight: atlasCellHeight,
+      cellWidth: atlasCellWidth,
+      characters,
+      fontSize: atlasFontSize,
+      pixelRatio,
+    });
 
     gl.activeTexture(gl.TEXTURE0);
     gl.bindTexture(gl.TEXTURE_2D, atlasTexture);
@@ -637,14 +649,28 @@ function createWebGlGlyphRenderer({
 
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cellCount);
     },
-    resize: ({ cssHeight, cssWidth, pixelRatio }: GlyphRenderSize): void => {
+    resize: ({
+      cellHeight: nextCellHeight,
+      cellWidth: nextCellWidth,
+      cssHeight,
+      cssWidth,
+      fontSize: nextFontSize,
+      pixelRatio,
+    }: GlyphRenderSize): void => {
+      const didUpdateAtlasMetrics =
+        nextCellHeight !== atlasCellHeight ||
+        nextCellWidth !== atlasCellWidth ||
+        nextFontSize !== atlasFontSize;
+      atlasCellHeight = nextCellHeight;
+      atlasCellWidth = nextCellWidth;
+      atlasFontSize = nextFontSize;
       canvas.width = cssWidth * pixelRatio;
       canvas.height = cssHeight * pixelRatio;
       gl.viewport(0, 0, canvas.width, canvas.height);
       gl.useProgram(program);
       gl.uniform2f(canvasSizeLocation, cssWidth, cssHeight);
 
-      if (pixelRatio !== lastPixelRatio) {
+      if (didUpdateAtlasMetrics || pixelRatio !== lastPixelRatio) {
         lastPixelRatio = pixelRatio;
         uploadAtlas(pixelRatio);
       }

@@ -140,10 +140,23 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
 
       return Number.isFinite(resolved) && resolved > 0 ? resolved : fallback;
     };
-    const baseCellWidth = resolveCssLength("--glyph-cell-width", options.cellWidth);
-    const baseCellHeight = resolveCssLength("--glyph-cell-height", options.cellHeight);
-    const fontSize = resolveCssLength("--glyph-font-size", options.fontSize);
-    const largeViewportHeight = canvas.clientHeight || window.innerHeight;
+    const readLargeViewportHeight = (): number => {
+      const probe = document.createElement("div");
+      probe.style.position = "fixed";
+      probe.style.visibility = "hidden";
+      probe.style.pointerEvents = "none";
+      probe.style.height = "100lvh";
+      document.documentElement.append(probe);
+
+      const { height } = probe.getBoundingClientRect();
+      probe.remove();
+
+      return height > 0 ? height : window.innerHeight;
+    };
+    let baseCellWidth = resolveCssLength("--glyph-cell-width", options.cellWidth);
+    let baseCellHeight = resolveCssLength("--glyph-cell-height", options.cellHeight);
+    let fontSize = resolveCssLength("--glyph-font-size", options.fontSize);
+    let largeViewportHeight = readLargeViewportHeight();
     let documentHeight = Math.max(document.body.offsetHeight, largeViewportHeight);
     let canvasTop = 0;
     if (options.documentAnchor) {
@@ -196,7 +209,7 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     };
     let cssWidth = canvas.clientWidth || window.innerWidth;
     let cssHeight = canvas.clientHeight || largeViewportHeight;
-    const pixelRatio = window.devicePixelRatio || 1;
+    let pixelRatio = window.devicePixelRatio || 1;
     canvas.width = cssWidth * pixelRatio;
     canvas.height = cssHeight * pixelRatio;
     gl.viewport(0, 0, canvas.width, canvas.height);
@@ -205,48 +218,50 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
 
     const atlasColumns = Math.ceil(Math.sqrt(options.characters.length));
     const atlasRows = Math.ceil(options.characters.length / atlasColumns);
-    const atlasCellWidth = Math.max(1, Math.ceil(baseCellWidth * pixelRatio));
-    const atlasCellHeight = Math.max(1, Math.ceil(baseCellHeight * pixelRatio));
     const atlas = document.createElement("canvas");
     const atlasContext = atlas.getContext("2d");
-    atlas.width = atlasColumns * atlasCellWidth;
-    atlas.height = atlasRows * atlasCellHeight;
     if (!atlasContext) {
       return;
     }
+    const drawGlyphAtlas = (): void => {
+      const atlasCellWidth = Math.max(1, Math.ceil(baseCellWidth * pixelRatio));
+      const atlasCellHeight = Math.max(1, Math.ceil(baseCellHeight * pixelRatio));
+      atlas.width = atlasColumns * atlasCellWidth;
+      atlas.height = atlasRows * atlasCellHeight;
+      atlasContext.clearRect(0, 0, atlas.width, atlas.height);
+      atlasContext.fillStyle = "#ffffff";
+      atlasContext.font = `${fontSize * pixelRatio}px ${options.fontFamily}`;
+      atlasContext.textBaseline = "alphabetic";
 
-    atlasContext.clearRect(0, 0, atlas.width, atlas.height);
-    atlasContext.fillStyle = "#ffffff";
-    atlasContext.font = `${fontSize * pixelRatio}px ${options.fontFamily}`;
-    atlasContext.textBaseline = "alphabetic";
+      for (let index = 0; index < options.characters.length; index += 1) {
+        const glyph = options.characters[index];
+        const metrics = atlasContext.measureText(glyph);
+        const left = metrics.actualBoundingBoxLeft || 0;
+        const right = metrics.actualBoundingBoxRight || metrics.width;
+        const ascent = metrics.actualBoundingBoxAscent || fontSize * pixelRatio;
+        const descent = metrics.actualBoundingBoxDescent || 0;
+        const glyphWidth = Math.max(1, left + right);
+        const glyphHeight = Math.max(1, ascent + descent);
+        const paddingX = Math.max(0.5, atlasCellWidth * options.glyphCellPaddingRatio);
+        const paddingY = Math.max(0.5, atlasCellHeight * options.glyphCellPaddingRatio);
+        const scale = Math.min(
+          1,
+          Math.max(1, atlasCellWidth - paddingX * 2) / glyphWidth,
+          Math.max(1, atlasCellHeight - paddingY * 2) / glyphHeight,
+        );
+        const cellX = (index % atlasColumns) * atlasCellWidth;
+        const cellY = Math.floor(index / atlasColumns) * atlasCellHeight;
+        const offsetX = (atlasCellWidth - glyphWidth * scale) / 2 + left * scale;
+        const offsetY = (atlasCellHeight - glyphHeight * scale) / 2 + ascent * scale;
 
-    for (let index = 0; index < options.characters.length; index += 1) {
-      const glyph = options.characters[index];
-      const metrics = atlasContext.measureText(glyph);
-      const left = metrics.actualBoundingBoxLeft || 0;
-      const right = metrics.actualBoundingBoxRight || metrics.width;
-      const ascent = metrics.actualBoundingBoxAscent || fontSize * pixelRatio;
-      const descent = metrics.actualBoundingBoxDescent || 0;
-      const glyphWidth = Math.max(1, left + right);
-      const glyphHeight = Math.max(1, ascent + descent);
-      const paddingX = Math.max(0.5, atlasCellWidth * options.glyphCellPaddingRatio);
-      const paddingY = Math.max(0.5, atlasCellHeight * options.glyphCellPaddingRatio);
-      const scale = Math.min(
-        1,
-        Math.max(1, atlasCellWidth - paddingX * 2) / glyphWidth,
-        Math.max(1, atlasCellHeight - paddingY * 2) / glyphHeight,
-      );
-      const cellX = (index % atlasColumns) * atlasCellWidth;
-      const cellY = Math.floor(index / atlasColumns) * atlasCellHeight;
-      const offsetX = (atlasCellWidth - glyphWidth * scale) / 2 + left * scale;
-      const offsetY = (atlasCellHeight - glyphHeight * scale) / 2 + ascent * scale;
-
-      atlasContext.save();
-      atlasContext.translate(cellX + offsetX, cellY + offsetY);
-      atlasContext.scale(scale, scale);
-      atlasContext.fillText(glyph, 0, 0);
-      atlasContext.restore();
-    }
+        atlasContext.save();
+        atlasContext.translate(cellX + offsetX, cellY + offsetY);
+        atlasContext.scale(scale, scale);
+        atlasContext.fillText(glyph, 0, 0);
+        atlasContext.restore();
+      }
+    };
+    drawGlyphAtlas();
 
     const vertexArray = gl.createVertexArray();
     const cornerBuffer = gl.createBuffer();
@@ -291,6 +306,12 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
+    const uploadGlyphAtlas = (): void => {
+      drawGlyphAtlas();
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, atlasTexture);
+      gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, atlas);
+    };
 
     const palette = new Uint8Array(options.colors.length * 4);
     for (let index = 0; index < options.colors.length; index += 1) {
@@ -355,10 +376,34 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
         gl.uniform2f(location, first, second);
       }
     };
-    const resizeGrid = (): boolean => {
+    const refreshViewportMetrics = (): boolean => {
+      const nextBaseCellWidth = resolveCssLength("--glyph-cell-width", options.cellWidth);
+      const nextBaseCellHeight = resolveCssLength("--glyph-cell-height", options.cellHeight);
+      const nextFontSize = resolveCssLength("--glyph-font-size", options.fontSize);
+      const nextLargeViewportHeight = readLargeViewportHeight();
+      const nextPixelRatio = window.devicePixelRatio || 1;
+      const didAtlasChange =
+        nextBaseCellWidth !== baseCellWidth ||
+        nextBaseCellHeight !== baseCellHeight ||
+        nextFontSize !== fontSize ||
+        nextPixelRatio !== pixelRatio;
+      const didChange = didAtlasChange || nextLargeViewportHeight !== largeViewportHeight;
+
+      baseCellWidth = nextBaseCellWidth;
+      baseCellHeight = nextBaseCellHeight;
+      fontSize = nextFontSize;
+      largeViewportHeight = nextLargeViewportHeight;
+      pixelRatio = nextPixelRatio;
+      if (didAtlasChange) {
+        uploadGlyphAtlas();
+      }
+
+      return didChange;
+    };
+    const resizeGrid = (force = false): boolean => {
       const nextCssWidth = canvas.clientWidth || window.innerWidth;
       const nextCssHeight = canvas.clientHeight || largeViewportHeight;
-      if (nextCssWidth === cssWidth && nextCssHeight === cssHeight) {
+      if (!force && nextCssWidth === cssWidth && nextCssHeight === cssHeight) {
         return false;
       }
 
@@ -408,6 +453,7 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     let layoutAnimationFrame = 0;
     let scrollAnimationFrame = 0;
     let lastLayoutSampleAt = 0;
+    let viewportMetricsDirty = false;
     const state: InitialGlyphFrameState = {
       disposed: false,
       modifiers: [],
@@ -425,7 +471,7 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cellCount);
     };
-    const updateDocumentAnchor = (): boolean => {
+    const updateDocumentAnchor = (forceGridResize = false): boolean => {
       if (!options.documentAnchor) {
         return false;
       }
@@ -438,8 +484,9 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
       const nextHeight = `${Math.min(overscanHeight, Math.floor(documentHeight))}px`;
       if (canvas.style.height !== nextHeight) {
         canvas.style.height = nextHeight;
-        didChange = resizeGrid() || didChange;
+        didChange = true;
       }
+      didChange = resizeGrid(forceGridResize) || didChange;
 
       const viewportScrollY = window.scrollY;
       const viewportHeight = window.innerHeight;
@@ -465,6 +512,15 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
       }
 
       return didChange;
+    };
+    const synchronizeViewportLayout = (): boolean => {
+      const didRefreshMetrics = viewportMetricsDirty ? refreshViewportMetrics() : false;
+      viewportMetricsDirty = false;
+      const didResizeGrid = options.documentAnchor
+        ? updateDocumentAnchor(didRefreshMetrics)
+        : resizeGrid(didRefreshMetrics);
+
+      return didRefreshMetrics || didResizeGrid;
     };
     const updateModifierBounds = (): boolean => {
       let didChange = false;
@@ -560,10 +616,10 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
         time - lastLayoutSampleAt >= 1000 / options.layoutSampleRate
       ) {
         lastLayoutSampleAt = time;
-        const didUpdateAnchor = updateDocumentAnchor();
+        const didUpdateViewportLayout = synchronizeViewportLayout();
         if (updateModifierBounds()) {
           uploadModifiers();
-        } else if (didUpdateAnchor) {
+        } else if (didUpdateViewportLayout) {
           renderFrame();
         }
       }
@@ -581,6 +637,17 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
           renderFrame();
         }
       });
+    };
+    const onWindowResize = (): void => {
+      if (state.disposed) {
+        return;
+      }
+
+      viewportMetricsDirty = true;
+      lastLayoutSampleAt = 0;
+      if (layoutAnimationFrame === 0) {
+        layoutAnimationFrame = requestAnimationFrame(synchronizeModifierLayout);
+      }
     };
     state.registerModifier = (modifierOptions: InitialGlyphModifierOptions): void => {
       const poster = state.posters[modifierOptions.sourceUrl];
@@ -643,6 +710,7 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     };
 
     initialFrameGlobal.__glyphInitialFrame = state;
+    window.addEventListener("resize", onWindowResize, { passive: true });
     if (options.documentAnchor) {
       updateDocumentAnchor();
       window.addEventListener("scroll", onDocumentScroll, { passive: true });
@@ -659,6 +727,7 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
       cancelAnimationFrame(layoutAnimationFrame);
       cancelAnimationFrame(scrollAnimationFrame);
       window.removeEventListener("scroll", onDocumentScroll);
+      window.removeEventListener("resize", onWindowResize);
       gl.deleteBuffer(cornerBuffer);
       gl.deleteBuffer(positionBuffer);
       gl.deleteTexture(atlasTexture);

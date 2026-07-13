@@ -276,7 +276,7 @@ export const GlyphRaster = component$(
       let removeVisibilityObserver = (): void => {
         /* Empty */
       };
-      const runtimePreset = resolveRuntimePreset(preset);
+      let runtimePreset = resolveRuntimePreset(preset);
 
       cleanup(() => {
         isCleanedUp = true;
@@ -625,6 +625,9 @@ export const GlyphRaster = component$(
       let sourceTime = 0;
       let lastCssHeight = 0;
       let lastCssWidth = 0;
+      let lastPresetCellHeight = 0;
+      let lastPresetCellWidth = 0;
+      let lastPresetFontSize = 0;
       let lastPixelRatio = 0;
       let canvasAnchorMode: "document" | "viewport" | "" = "";
       let canvasTop = 0;
@@ -644,6 +647,9 @@ export const GlyphRaster = component$(
         if (
           cssHeight === lastCssHeight &&
           cssWidth === lastCssWidth &&
+          runtimePreset.cellHeight === lastPresetCellHeight &&
+          runtimePreset.cellWidth === lastPresetCellWidth &&
+          runtimePreset.fontSize === lastPresetFontSize &&
           pixelRatio === lastPixelRatio
         ) {
           scheduleActiveGlyphRasters();
@@ -652,9 +658,19 @@ export const GlyphRaster = component$(
 
         lastCssHeight = cssHeight;
         lastCssWidth = cssWidth;
+        lastPresetCellHeight = runtimePreset.cellHeight;
+        lastPresetCellWidth = runtimePreset.cellWidth;
+        lastPresetFontSize = runtimePreset.fontSize;
         lastPixelRatio = pixelRatio;
 
-        renderer.resize({ cssHeight, cssWidth, pixelRatio });
+        renderer.resize({
+          cellHeight: runtimePreset.cellHeight,
+          cellWidth: runtimePreset.cellWidth,
+          cssHeight,
+          cssWidth,
+          fontSize: runtimePreset.fontSize,
+          pixelRatio,
+        });
 
         const grid = resolveGlyphGrid({
           cellHeight: runtimePreset.cellHeight,
@@ -858,6 +874,7 @@ export const GlyphRaster = component$(
       (canvas as GlyphInitialFrameCanvas).__disposeGlyphInitialFrame?.();
 
       const onWindowResize = (): void => {
+        runtimePreset = resolveRuntimePreset(preset);
         largeViewportHeight = readLargeViewportHeight();
         updateCanvasHeight();
         resize();
