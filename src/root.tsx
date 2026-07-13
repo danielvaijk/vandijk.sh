@@ -11,16 +11,21 @@ import styles from "src/global.css?url";
 // Of CSS is less than 10KB. If the file is larger than 10KB, it will
 // Be loaded as a separate file.
 
-// Moderate document rules wait for user intent, so they can be discovered
-// In the head without competing with the current document's first paint.
-const INTENT_NAVIGATION_PREFETCH_RULES = JSON.stringify({
-  prefetch: [
+// Moderate document rules wait for user intent, so destination startup work
+// happens before activation without competing with the current first paint.
+const INTENT_NAVIGATION_PRERENDER_RULES = JSON.stringify({
+  prerender: [
     {
       eagerness: "moderate",
       where: { href_matches: "/*" },
     },
   ],
 });
+
+// Intersection observers stay suspended while a document is prerendering.
+// Resume only glyph tasks at Qwik initialization so their runtime renderers
+// and frame streams are ready before the hidden document is activated.
+const PRERENDER_GLYPH_RESUME_SCRIPT = `document.prerendering&&document.addEventListener("qinit",()=>{for(const element of document.querySelectorAll(".glyph-raster[on\\\\:qvisible],.glyph-raster-region[on\\\\:qvisible]")){const qrl=element.getAttribute("on:qvisible");element.dispatchEvent(new CustomEvent("qvisible",{bubbles:true,detail:{isIntersecting:true}}));element.removeAttribute("on:qvisible");queueMicrotask(()=>qrl&&element.setAttribute("on:qvisible",qrl));}},{once:true});`;
 
 const RootHead = component$((): QwikJSX.Element => {
   const head = useDocumentHead();
@@ -42,7 +47,8 @@ const RootHead = component$((): QwikJSX.Element => {
       <link rel="canonical" href={url.href} />
       <link rel="icon" type="image/x-icon" href="/favicon.ico" />
 
-      <script type="speculationrules" dangerouslySetInnerHTML={INTENT_NAVIGATION_PREFETCH_RULES} />
+      <script type="speculationrules" dangerouslySetInnerHTML={INTENT_NAVIGATION_PRERENDER_RULES} />
+      <script dangerouslySetInnerHTML={PRERENDER_GLYPH_RESUME_SCRIPT} />
 
       {head.links.map(
         (link): QwikJSX.Element => (

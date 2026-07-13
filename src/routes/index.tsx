@@ -14,9 +14,9 @@ import { GlyphRaster } from "src/components/glyph-raster";
 import styles from "src/routes/index.css?inline";
 
 // This rule is rendered after the splash subtree so its unconditional
-// Prefetch cannot get ahead of the homepage's streamed first-paint markup.
-const BLOG_NAVIGATION_PREFETCH_RULES = JSON.stringify({
-  prefetch: [
+// prerender cannot get ahead of the homepage's streamed first-paint markup.
+const BLOG_NAVIGATION_PRERENDER_RULES = JSON.stringify({
+  prerender: [
     {
       eagerness: "immediate",
       urls: ["/blog/"],
@@ -82,7 +82,7 @@ export default component$((): QwikJSX.Element => {
         />
       </section>
 
-      <script type="speculationrules" dangerouslySetInnerHTML={BLOG_NAVIGATION_PREFETCH_RULES} />
+      <script type="speculationrules" dangerouslySetInnerHTML={BLOG_NAVIGATION_PRERENDER_RULES} />
     </>
   );
 });
