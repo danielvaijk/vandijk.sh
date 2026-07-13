@@ -42,12 +42,11 @@ float glyphEntropyEvent(vec2 cell, float tick) {
 
 float glyphEntropyEpoch(vec2 cell, float brightness) {
   // Candidate events run at the brightest cell's maximum churn rate. Each
-  // Cell accepts a deterministic subset based on its current brightness, so
-  // Glyph entropy remains stateless and entirely GPU-driven.
+  // Cell gets a deterministic phase and accepts a brightness-weighted subset,
+  // So glyph entropy remains asynchronous, stateless, and entirely GPU-driven.
   const float max_entropy_rate = 0.3304;
   const int event_search_size = 32;
-  float entropy_scale =
-    0.82 + hash(vec3(cell, u_entropy_seed + 17.0)) * 0.36;
+  float entropy_scale = 0.82 + hash(vec3(cell, u_entropy_seed + 17.0)) * 0.36;
   float entropy_rate = glyphBrightnessEntropy(
     glyphProceduralEntropyBrightness(brightness)
   );
@@ -56,8 +55,10 @@ float glyphEntropyEpoch(vec2 cell, float brightness) {
     0.0,
     1.0
   );
+  float candidate_phase = hash(vec3(cell, u_entropy_seed + 53.0));
   float candidate_tick = floor(
-    u_source_time * 0.001 * u_glyph_frame_rate * max_entropy_rate
+    u_source_time * 0.001 * u_glyph_frame_rate * max_entropy_rate +
+      candidate_phase
   );
   float epoch =
     floor(candidate_tick / float(event_search_size)) *
