@@ -16,6 +16,7 @@ import {
   DOCUMENT_ANCHOR_EDGE_MARGIN,
   DOCUMENT_ANCHOR_OVERSCAN,
   GLYPH_CHARS,
+  type GlyphFieldGridGeometry,
   type GlyphRasterLayout,
   type GlyphRasterPreset,
   MAX_FRAME_RATE,
@@ -25,6 +26,7 @@ import {
   quantizeTime,
   resolveGlyphGrid,
   resolvePreset,
+  snapGlyphFieldModifierBounds,
 } from "src/vfx/glyph-raster/logic";
 import { clamp } from "src/vfx/shared/math";
 import { PROCEDURAL_LAYOUT_SAMPLE_RATE } from "src/vfx/glyph-raster/config";
@@ -101,6 +103,7 @@ type GlyphFieldModifierRegion = FieldGlyphFieldModifierRegion & {
 
 const glyphFieldModifierRegions = new Map<string, GlyphFieldModifierRegion>();
 let glyphFieldModifierRegionsVersion = 0;
+let glyphFieldGridGeometry: GlyphFieldGridGeometry | null = null;
 
 const getInitialGlyphModifier = (rasterId: string): GlyphInitialModifier | undefined =>
   (globalThis as GlyphInitialFrameGlobal).__glyphInitialFrame?.modifiers.find(
@@ -159,23 +162,52 @@ const updateGlyphFieldModifierRegionBounds = (
   shouldMarkChanged = true,
 ): boolean => {
   const rect = region.element.getBoundingClientRect();
-  const documentLeft = rect.left + window.scrollX;
-  const documentTop = rect.top + window.scrollY;
+  const measuredBounds = {
+    documentLeft: rect.left + window.scrollX,
+    documentTop: rect.top + window.scrollY,
+    height: rect.height,
+    width: rect.width,
+  };
+  const bounds = glyphFieldGridGeometry
+    ? snapGlyphFieldModifierBounds(measuredBounds, glyphFieldGridGeometry)
+    : measuredBounds;
   const changed =
-    Math.abs(region.documentLeft - documentLeft) > 0.01 ||
-    Math.abs(region.documentTop - documentTop) > 0.01 ||
-    Math.abs(region.width - rect.width) > 0.01 ||
-    Math.abs(region.height - rect.height) > 0.01;
+    Math.abs(region.documentLeft - bounds.documentLeft) > 0.01 ||
+    Math.abs(region.documentTop - bounds.documentTop) > 0.01 ||
+    Math.abs(region.width - bounds.width) > 0.01 ||
+    Math.abs(region.height - bounds.height) > 0.01;
 
-  region.documentLeft = documentLeft;
-  region.documentTop = documentTop;
-  region.width = rect.width;
-  region.height = rect.height;
+  region.documentLeft = bounds.documentLeft;
+  region.documentTop = bounds.documentTop;
+  region.width = bounds.width;
+  region.height = bounds.height;
   if (changed && shouldMarkChanged) {
     markGlyphFieldModifierRegionsChanged();
   }
 
   return changed;
+};
+
+const synchronizeGlyphFieldGridGeometry = (next: GlyphFieldGridGeometry): void => {
+  if (
+    glyphFieldGridGeometry &&
+    glyphFieldGridGeometry.cellHeight === next.cellHeight &&
+    glyphFieldGridGeometry.cellWidth === next.cellWidth &&
+    glyphFieldGridGeometry.originX === next.originX &&
+    glyphFieldGridGeometry.originY === next.originY
+  ) {
+    return;
+  }
+
+  glyphFieldGridGeometry = next;
+  let didUpdateModifierBounds = false;
+  for (const region of glyphFieldModifierRegions.values()) {
+    didUpdateModifierBounds =
+      updateGlyphFieldModifierRegionBounds(region, false) || didUpdateModifierBounds;
+  }
+  if (didUpdateModifierBounds) {
+    markGlyphFieldModifierRegionsChanged();
+  }
 };
 
 const updateGlyphFieldModifierRegionBlend = (region: GlyphFieldModifierRegion): boolean => {
@@ -829,6 +861,12 @@ export const GlyphRaster = component$(
 
         const gridOriginX = usesDocumentAnchor ? 0 : window.scrollX;
         const gridOriginY = usesDocumentAnchor ? canvasTop : viewportScrollY;
+        synchronizeGlyphFieldGridGeometry({
+          cellHeight,
+          cellWidth,
+          originX: gridOriginX,
+          originY: gridOriginY,
+        });
 
         lastFrameAt = time;
         sourceTime += elapsedMilliseconds;

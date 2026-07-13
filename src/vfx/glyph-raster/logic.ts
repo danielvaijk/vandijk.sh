@@ -12,6 +12,20 @@ interface GlyphRasterPreset {
   layout: GlyphRasterLayout;
 }
 
+interface GlyphFieldGridGeometry {
+  cellHeight: number;
+  cellWidth: number;
+  originX: number;
+  originY: number;
+}
+
+interface GlyphFieldModifierBounds {
+  documentLeft: number;
+  documentTop: number;
+  height: number;
+  width: number;
+}
+
 const GLYPH_CHARS = String.raw`0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz@#$%&*+=-~.:;|/\<>`;
 const GLYPH_COLORS = ["#2e2e2e", "#585858", "#8a8a8a", "#d0d0d0", "#f4f4f4"];
 const NOISE_COLORS = ["#070707", "#151515", "#303030", "#747474", "#ffffff"];
@@ -81,6 +95,45 @@ function resolveGlyphGrid({
   };
 }
 
+// The shader includes a glyph by its center point. Resolve the exact outer
+// Cell boundaries of that same selection so the modifier texture never ends
+// Partway through a glyph quad.
+function snapGlyphFieldModifierBounds(
+  bounds: GlyphFieldModifierBounds,
+  grid: GlyphFieldGridGeometry,
+): GlyphFieldModifierBounds {
+  const snapAxis = (
+    start: number,
+    length: number,
+    origin: number,
+    cellSize: number,
+  ): { length: number; start: number } => {
+    if (!Number.isFinite(cellSize) || cellSize <= 0) {
+      return { length, start };
+    }
+
+    const firstCell = Math.ceil((start - origin) / cellSize - 0.5);
+    const exclusiveEndCell = Math.ceil((start + length - origin) / cellSize - 0.5);
+    if (exclusiveEndCell <= firstCell) {
+      return { length: cellSize, start: origin + firstCell * cellSize };
+    }
+
+    return {
+      length: (exclusiveEndCell - firstCell) * cellSize,
+      start: origin + firstCell * cellSize,
+    };
+  };
+  const horizontal = snapAxis(bounds.documentLeft, bounds.width, grid.originX, grid.cellWidth);
+  const vertical = snapAxis(bounds.documentTop, bounds.height, grid.originY, grid.cellHeight);
+
+  return {
+    documentLeft: horizontal.start,
+    documentTop: vertical.start,
+    height: vertical.length,
+    width: horizontal.length,
+  };
+}
+
 function quantizeTime(time: number, sampleRate: number): number {
   const interval = 1000 / sampleRate;
 
@@ -105,7 +158,8 @@ export {
   PROCEDURAL_VISUAL_SAMPLE_RATE,
   resolveGlyphGrid,
   resolvePreset,
+  snapGlyphFieldModifierBounds,
   quantizeTime,
 };
 
-export type { GlyphRasterPreset };
+export type { GlyphFieldGridGeometry, GlyphFieldModifierBounds, GlyphRasterPreset };

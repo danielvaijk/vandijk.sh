@@ -522,6 +522,39 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
 
       return didRefreshMetrics || didResizeGrid;
     };
+    const resolveSnappedModifierBounds = (
+      bounds: DOMRect,
+    ): Pick<InitialGlyphModifier, "documentLeft" | "documentTop" | "height" | "width"> => {
+      // This function is serialized without module imports. Keep this cell
+      // Envelope calculation equivalent to snapGlyphFieldModifierBounds.
+      const snapAxis = (
+        start: number,
+        length: number,
+        origin: number,
+        cellSize: number,
+      ): { length: number; start: number } => {
+        const firstCell = Math.ceil((start - origin) / cellSize - 0.5);
+        const exclusiveEndCell = Math.ceil((start + length - origin) / cellSize - 0.5);
+
+        return exclusiveEndCell <= firstCell
+          ? { length: cellSize, start: origin + firstCell * cellSize }
+          : {
+              length: (exclusiveEndCell - firstCell) * cellSize,
+              start: origin + firstCell * cellSize,
+            };
+      };
+      const measuredDocumentLeft = bounds.left + window.scrollX;
+      const measuredDocumentTop = bounds.top + window.scrollY;
+      const horizontal = snapAxis(measuredDocumentLeft, bounds.width, 0, cellWidth);
+      const vertical = snapAxis(measuredDocumentTop, bounds.height, canvasTop, cellHeight);
+
+      return {
+        documentLeft: horizontal.start,
+        documentTop: vertical.start,
+        height: vertical.length,
+        width: horizontal.length,
+      };
+    };
     const updateModifierBounds = (): boolean => {
       let didChange = false;
 
@@ -532,21 +565,20 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
         }
 
         const bounds = element.getBoundingClientRect();
-        const documentLeft = bounds.left + window.scrollX;
-        const documentTop = bounds.top + window.scrollY;
+        const snappedBounds = resolveSnappedModifierBounds(bounds);
         if (
-          modifier.documentLeft === documentLeft &&
-          modifier.documentTop === documentTop &&
-          modifier.width === bounds.width &&
-          modifier.height === bounds.height
+          modifier.documentLeft === snappedBounds.documentLeft &&
+          modifier.documentTop === snappedBounds.documentTop &&
+          modifier.width === snappedBounds.width &&
+          modifier.height === snappedBounds.height
         ) {
           continue;
         }
 
-        modifier.documentLeft = documentLeft;
-        modifier.documentTop = documentTop;
-        modifier.width = bounds.width;
-        modifier.height = bounds.height;
+        modifier.documentLeft = snappedBounds.documentLeft;
+        modifier.documentTop = snappedBounds.documentTop;
+        modifier.width = snappedBounds.width;
+        modifier.height = snappedBounds.height;
         didChange = true;
       }
 
@@ -682,17 +714,18 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
 
       const element = document.getElementById(modifierOptions.elementId);
       const bounds = element?.getBoundingClientRect();
+      const snappedBounds = bounds ? resolveSnappedModifierBounds(bounds) : null;
       const opacity = element ? Number(getComputedStyle(element).opacity) : 1;
       const modifier: InitialGlyphModifier = {
         blend:
           modifierOptions.blend *
           (Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1),
         brightnessGrid,
-        documentLeft: (bounds?.left ?? 0) + window.scrollX,
-        documentTop: (bounds?.top ?? 0) + window.scrollY,
+        documentLeft: snappedBounds?.documentLeft ?? 0,
+        documentTop: snappedBounds?.documentTop ?? 0,
         elementId: modifierOptions.elementId,
-        height: bounds?.height ?? 0,
-        width: bounds?.width ?? 0,
+        height: snappedBounds?.height ?? 0,
+        width: snappedBounds?.width ?? 0,
       };
       const existingIndex = state.modifiers.findIndex(
         (candidate) => candidate.elementId === modifier.elementId,
