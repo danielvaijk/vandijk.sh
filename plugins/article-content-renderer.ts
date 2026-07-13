@@ -55,12 +55,13 @@ interface ArticleMetadata {
 }
 
 interface ArticleContentRenderer {
-  ensureGeneratedGlyphFrames: () => Promise<void>;
+  ensureGeneratedGlyphFrames: () => Promise<ReadonlyMap<string, string>>;
   plugins: Plugin[];
 }
 
 interface ArticlesMetadataPlugin {
   ensureArticlesMetadata: () => Promise<ArticleMetadata[]>;
+  ensureGeneratedGlyphFrames: () => Promise<ReadonlyMap<string, string>>;
   plugin: Plugin;
 }
 
@@ -620,7 +621,7 @@ async function generateCoverFrames({
   const framesPath = `/blog/${path}/cover.frames`;
   const coverFileName = getArticleAssetFileName(cover);
 
-  await generateGreyscaleFrameSource(
+  const output = await generateGreyscaleFrameSource(
     {
       grid: glyphFrameOptions.grids.articleCover,
       output: resolve(root, "public", framesPath.replace(/^\//u, "")),
@@ -629,19 +630,20 @@ async function generateCoverFrames({
     glyphFrameOptions,
   );
 
-  return framesPath;
+  return `/blog/${path}/${basename(output)}`;
 }
 
 async function generateArticleGifFrames(
   root: string,
   path: string,
   glyphFrameOptions: GlyphRasterFrameOptions,
-): Promise<void> {
+): Promise<Map<string, string>> {
   const articleAssetsDirectory = getArticleAssetsDirectory(root, path);
   const articlePublicAssetsDirectory = getArticlePublicAssetsDirectory(root, path);
+  const generatedPaths = new Map<string, string>();
 
   if (!existsSync(articleAssetsDirectory)) {
-    return;
+    return generatedPaths;
   }
 
   for (const entity of readdirSync(articleAssetsDirectory, { withFileTypes: true })) {
@@ -653,18 +655,26 @@ async function generateArticleGifFrames(
     const { name } = parse(entity.name);
     const output = join(articlePublicAssetsDirectory, `${name}.frames`);
 
-    await generateGreyscaleFrameSource(
+    const generatedOutput = await generateGreyscaleFrameSource(
       { grid: glyphFrameOptions.grids.articleImage, output, source },
       glyphFrameOptions,
     );
+    generatedPaths.set(
+      `/blog/${path}/${name}.frames`,
+      `/blog/${path}/${basename(generatedOutput)}`,
+    );
   }
+
+  return generatedPaths;
 }
 
 async function generateArticlesMetadata(
   root: string,
   glyphFrameOptions: GlyphRasterFrameOptions,
+  generatedGlyphFramePaths: Map<string, string>,
 ): Promise<ArticleMetadata[]> {
   const results: ArticleMetadata[] = [];
+  generatedGlyphFramePaths.clear();
 
   for (const { filePath, path } of readArticleFiles(root)) {
     const { content, data } = parseArticleMetadataFrontmatter(filePath);
@@ -687,7 +697,14 @@ async function generateArticlesMetadata(
       path,
       root,
     });
-    await generateArticleGifFrames(root, path, glyphFrameOptions);
+    generatedGlyphFramePaths.set(`/blog/${path}/cover.frames`, coverImageFramesPath);
+    for (const [logicalPath, generatedPath] of await generateArticleGifFrames(
+      root,
+      path,
+      glyphFrameOptions,
+    )) {
+      generatedGlyphFramePaths.set(logicalPath, generatedPath);
+    }
 
     results.push({
       coverImageFramesPath,
@@ -715,6 +732,7 @@ function articlesMetadataPlugin(
 ): ArticlesMetadataPlugin {
   let config: ResolvedConfig | null = null;
   let articlesMetadata: Promise<ArticleMetadata[]> | null = null;
+  const generatedGlyphFramePaths = new Map<string, string>();
 
   function ensureArticlesMetadata(): Promise<ArticleMetadata[]> {
     if (articlesMetadata === null) {
@@ -723,7 +741,7 @@ function articlesMetadataPlugin(
           throw new Error("Vite config was not resolved before metadata generation.");
         }
         await ensureArticleImages(config.root);
-        return generateArticlesMetadata(config.root, glyphFrameOptions);
+        return generateArticlesMetadata(config.root, glyphFrameOptions, generatedGlyphFramePaths);
       })();
     }
 
@@ -732,6 +750,10 @@ function articlesMetadataPlugin(
 
   return {
     ensureArticlesMetadata,
+    ensureGeneratedGlyphFrames: async (): Promise<ReadonlyMap<string, string>> => {
+      await ensureArticlesMetadata();
+      return generatedGlyphFramePaths;
+    },
     plugin: {
       async buildStart(): Promise<void> {
         await ensureArticlesMetadata();
@@ -789,12 +811,10 @@ function articleCodeDrawerMdxPlugin(): Plugin {
 function articleContentRendererPlugin(
   glyphFrameOptions: GlyphRasterFrameOptions,
 ): ArticleContentRenderer {
-  const { ensureArticlesMetadata, plugin } = articlesMetadataPlugin(glyphFrameOptions);
+  const { ensureGeneratedGlyphFrames, plugin } = articlesMetadataPlugin(glyphFrameOptions);
 
   return {
-    ensureGeneratedGlyphFrames: async (): Promise<void> => {
-      await ensureArticlesMetadata();
-    },
+    ensureGeneratedGlyphFrames,
     plugins: [plugin, articleCodeDrawerMdxPlugin()],
   };
 }

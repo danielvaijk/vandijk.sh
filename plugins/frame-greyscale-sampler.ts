@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 
 import sharp, { type Sharp } from "sharp";
@@ -15,6 +15,7 @@ import {
   encodePredictiveGlyphFrames,
   getPackedGlyphFrameSize,
 } from "../src/vfx/glyph-raster/frame-codec";
+import { createAssetContentHash } from "./asset-content-hash";
 
 interface GlyphFrameSource {
   grid: GlyphRasterFrameGrid;
@@ -423,16 +424,30 @@ function createGlyphFramePostersManifest(
 async function generateGreyscaleFrameSource(
   source: GlyphFrameSource,
   options: GlyphRasterFrameOptions,
-): Promise<void> {
+): Promise<string> {
   const dimensions = await getImageDimensions(source.source, options, source.grid);
   const { fps, rawFrames } = await readImageFrames(
     sharp(source.source, { animated: true }),
     dimensions,
   );
   const framesFile = createFramesFile(fps, dimensions, rawFrames);
+  const { base, dir } = path.parse(source.output);
+  const contentHash = createAssetContentHash(framesFile);
+  const output = path.join(dir, `${contentHash}-${base}`);
 
-  await mkdir(path.dirname(source.output), { recursive: true });
-  await writeFile(source.output, framesFile);
+  await mkdir(dir, { recursive: true });
+  for (const entry of await readdir(dir, { withFileTypes: true })) {
+    const isLogicalOutput = entry.name === base;
+    const isHashedOutput =
+      entry.name.endsWith(`-${base}`) && /^[\da-f]{16}(?:[\da-f]{48})?-/u.test(entry.name);
+
+    if (entry.isFile() && (isLogicalOutput || isHashedOutput)) {
+      await rm(path.join(dir, entry.name), { force: true });
+    }
+  }
+  await writeFile(output, framesFile);
+
+  return output;
 }
 
 function readSourceFiles(directory: string): string[] {
@@ -503,23 +518,62 @@ function resolveSiteGlyphFrameSources(
 
 function frameGreyscaleSamplerPlugin(
   options: GlyphRasterFrameOptions,
-  ensureGeneratedGlyphFrames: () => Promise<void> = (): Promise<void> => Promise.resolve(),
+  ensureGeneratedGlyphFrames: () => Promise<ReadonlyMap<string, string>> = () =>
+    Promise.resolve(new Map()),
 ): Plugin {
   let config: ResolvedConfig | null = null;
+  let glyphFramesBuild: Promise<void> | null = null;
+  const generatedGlyphFramePaths = new Map<string, string>();
+
+  const getPublicPath = (file: string): string => {
+    if (!config) {
+      throw new Error("Vite config was not resolved before resolving a glyph frame path.");
+    }
+
+    const publicDirectory = path.resolve(config.root, SITE_GLYPH_PUBLIC_DIRECTORY);
+    const relativePath = path.relative(publicDirectory, file);
+
+    if (relativePath.startsWith("..")) {
+      throw new Error(`Glyph frame output '${file}' is outside the public directory.`);
+    }
+
+    return `/${relativePath.split(path.sep).join("/")}`;
+  };
+
+  const ensureGlyphFrames = (): Promise<void> => {
+    if (!config) {
+      throw new Error("Vite config was not resolved before generating glyph frames.");
+    }
+
+    if (glyphFramesBuild === null) {
+      const resolvedConfig = config;
+      glyphFramesBuild = (async (): Promise<void> => {
+        generatedGlyphFramePaths.clear();
+
+        for (const [logicalPath, generatedPath] of await ensureGeneratedGlyphFrames()) {
+          generatedGlyphFramePaths.set(logicalPath, generatedPath);
+        }
+        for (const source of resolveSiteGlyphFrameSources(
+          resolvedConfig.root,
+          options.grids.viewport,
+        )) {
+          const output = await generateGreyscaleFrameSource(source, options);
+          generatedGlyphFramePaths.set(getPublicPath(source.output), getPublicPath(output));
+        }
+      })();
+    }
+
+    return glyphFramesBuild;
+  };
 
   return {
     async buildStart(): Promise<void> {
-      if (!config) {
-        throw new Error("Vite config was not resolved before build start.");
-      }
-      await ensureGeneratedGlyphFrames();
-      for (const source of resolveSiteGlyphFrameSources(config.root, options.grids.viewport)) {
-        await generateGreyscaleFrameSource(source, options);
-      }
+      await ensureGlyphFrames();
     },
     configResolved(resolvedConfig): void {
       config = resolvedConfig;
     },
+    enforce: "pre",
     async load(id): Promise<string | null> {
       if (id !== RESOLVED_GLYPH_FRAME_POSTERS_MODULE_ID) {
         return null;
@@ -527,13 +581,28 @@ function frameGreyscaleSamplerPlugin(
       if (!config) {
         throw new Error("Vite config was not resolved before loading glyph frame posters.");
       }
-      await ensureGeneratedGlyphFrames();
+      await ensureGlyphFrames();
 
       return `export default ${JSON.stringify(createGlyphFramePostersManifest(config.root, options))};`;
     },
     name: "glyph-frames",
     resolveId(id): string | null {
       return id === GLYPH_FRAME_POSTERS_MODULE_ID ? RESOLVED_GLYPH_FRAME_POSTERS_MODULE_ID : null;
+    },
+    async transform(source, id): Promise<string | null> {
+      const file = id.split("?", 1)[0] ?? id;
+      if (!SITE_GLYPH_SOURCE_FILE_EXTENSIONS.has(path.extname(file))) {
+        return null;
+      }
+
+      await ensureGlyphFrames();
+
+      let transformed = source;
+      for (const [logicalPath, generatedPath] of generatedGlyphFramePaths) {
+        transformed = transformed.replaceAll(logicalPath, generatedPath);
+      }
+
+      return transformed === source ? null : transformed;
     },
   };
 }

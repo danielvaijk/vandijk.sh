@@ -1,4 +1,3 @@
-import { createHash } from "node:crypto";
 import { copyFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import * as path from "node:path";
@@ -6,6 +5,8 @@ import { env } from "node:process";
 
 import sharp, { type Sharp } from "sharp";
 import type { Plugin, ResolvedConfig } from "vite";
+
+import { createAssetContentHash } from "./asset-content-hash";
 
 enum ImageFormat {
   AVIF = "avif",
@@ -293,7 +294,7 @@ async function saveImage(
   publicDirectory = "/",
 ): Promise<string> {
   const { format, width } = metadata;
-  const contentHash = createHash("sha256").update(output).digest("hex");
+  const contentHash = createAssetContentHash(output);
 
   const fileName = `${contentHash}-${width}.${format}`;
   const normalizedPublicDirectory = `/${publicDirectory.replaceAll(/^\/+|\/+$/gu, "")}`;

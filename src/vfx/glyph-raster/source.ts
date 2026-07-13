@@ -190,7 +190,7 @@ async function createFrameModifierBrightnessGrids({
   onFrame,
   source,
 }: StreamFrameModifierBrightnessGridsParams): Promise<FrameModifierBrightnessGrids> {
-  const response = await fetch(source.url);
+  const response = await fetch(source.url, { cache: "force-cache" });
 
   if (!response.ok) {
     throw new Error(`Unable to load character animation frames from ${source.url}.`);

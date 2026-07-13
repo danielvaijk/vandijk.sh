@@ -8,7 +8,8 @@ import { NavigationHeader } from "src/components/navigation-header";
 import styles from "src/routes/layout.css?inline";
 import glyphFramePosters from "virtual:glyph-frame-posters";
 
-const ARTICLE_COVER_FRAME_PATH = /^\/blog\/[^/]+\/cover\.frames$/u;
+const ARTICLE_COVER_FRAME_PATH = /^\/blog\/[^/]+\/[\da-f]{16}-cover\.frames$/u;
+const SITE_EYE_FRAME_PATH = /^\/[\da-f]{16}-eye\.frames$/u;
 
 const resolveInitialFrameSources = (pathname: string): string[] => {
   if (!isServer) {
@@ -17,7 +18,7 @@ const resolveInitialFrameSources = (pathname: string): string[] => {
 
   const sources = Object.keys(glyphFramePosters);
   if (pathname === "/") {
-    return sources.filter((source) => source === "/eye.frames");
+    return sources.filter((source) => SITE_EYE_FRAME_PATH.test(source));
   }
   if (pathname === "/blog/") {
     return sources.filter((source) => ARTICLE_COVER_FRAME_PATH.test(source));
@@ -27,7 +28,7 @@ const resolveInitialFrameSources = (pathname: string): string[] => {
 
   return routeSources.length > 0
     ? routeSources
-    : sources.filter((source) => source === "/eye.frames");
+    : sources.filter((source) => SITE_EYE_FRAME_PATH.test(source));
 };
 
 export default component$((): QwikJSX.Element => {
