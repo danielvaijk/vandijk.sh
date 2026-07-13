@@ -6,6 +6,7 @@ import {
   MAX_FIELD_MODIFIER_REGIONS,
   PROCEDURAL_LAYOUT_SAMPLE_RATE,
 } from "src/vfx/glyph-raster/config";
+import { DOCUMENT_ANCHOR_EDGE_MARGIN, DOCUMENT_ANCHOR_OVERSCAN } from "src/vfx/glyph-raster/logic";
 import { createGlyphRasterShaderSources } from "src/vfx/glyph-raster/shaders";
 
 interface InitialGlyphFrameOptions {
@@ -15,6 +16,9 @@ interface InitialGlyphFrameOptions {
   cellWidth: number;
   characters: string[];
   colors: string[];
+  documentAnchor: boolean;
+  documentAnchorEdgeMargin: number;
+  documentAnchorOverscan: number;
   entropySeed: number;
   fieldModifierSampleSize: number;
   fontFamily: string;
@@ -139,32 +143,65 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     const baseCellWidth = resolveCssLength("--glyph-cell-width", options.cellWidth);
     const baseCellHeight = resolveCssLength("--glyph-cell-height", options.cellHeight);
     const fontSize = resolveCssLength("--glyph-font-size", options.fontSize);
-    const cssWidth = canvas.clientWidth || window.innerWidth;
-    const cssHeight = canvas.clientHeight || window.innerHeight;
+    const largeViewportHeight = canvas.clientHeight || window.innerHeight;
+    let documentHeight = Math.max(document.body.offsetHeight, largeViewportHeight);
+    let canvasTop = 0;
+    if (options.documentAnchor) {
+      // Match the runtime's document-space canvas before the first paint so
+      // The compositor scrolls the frozen field with the page.
+      canvas.style.position = "absolute";
+      canvas.style.top = "0px";
+      canvas.style.height = `${Math.min(
+        Math.round(largeViewportHeight * options.documentAnchorOverscan),
+        Math.floor(documentHeight),
+      )}px`;
+    }
+
+    const resolveGrid = (
+      width: number,
+      height: number,
+    ): {
+      cellCount: number;
+      cellHeight: number;
+      cellWidth: number;
+      positions: Float32Array;
+    } => {
+      const baseColumns = Math.max(1, Math.ceil(width / baseCellWidth));
+      const baseRows = Math.max(1, Math.ceil(height / baseCellHeight));
+      const maxGridCells =
+        options.maxGridCells *
+        // Preserve the viewport-density cell scale as the streamed document
+        // Grows the initial canvas toward its overscan height.
+        (options.documentAnchor ? Math.max(1, height / largeViewportHeight) : 1);
+      const cellScale = Math.min(
+        8,
+        Math.max(1, Math.sqrt((baseColumns * baseRows) / maxGridCells)),
+      );
+      const cellWidth = baseCellWidth * cellScale;
+      const cellHeight = baseCellHeight * cellScale;
+      const columns = Math.max(1, Math.ceil(width / cellWidth)) + 1;
+      const rows = Math.max(1, Math.ceil(height / cellHeight)) + 1;
+      const cellCount = columns * rows;
+      const positions = new Float32Array(cellCount * 2);
+
+      for (let row = 0; row < rows; row += 1) {
+        for (let column = 0; column < columns; column += 1) {
+          const positionIndex = (row * columns + column) * 2;
+          positions[positionIndex] = column * cellWidth;
+          positions[positionIndex + 1] = row * cellHeight;
+        }
+      }
+
+      return { cellCount, cellHeight, cellWidth, positions };
+    };
+    let cssWidth = canvas.clientWidth || window.innerWidth;
+    let cssHeight = canvas.clientHeight || largeViewportHeight;
     const pixelRatio = window.devicePixelRatio || 1;
     canvas.width = cssWidth * pixelRatio;
     canvas.height = cssHeight * pixelRatio;
     gl.viewport(0, 0, canvas.width, canvas.height);
-    const baseColumns = Math.max(1, Math.ceil(cssWidth / baseCellWidth));
-    const baseRows = Math.max(1, Math.ceil(cssHeight / baseCellHeight));
-    const cellScale = Math.min(
-      8,
-      Math.max(1, Math.sqrt((baseColumns * baseRows) / options.maxGridCells)),
-    );
-    const cellWidth = baseCellWidth * cellScale;
-    const cellHeight = baseCellHeight * cellScale;
-    const columns = Math.max(1, Math.ceil(cssWidth / cellWidth)) + 1;
-    const rows = Math.max(1, Math.ceil(cssHeight / cellHeight)) + 1;
-    const cellCount = columns * rows;
-    const positions = new Float32Array(cellCount * 2);
-
-    for (let row = 0; row < rows; row += 1) {
-      for (let column = 0; column < columns; column += 1) {
-        const positionIndex = (row * columns + column) * 2;
-        positions[positionIndex] = column * cellWidth;
-        positions[positionIndex + 1] = row * cellHeight;
-      }
-    }
+    const initialGrid = resolveGrid(cssWidth, cssHeight);
+    let { cellCount, cellHeight, cellWidth, positions } = initialGrid;
 
     const atlasColumns = Math.ceil(Math.sqrt(options.characters.length));
     const atlasRows = Math.ceil(options.characters.length / atlasColumns);
@@ -318,6 +355,30 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
         gl.uniform2f(location, first, second);
       }
     };
+    const resizeGrid = (): boolean => {
+      const nextCssWidth = canvas.clientWidth || window.innerWidth;
+      const nextCssHeight = canvas.clientHeight || largeViewportHeight;
+      if (nextCssWidth === cssWidth && nextCssHeight === cssHeight) {
+        return false;
+      }
+
+      cssWidth = nextCssWidth;
+      cssHeight = nextCssHeight;
+      canvas.width = cssWidth * pixelRatio;
+      canvas.height = cssHeight * pixelRatio;
+      gl.viewport(0, 0, canvas.width, canvas.height);
+
+      const nextGrid = resolveGrid(cssWidth, cssHeight);
+      ({ cellCount, cellHeight, cellWidth, positions } = nextGrid);
+      gl.useProgram(program);
+      gl.bindVertexArray(vertexArray);
+      gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+      gl.bufferData(gl.ARRAY_BUFFER, positions, gl.STATIC_DRAW);
+      uniform2f("u_canvas_size", cssWidth, cssHeight);
+      uniform2f("u_cell_size", cellWidth, cellHeight);
+
+      return true;
+    };
 
     uniform1i("u_atlas", 0);
     uniform1i("u_palette", 1);
@@ -345,6 +406,7 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     const modifierRects = new Float32Array(options.maxFieldModifierRegions * 4);
     const initialFrameGlobal = globalThis as typeof globalThis & InitialGlyphFrameGlobal;
     let layoutAnimationFrame = 0;
+    let scrollAnimationFrame = 0;
     let lastLayoutSampleAt = 0;
     const state: InitialGlyphFrameState = {
       disposed: false,
@@ -362,6 +424,47 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
       gl.enable(gl.BLEND);
       gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
       gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, cellCount);
+    };
+    const updateDocumentAnchor = (): boolean => {
+      if (!options.documentAnchor) {
+        return false;
+      }
+
+      let didChange = false;
+      // The absolute canvas is out of flow, so the body's box measures the
+      // Content without feeding the canvas's own overscan back into it.
+      documentHeight = Math.max(document.body.offsetHeight, largeViewportHeight);
+      const overscanHeight = Math.round(largeViewportHeight * options.documentAnchorOverscan);
+      const nextHeight = `${Math.min(overscanHeight, Math.floor(documentHeight))}px`;
+      if (canvas.style.height !== nextHeight) {
+        canvas.style.height = nextHeight;
+        didChange = resizeGrid() || didChange;
+      }
+
+      const viewportScrollY = window.scrollY;
+      const viewportHeight = window.innerHeight;
+      const edgeMargin = viewportHeight * options.documentAnchorEdgeMargin;
+      const maxTopRow = Math.max(0, Math.floor((documentHeight - cssHeight) / cellHeight));
+      let nextTop = Math.min(canvasTop, maxTopRow * cellHeight);
+      const isNearTop = nextTop > 0 && viewportScrollY < nextTop + edgeMargin;
+      const isNearBottom =
+        nextTop + cssHeight < documentHeight - cellHeight &&
+        viewportScrollY + viewportHeight > nextTop + cssHeight - edgeMargin;
+      if (isNearTop || isNearBottom) {
+        const centeredTopRow = Math.floor(
+          (viewportScrollY - (cssHeight - viewportHeight) / 2) / cellHeight,
+        );
+        nextTop = Math.min(maxTopRow, Math.max(0, centeredTopRow)) * cellHeight;
+      }
+
+      if (nextTop !== canvasTop) {
+        canvasTop = nextTop;
+        canvas.style.top = `${canvasTop}px`;
+        uniform2f("u_grid_origin", 0, canvasTop);
+        didChange = true;
+      }
+
+      return didChange;
     };
     const updateModifierBounds = (): boolean => {
       let didChange = false;
@@ -457,12 +560,27 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
         time - lastLayoutSampleAt >= 1000 / options.layoutSampleRate
       ) {
         lastLayoutSampleAt = time;
+        const didUpdateAnchor = updateDocumentAnchor();
         if (updateModifierBounds()) {
           uploadModifiers();
+        } else if (didUpdateAnchor) {
+          renderFrame();
         }
       }
 
       layoutAnimationFrame = requestAnimationFrame(synchronizeModifierLayout);
+    };
+    const onDocumentScroll = (): void => {
+      if (scrollAnimationFrame !== 0 || state.disposed) {
+        return;
+      }
+
+      scrollAnimationFrame = requestAnimationFrame((): void => {
+        scrollAnimationFrame = 0;
+        if (!state.disposed && updateDocumentAnchor()) {
+          renderFrame();
+        }
+      });
     };
     state.registerModifier = (modifierOptions: InitialGlyphModifierOptions): void => {
       const poster = state.posters[modifierOptions.sourceUrl];
@@ -525,6 +643,11 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     };
 
     initialFrameGlobal.__glyphInitialFrame = state;
+    if (options.documentAnchor) {
+      updateDocumentAnchor();
+      window.addEventListener("scroll", onDocumentScroll, { passive: true });
+      layoutAnimationFrame = requestAnimationFrame(synchronizeModifierLayout);
+    }
     renderFrame();
     for (const modifier of initialFrameGlobal.__glyphInitialFrameQueue ?? []) {
       state.registerModifier(modifier);
@@ -534,6 +657,8 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     canvas.__disposeGlyphInitialFrame = (): void => {
       state.disposed = true;
       cancelAnimationFrame(layoutAnimationFrame);
+      cancelAnimationFrame(scrollAnimationFrame);
+      window.removeEventListener("scroll", onDocumentScroll);
       gl.deleteBuffer(cornerBuffer);
       gl.deleteBuffer(positionBuffer);
       gl.deleteTexture(atlasTexture);
@@ -553,6 +678,8 @@ function createInitialGlyphFrameScript(
   options: Omit<
     InitialGlyphFrameOptions,
     | "fieldModifierSampleSize"
+    | "documentAnchorEdgeMargin"
+    | "documentAnchorOverscan"
     | "fontFamily"
     | "fragmentSource"
     | "glyphCellPaddingRatio"
@@ -566,6 +693,8 @@ function createInitialGlyphFrameScript(
   );
   const serializedOptions = JSON.stringify({
     ...options,
+    documentAnchorEdgeMargin: DOCUMENT_ANCHOR_EDGE_MARGIN,
+    documentAnchorOverscan: DOCUMENT_ANCHOR_OVERSCAN,
     fieldModifierSampleSize: FIELD_MODIFIER_SAMPLE_SIZE,
     glyphCellPaddingRatio: GLYPH_CELL_PADDING_RATIO,
     layoutSampleRate: PROCEDURAL_LAYOUT_SAMPLE_RATE,

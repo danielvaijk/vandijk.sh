@@ -237,6 +237,7 @@ export const GlyphRaster = component$(
             cellWidth: preset.cellWidth,
             characters: resolvedCharacters,
             colors: preset.colors,
+            documentAnchor: anchor !== "viewport",
             entropySeed,
             fontSize: preset.fontSize,
             frameRate: DEFAULT_FRAME_RATE,
