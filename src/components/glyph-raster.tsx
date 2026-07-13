@@ -706,19 +706,38 @@ export const GlyphRaster = component$(
       };
 
       const applyAnchorMode = (mode: "document" | "viewport"): void => {
-        if (canvasAnchorMode === mode) {
-          return;
-        }
-
+        const didModeChange = canvasAnchorMode !== mode;
         canvasAnchorMode = mode;
+        let didRestoreStyles = false;
 
         if (mode === "document") {
-          canvas.style.position = "absolute";
-          canvas.style.top = `${canvasTop}px`;
+          const nextTop = `${canvasTop}px`;
+          if (canvas.style.position !== "absolute") {
+            canvas.style.position = "absolute";
+            didRestoreStyles = true;
+          }
+          if (canvas.style.top !== nextTop) {
+            canvas.style.top = nextTop;
+            didRestoreStyles = true;
+          }
+          if (!canvas.style.height) {
+            didRestoreStyles = true;
+          }
         } else {
-          canvas.style.position = "";
-          canvas.style.top = "";
-          canvas.style.height = "";
+          if (canvas.style.position || canvas.style.top || canvas.style.height) {
+            canvas.style.position = "";
+            canvas.style.top = "";
+            canvas.style.height = "";
+            didRestoreStyles = true;
+          }
+        }
+
+        // Qwik reconciles the canvas's declarative style attribute during a
+        // Client-side route transition. That can remove the imperative
+        // Document anchor without recreating this visible task, so its cached
+        // Anchor mode alone is not proof that the DOM is still synchronized.
+        if (!didModeChange && !didRestoreStyles) {
+          return;
         }
 
         updateCanvasHeight();
