@@ -4,14 +4,19 @@ import path from "node:path";
 
 import sharp, { type Sharp } from "sharp";
 import type { Plugin, ResolvedConfig } from "vite";
-import type { GlyphRasterFrameOptions } from "src/vfx/glyph-raster/frame-options";
+import type {
+  GlyphRasterFrameGrid,
+  GlyphRasterFrameOptions,
+} from "src/vfx/glyph-raster/frame-options";
 
 interface GlyphFrameSource {
+  grid: GlyphRasterFrameGrid;
   output: string;
   source: string;
 }
 
 interface FrameDimensions {
+  aspectRatio: number;
   cols: number;
   rows: number;
 }
@@ -24,6 +29,7 @@ interface GlyphFramePoster {
 }
 
 interface GlyphFrameHeader {
+  aspect_ratio?: number;
   cols: number;
   rows: number;
 }
@@ -40,7 +46,6 @@ const SITE_GLYPH_SOURCE_DIRECTORY = "src/routes/assets";
 const SITE_GLYPH_SOURCE_EXTENSIONS = [".gif"];
 const SITE_GLYPH_SOURCE_FILE_EXTENSIONS = new Set([".mdx", ".ts", ".tsx"]);
 const SITE_GLYPH_FRAME_URL_REGEX = /["'`]\/(?<name>[\w-]+)\.frames["'`]/gu;
-const GLYPH_FRAME_POSTER_SAMPLE_SIZE = 128;
 const GLYPH_FRAME_POSTERS_MODULE_ID = "virtual:glyph-frame-posters";
 const RESOLVED_GLYPH_FRAME_POSTERS_MODULE_ID = `\0${GLYPH_FRAME_POSTERS_MODULE_ID}`;
 
@@ -48,21 +53,24 @@ function getFrameDimensions(
   width: number,
   height: number,
   options: GlyphRasterFrameOptions,
+  grid: GlyphRasterFrameGrid,
 ): FrameDimensions {
   if (width <= 0 || height <= 0) {
     throw new Error(`Invalid glyph frame source dimensions: ${width}x${height}.`);
   }
+  if (grid.cols <= 0 || (typeof grid.rows === "number" && grid.rows <= 0)) {
+    throw new Error(`Invalid glyph frame sampling grid: ${grid.cols}x${grid.rows ?? "auto"}.`);
+  }
 
-  const rows = height;
-  const aspectRatio = width / height;
-  const cols = Math.max(
+  const sourceAspectRatio = width / height;
+  const cols = Math.max(1, Math.round(grid.cols));
+  const rows = Math.max(
     1,
-    Math.round(
-      (aspectRatio * rows * options.cellHeight * options.horizontalScale) / options.cellWidth,
-    ),
+    Math.round(grid.rows ?? (cols * options.cellWidth) / (sourceAspectRatio * options.cellHeight)),
   );
+  const aspectRatio = (cols * options.cellWidth) / (rows * options.cellHeight);
 
-  return { cols, rows };
+  return { aspectRatio, cols, rows };
 }
 
 function clamp(value: number, min: number, max: number): number {
@@ -257,6 +265,7 @@ function processRawFrames(
 async function getImageDimensions(
   source: string,
   options: GlyphRasterFrameOptions,
+  grid: GlyphRasterFrameGrid,
 ): Promise<FrameDimensions> {
   const metadata = await sharp(source, { animated: true }).metadata();
   const height = metadata.pageHeight ?? metadata.height;
@@ -265,7 +274,7 @@ async function getImageDimensions(
     throw new Error(`Could not read image dimensions for ${source}.`);
   }
 
-  return getFrameDimensions(metadata.width, height, options);
+  return getFrameDimensions(metadata.width, height, options, grid);
 }
 
 function getFrameRate(
@@ -318,6 +327,7 @@ function createFramesFile(fps: number, dimensions: FrameDimensions, rawFrames: B
 
   const header = Buffer.from(
     `${JSON.stringify({
+      aspect_ratio: dimensions.aspectRatio,
       cols: dimensions.cols,
       fps,
       n_frames: rawFrames.length / frameSize,
@@ -343,26 +353,14 @@ function createGlyphFramePoster(
     throw new Error("Glyph frame poster source does not contain a complete first frame.");
   }
 
-  const cols = GLYPH_FRAME_POSTER_SAMPLE_SIZE;
-  const rows = GLYPH_FRAME_POSTER_SAMPLE_SIZE;
-  const poster = Buffer.alloc(cols * rows);
-
-  for (let row = 0; row < rows; row += 1) {
-    const sourceRow = Math.min(header.rows - 1, Math.floor(((row + 0.5) * header.rows) / rows));
-
-    for (let col = 0; col < cols; col += 1) {
-      const sourceCol = Math.min(header.cols - 1, Math.floor(((col + 0.5) * header.cols) / cols));
-      poster[row * cols + col] = frame[sourceRow * header.cols + sourceCol];
-    }
-  }
-
   return {
     aspectRatio:
+      header.aspect_ratio ??
       ((header.cols / options.horizontalScale) * options.cellWidth) /
-      (header.rows * options.cellHeight),
-    cols,
-    data: poster.toString("base64"),
-    rows,
+        (header.rows * options.cellHeight),
+    cols: header.cols,
+    data: frame.toString("base64"),
+    rows: header.rows,
   };
 }
 
@@ -401,7 +399,7 @@ async function generateGreyscaleFrameSource(
   source: GlyphFrameSource,
   options: GlyphRasterFrameOptions,
 ): Promise<void> {
-  const dimensions = await getImageDimensions(source.source, options);
+  const dimensions = await getImageDimensions(source.source, options, source.grid);
   const { fps, rawFrames } = await readImageFrames(
     sharp(source.source, { animated: true }),
     dimensions,
@@ -447,12 +445,17 @@ function getSiteGlyphFrameNames(root: string): string[] {
   return [...names].sort();
 }
 
-function resolveSiteGlyphFrameSource(root: string, name: string): GlyphFrameSource | null {
+function resolveSiteGlyphFrameSource(
+  root: string,
+  name: string,
+  grid: GlyphRasterFrameGrid,
+): GlyphFrameSource | null {
   for (const extension of SITE_GLYPH_SOURCE_EXTENSIONS) {
     const source = path.resolve(root, SITE_GLYPH_SOURCE_DIRECTORY, `${name}${extension}`);
 
     if (existsSync(source)) {
       return {
+        grid,
         output: path.resolve(root, SITE_GLYPH_PUBLIC_DIRECTORY, `${name}.frames`),
         source,
       };
@@ -462,9 +465,12 @@ function resolveSiteGlyphFrameSource(root: string, name: string): GlyphFrameSour
   return null;
 }
 
-function resolveSiteGlyphFrameSources(root: string): GlyphFrameSource[] {
+function resolveSiteGlyphFrameSources(
+  root: string,
+  grid: GlyphRasterFrameGrid,
+): GlyphFrameSource[] {
   return getSiteGlyphFrameNames(root).flatMap((name): GlyphFrameSource[] => {
-    const source = resolveSiteGlyphFrameSource(root, name);
+    const source = resolveSiteGlyphFrameSource(root, name, grid);
 
     return source === null ? [] : [source];
   });
@@ -482,7 +488,7 @@ function frameGreyscaleSamplerPlugin(
         throw new Error("Vite config was not resolved before build start.");
       }
       await ensureGeneratedGlyphFrames();
-      for (const source of resolveSiteGlyphFrameSources(config.root)) {
+      for (const source of resolveSiteGlyphFrameSources(config.root, options.grids.viewport)) {
         await generateGreyscaleFrameSource(source, options);
       }
     },

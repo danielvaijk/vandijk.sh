@@ -32,6 +32,7 @@ interface StreamFrameModifierBrightnessGridsParams {
 }
 
 interface ParsedSourceHeader {
+  aspect_ratio?: number;
   cols: number;
   fps?: number;
   n_frames: number;
@@ -59,6 +60,15 @@ const DEFAULT_FRAME_RATE = 18;
 const FIELD_MODIFIER_SAMPLE_SIZE = 256;
 const MAX_FRAME_BRIGHTNESS_CACHE_SIZE = 8;
 const frameBrightnessCache = new Map<string, Uint8Array>();
+
+function resolveFrameAspectRatio(
+  header: Pick<ParsedSourceHeader, "aspect_ratio" | "cols" | "rows">,
+): number {
+  return (
+    header.aspect_ratio ??
+    ((header.cols / GLYPH_HORIZONTAL_SCALE) * NOISE_CELL_WIDTH) / (header.rows * NOISE_CELL_HEIGHT)
+  );
+}
 
 function getCachedValue<Value>(cache: Map<string, Value>, key: string): Value | null {
   const value = cache.get(key);
@@ -100,9 +110,7 @@ function parseSourceHeader(raw: Uint8Array, sourceUrl: string): ParsedFrameSourc
   const frameSize = header.cols * header.rows;
 
   return {
-    aspectRatio:
-      ((header.cols / GLYPH_HORIZONTAL_SCALE) * NOISE_CELL_WIDTH) /
-      (header.rows * NOISE_CELL_HEIGHT),
+    aspectRatio: resolveFrameAspectRatio(header),
     cols: header.cols,
     defaultFps: header.fps ?? DEFAULT_FRAME_RATE,
     frameCount: header.n_frames,
@@ -233,9 +241,7 @@ async function createFrameModifierBrightnessGrids({
       const header = parseFrameSourceHeader(headerBytes, source.url);
       const frameSize = header.cols * header.rows;
       frameSource = {
-        aspectRatio:
-          ((header.cols / GLYPH_HORIZONTAL_SCALE) * NOISE_CELL_WIDTH) /
-          (header.rows * NOISE_CELL_HEIGHT),
+        aspectRatio: resolveFrameAspectRatio(header),
         cols: header.cols,
         defaultFps: header.fps ?? DEFAULT_FRAME_RATE,
         frameCount: header.n_frames,

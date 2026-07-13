@@ -622,6 +622,7 @@ async function generateCoverFrames({
 
   await generateGreyscaleFrameSource(
     {
+      grid: glyphFrameOptions.grids.articleCover,
       output: resolve(root, "public", framesPath.replace(/^\//u, "")),
       source: join(getArticleAssetsDirectory(root, path), coverFileName),
     },
@@ -652,7 +653,10 @@ async function generateArticleGifFrames(
     const { name } = parse(entity.name);
     const output = join(articlePublicAssetsDirectory, `${name}.frames`);
 
-    await generateGreyscaleFrameSource({ output, source }, glyphFrameOptions);
+    await generateGreyscaleFrameSource(
+      { grid: glyphFrameOptions.grids.articleImage, output, source },
+      glyphFrameOptions,
+    );
   }
 }
 
