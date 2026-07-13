@@ -6,7 +6,7 @@ import {
   useStylesScoped$,
   useVisibleTask$,
 } from "@builder.io/qwik";
-import { type DocumentHead, type DocumentHeadValue, useNavigate } from "@builder.io/qwik-city";
+import { type DocumentHead, type DocumentHeadValue } from "@builder.io/qwik-city";
 import type TypeIt from "typeit";
 
 import { CenteredTitle } from "src/components/centered-title";
@@ -15,7 +15,6 @@ import styles from "src/routes/index.css?inline";
 
 export default component$((): QwikJSX.Element => {
   const continuePrompt = useSignal("press any key to continue");
-  const navigate = useNavigate();
 
   useStylesScoped$(styles);
 
@@ -23,8 +22,8 @@ export default component$((): QwikJSX.Element => {
     const hasTouch = navigator.maxTouchPoints > 0 || "ontouchstart" in globalThis;
     continuePrompt.value = hasTouch ? "tap to continue" : "press any key to continue";
 
-    const continueToBlog = async (): Promise<void> => {
-      await navigate("/blog/");
+    const continueToBlog = (): void => {
+      globalThis.location.assign("/blog/");
     };
 
     globalThis.addEventListener("keydown", continueToBlog, { capture: true });

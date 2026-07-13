@@ -1,5 +1,4 @@
 import { type QwikJSX, component$, useStylesScoped$ } from "@builder.io/qwik";
-import { Link } from "@builder.io/qwik-city";
 
 import { GlyphRaster } from "src/components/glyph-raster";
 import styles from "src/components/article-summary-item.css?inline";
@@ -44,9 +43,11 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
         `<${tag}${attributes} class="${scopeId}">`,
     );
 
+    // Keep article navigation document-based so the browser can progressively
+    // Parse the SSG HTML and run its embedded glyph/poster first-frame scripts.
     return (
       <li class="article-summary">
-        <Link class={scopeId} href={`/blog/${path}/`} prefetch>
+        <a class={scopeId} href={`/blog/${path}/`}>
           <div class="article-summary-cover-image">
             {coverImageFramesPath && (
               <GlyphRaster
@@ -70,7 +71,7 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
               <p>~{readTime} min read</p>
             </div>
           </div>
-        </Link>
+        </a>
       </li>
     );
   },

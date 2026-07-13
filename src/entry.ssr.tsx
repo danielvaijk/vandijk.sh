@@ -23,7 +23,11 @@ export default function serve(opts: RenderToStreamOptions): Promise<RenderToStre
   }
 
   opts.containerAttributes = containerAttributes;
-  opts.manifest = manifest;
+  // The SSG document already embeds the GPU/poster first paint. Keep Qwik's
+  // Event loader, but let the core and feature chunks load lazily so they do
+  // Not compete with the streamed HTML that produces visible content.
+  opts.manifest = { ...manifest, core: undefined };
+  opts.preloader = false;
 
   return renderToStream(<Root />, opts);
 }
