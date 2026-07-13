@@ -11,6 +11,17 @@ import styles from "src/global.css?url";
 // Of CSS is less than 10KB. If the file is larger than 10KB, it will
 // Be loaded as a separate file.
 
+// Moderate document rules wait for user intent, so they can be discovered
+// In the head without competing with the current document's first paint.
+const INTENT_NAVIGATION_PREFETCH_RULES = JSON.stringify({
+  prefetch: [
+    {
+      eagerness: "moderate",
+      where: { href_matches: "/*" },
+    },
+  ],
+});
+
 const RootHead = component$((): QwikJSX.Element => {
   const head = useDocumentHead();
   const { url } = useLocation();
@@ -30,6 +41,8 @@ const RootHead = component$((): QwikJSX.Element => {
 
       <link rel="canonical" href={url.href} />
       <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+
+      <script type="speculationrules" dangerouslySetInnerHTML={INTENT_NAVIGATION_PREFETCH_RULES} />
 
       {head.links.map(
         (link): QwikJSX.Element => (
