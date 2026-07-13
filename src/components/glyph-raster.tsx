@@ -64,6 +64,7 @@ type GlyphInitialFrameCanvas = HTMLCanvasElement & {
   __disposeGlyphInitialFrame?: () => void;
 };
 type GlyphInitialModifier = {
+  baseBlend: number;
   blend: number;
   brightnessGrid: Uint8Array;
   documentLeft: number;
@@ -625,7 +626,7 @@ export const GlyphRaster = component$(
         }
 
         glyphFieldModifierRegions.set(modifier.elementId, {
-          baseBlend: modifier.blend,
+          baseBlend: modifier.baseBlend,
           blend: modifier.blend,
           brightnessGrid: modifier.brightnessGrid,
           documentLeft: modifier.documentLeft,

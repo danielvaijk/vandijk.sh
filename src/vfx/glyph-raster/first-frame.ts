@@ -52,6 +52,7 @@ interface InitialGlyphModifierPoster {
 }
 
 interface InitialGlyphModifier {
+  baseBlend: number;
   blend: number;
   brightnessGrid: Uint8Array;
   documentLeft: number;
@@ -450,6 +451,8 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     const modifierBlends = new Float32Array(options.maxFieldModifierRegions);
     const modifierRects = new Float32Array(options.maxFieldModifierRegions * 4);
     const initialFrameGlobal = globalThis as typeof globalThis & InitialGlyphFrameGlobal;
+    const activeModifierBlendTransitions = new Set<string>();
+    let blendAnimationFrame = 0;
     let layoutAnimationFrame = 0;
     let scrollAnimationFrame = 0;
     let lastLayoutSampleAt = 0;
@@ -584,6 +587,28 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
 
       return didChange;
     };
+    const updateModifierBlends = (): boolean => {
+      let didChange = false;
+
+      for (const modifier of state.modifiers) {
+        const element = document.getElementById(modifier.elementId);
+        if (!element) {
+          continue;
+        }
+
+        const opacity = Number(getComputedStyle(element).opacity);
+        const nextBlend =
+          modifier.baseBlend * (Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1);
+        if (Math.abs(modifier.blend - nextBlend) <= 0.001) {
+          continue;
+        }
+
+        modifier.blend = nextBlend;
+        didChange = true;
+      }
+
+      return didChange;
+    };
     const uploadModifiers = (): void => {
       modifierBrightness.fill(0);
       modifierBlends.fill(0);
@@ -649,7 +674,9 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
       ) {
         lastLayoutSampleAt = time;
         const didUpdateViewportLayout = synchronizeViewportLayout();
-        if (updateModifierBounds()) {
+        const didUpdateModifierBounds = updateModifierBounds();
+        const didUpdateModifierBlends = updateModifierBlends();
+        if (didUpdateModifierBounds || didUpdateModifierBlends) {
           uploadModifiers();
         } else if (didUpdateViewportLayout) {
           renderFrame();
@@ -657,6 +684,41 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
       }
 
       layoutAnimationFrame = requestAnimationFrame(synchronizeModifierLayout);
+    };
+    const synchronizeModifierBlendTransition = (): void => {
+      blendAnimationFrame = 0;
+      if (state.disposed) {
+        return;
+      }
+
+      if (updateModifierBlends()) {
+        uploadModifiers();
+      }
+      if (activeModifierBlendTransitions.size > 0) {
+        blendAnimationFrame = requestAnimationFrame(synchronizeModifierBlendTransition);
+      }
+    };
+    const onModifierBlendTransitionChanged = (event: TransitionEvent): void => {
+      if (event.propertyName !== "opacity") {
+        return;
+      }
+
+      const element = event.target;
+      if (
+        !(element instanceof HTMLElement) ||
+        !state.modifiers.some((modifier) => modifier.elementId === element.id)
+      ) {
+        return;
+      }
+
+      if (event.type === "transitionrun") {
+        activeModifierBlendTransitions.add(element.id);
+      } else {
+        activeModifierBlendTransitions.delete(element.id);
+      }
+      if (blendAnimationFrame === 0) {
+        blendAnimationFrame = requestAnimationFrame(synchronizeModifierBlendTransition);
+      }
     };
     const onDocumentScroll = (): void => {
       if (scrollAnimationFrame !== 0 || state.disposed) {
@@ -717,6 +779,7 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
       const snappedBounds = bounds ? resolveSnappedModifierBounds(bounds) : null;
       const opacity = element ? Number(getComputedStyle(element).opacity) : 1;
       const modifier: InitialGlyphModifier = {
+        baseBlend: modifierOptions.blend,
         blend:
           modifierOptions.blend *
           (Number.isFinite(opacity) ? Math.min(1, Math.max(0, opacity)) : 1),
@@ -746,6 +809,9 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     };
 
     initialFrameGlobal.__glyphInitialFrame = state;
+    document.addEventListener("transitionrun", onModifierBlendTransitionChanged);
+    document.addEventListener("transitionend", onModifierBlendTransitionChanged);
+    document.addEventListener("transitioncancel", onModifierBlendTransitionChanged);
     window.addEventListener("resize", onWindowResize, { passive: true });
     if (options.documentAnchor) {
       updateDocumentAnchor();
@@ -760,8 +826,12 @@ function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
     canvas.dataset.glyphInitialFrame = "";
     canvas.__disposeGlyphInitialFrame = (): void => {
       state.disposed = true;
+      cancelAnimationFrame(blendAnimationFrame);
       cancelAnimationFrame(layoutAnimationFrame);
       cancelAnimationFrame(scrollAnimationFrame);
+      document.removeEventListener("transitionrun", onModifierBlendTransitionChanged);
+      document.removeEventListener("transitionend", onModifierBlendTransitionChanged);
+      document.removeEventListener("transitioncancel", onModifierBlendTransitionChanged);
       window.removeEventListener("scroll", onDocumentScroll);
       window.removeEventListener("resize", onWindowResize);
       gl.deleteBuffer(cornerBuffer);
