@@ -71,7 +71,7 @@ const GLYPH_HORIZONTAL_SCALE = 1.09;
 const NOISE_CELL_WIDTH = 8;
 const NOISE_CELL_HEIGHT = 14;
 const DEFAULT_FRAME_RATE = 18;
-const FIELD_MODIFIER_SAMPLE_SIZE = 256;
+const FIELD_MODIFIER_SAMPLE_SIZE = 128;
 const MAX_FRAME_BRIGHTNESS_CACHE_SIZE = 8;
 const frameBrightnessCache = new Map<string, Uint8Array>();
 

@@ -460,6 +460,7 @@ export const GlyphRaster = component$(
           onRegionChanged();
           onRegionBlendChanged();
           let availableFrameCount = 0;
+          let hasStartedFrameLoading = false;
           let isFrameLoadComplete = false;
           const showFirstFrame = ({ aspectRatio, grids }: FrameModifierBrightnessGrids): void => {
             if (isCleanedUp) {
@@ -509,30 +510,37 @@ export const GlyphRaster = component$(
             addActiveGlyphRaster(activeRaster);
             scheduleActiveGlyphRasters();
           };
-          createFrameModifierBrightnessGrids({
-            onFrame: (frame, frameGrids): void => {
-              availableFrameCount = Math.max(availableFrameCount, frame + 1);
-              if (frame === 0) {
-                showFirstFrame(frameGrids);
-              }
-              startProgressivePlayback(frameGrids);
-              scheduleActiveGlyphRasters();
-            },
-            source: resolvedSource,
-          })
-            .then(({ defaultFps, frameCount, grids }) => {
-              if (isCleanedUp) {
-                return;
-              }
+          const startFrameLoading = (): void => {
+            if (hasStartedFrameLoading) {
+              return;
+            }
+            hasStartedFrameLoading = true;
 
-              availableFrameCount = frameCount;
-              isFrameLoadComplete = true;
-              startProgressivePlayback({ defaultFps, frameCount, grids });
-              scheduleActiveGlyphRasters();
+            createFrameModifierBrightnessGrids({
+              onFrame: (frame, frameGrids): void => {
+                availableFrameCount = Math.max(availableFrameCount, frame + 1);
+                if (frame === 0) {
+                  showFirstFrame(frameGrids);
+                }
+                startProgressivePlayback(frameGrids);
+                scheduleActiveGlyphRasters();
+              },
+              source: resolvedSource,
             })
-            .catch(() => {
-              /* Empty */
-            });
+              .then(({ defaultFps, frameCount, grids }) => {
+                if (isCleanedUp) {
+                  return;
+                }
+
+                availableFrameCount = frameCount;
+                isFrameLoadComplete = true;
+                startProgressivePlayback({ defaultFps, frameCount, grids });
+                scheduleActiveGlyphRasters();
+              })
+              .catch(() => {
+                /* Empty */
+              });
+          };
           animationFrame = requestAnimationFrame(onNextFrame);
           resizeObserver.observe(element);
           window.addEventListener("load", onWindowChanged);
@@ -575,6 +583,7 @@ export const GlyphRaster = component$(
               ([entry]): void => {
                 isRasterVisible = Boolean(entry && entry.isIntersecting);
                 if (isRasterVisible) {
+                  startFrameLoading();
                   scheduleActiveGlyphRasters();
                 }
               },
@@ -582,6 +591,8 @@ export const GlyphRaster = component$(
             );
             observer.observe(element);
             removeVisibilityObserver = () => observer.disconnect();
+          } else {
+            startFrameLoading();
           }
 
           const onVisibilityChange = (): void => {

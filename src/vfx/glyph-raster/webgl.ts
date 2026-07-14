@@ -433,9 +433,8 @@ function createWebGlGlyphRenderer({
   let lastColorsKey = "";
   let lastFieldModifierVersion = -1;
   let lastPositionKey = "";
-  const fieldModifierBrightnessBytes = new Uint8Array(
-    FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE * MAX_FIELD_MODIFIER_REGIONS,
-  );
+  const lastFieldModifierBrightnessGrids: Array<Uint8Array | undefined> = [];
+  const lastFieldModifierRegions: Array<GlyphFieldModifierRegion | undefined> = [];
   const fieldModifierRects = new Float32Array(MAX_FIELD_MODIFIER_REGIONS * 4);
   const fieldModifierBlends = new Float32Array(MAX_FIELD_MODIFIER_REGIONS);
   const atlasCols = Math.ceil(Math.sqrt(characters.length));
@@ -462,6 +461,25 @@ function createWebGlGlyphRenderer({
   gl.uniform2f(cellSizeLocation, cellWidth, cellHeight);
   gl.enable(gl.BLEND);
   gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+  gl.activeTexture(gl.TEXTURE3);
+  gl.bindTexture(gl.TEXTURE_2D, fieldModifierBrightnessTexture);
+  gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(
+    gl.TEXTURE_2D,
+    0,
+    gl.R8,
+    FIELD_MODIFIER_SAMPLE_SIZE,
+    FIELD_MODIFIER_SAMPLE_SIZE * MAX_FIELD_MODIFIER_REGIONS,
+    0,
+    gl.RED,
+    gl.UNSIGNED_BYTE,
+    null,
+  );
 
   const uploadAtlas = (pixelRatio: number): void => {
     const atlas = createGlyphAtlas({
@@ -538,46 +556,54 @@ function createWebGlGlyphRenderer({
 
     let regionCount = 0;
 
-    fieldModifierBrightnessBytes.fill(0);
     fieldModifierBlends.fill(0);
     fieldModifierRects.fill(0);
 
+    gl.activeTexture(gl.TEXTURE3);
+    gl.bindTexture(gl.TEXTURE_2D, fieldModifierBrightnessTexture);
+
     for (const region of regions) {
       const valueIndex = regionCount * 4;
-      const brightnessOffset =
-        regionCount * FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
+      const brightnessGrid = region.brightnessGrid;
+
+      if (!brightnessGrid) {
+        continue;
+      }
 
       fieldModifierRects[valueIndex] = region.documentLeft;
       fieldModifierRects[valueIndex + 1] = region.documentTop;
       fieldModifierRects[valueIndex + 2] = region.width;
       fieldModifierRects[valueIndex + 3] = region.height;
       fieldModifierBlends[regionCount] = region.blend;
-      fieldModifierBrightnessBytes.set(region.brightnessGrid ?? [], brightnessOffset);
+
+      if (
+        lastFieldModifierRegions[regionCount] !== region ||
+        lastFieldModifierBrightnessGrids[regionCount] !== brightnessGrid
+      ) {
+        gl.texSubImage2D(
+          gl.TEXTURE_2D,
+          0,
+          0,
+          regionCount * FIELD_MODIFIER_SAMPLE_SIZE,
+          FIELD_MODIFIER_SAMPLE_SIZE,
+          FIELD_MODIFIER_SAMPLE_SIZE,
+          gl.RED,
+          gl.UNSIGNED_BYTE,
+          brightnessGrid,
+        );
+        lastFieldModifierRegions[regionCount] = region;
+        lastFieldModifierBrightnessGrids[regionCount] = brightnessGrid;
+      }
       regionCount += 1;
     }
+
+    lastFieldModifierRegions.length = regionCount;
+    lastFieldModifierBrightnessGrids.length = regionCount;
 
     gl.useProgram(program);
     gl.uniform1i(fieldModifierCountLocation, regionCount);
     gl.uniform1fv(fieldModifierBlendsLocation, fieldModifierBlends);
     gl.uniform4fv(fieldModifierRectsLocation, fieldModifierRects);
-
-    gl.activeTexture(gl.TEXTURE3);
-    gl.bindTexture(gl.TEXTURE_2D, fieldModifierBrightnessTexture);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-    gl.texImage2D(
-      gl.TEXTURE_2D,
-      0,
-      gl.R8,
-      FIELD_MODIFIER_SAMPLE_SIZE,
-      FIELD_MODIFIER_SAMPLE_SIZE * MAX_FIELD_MODIFIER_REGIONS,
-      0,
-      gl.RED,
-      gl.UNSIGNED_BYTE,
-      fieldModifierBrightnessBytes,
-    );
   };
 
   return {
