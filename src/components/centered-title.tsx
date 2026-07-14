@@ -27,6 +27,10 @@ export const CenteredTitle = component$<CenteredTitleProps>(
     useStylesScoped$(styles);
 
     useVisibleTask$(({ cleanup }): void => {
+      if (!typeTitle$) {
+        return;
+      }
+
       const element = typedTitleElement.value;
 
       if (!element) {
@@ -35,30 +39,21 @@ export const CenteredTitle = component$<CenteredTitleProps>(
 
       let isCleanedUp = false;
       const configuredOptions = typeTitleOptions ?? {};
-      const shouldStartByDeletingTitle = typeTitle$ && configuredOptions.startDelete === true;
-      const options = typeTitle$
-        ? configuredOptions
-        : Object.assign(configuredOptions, {
-            startDelay: configuredOptions.startDelay ?? 0,
-            startDelete: false,
-            strings: [],
-          });
-
-      if (shouldStartByDeletingTitle) {
-        element.textContent = title;
-      }
-
-      const typeIt = new TypeIt(element, options);
-
-      if (!typeTitle$) {
-        element.textContent = title;
-      }
-
-      element.hidden = false;
+      const configuredAfterStep = configuredOptions.afterStep;
       const staticTitle = staticTitleElement.value;
-      if (staticTitle) {
-        staticTitle.setAttribute("hidden", "");
-      }
+      let didRevealTypedTitle = false;
+      const typeIt = new TypeIt(element, {
+        ...configuredOptions,
+        afterStep: async (instance: TypeIt): Promise<void> => {
+          if (!didRevealTypedTitle && element.textContent !== title) {
+            didRevealTypedTitle = true;
+            element.hidden = false;
+            staticTitle?.setAttribute("hidden", "");
+          }
+
+          await configuredAfterStep?.(instance);
+        },
+      });
 
       const startTypeIt = (): void => {
         if (!isCleanedUp) {
@@ -77,11 +72,9 @@ export const CenteredTitle = component$<CenteredTitleProps>(
       cleanup((): void => {
         isCleanedUp = true;
         typeIt.destroy();
-        if (staticTitle) {
-          staticTitle.removeAttribute("hidden");
-        }
+        staticTitle?.removeAttribute("hidden");
         element.hidden = true;
-        element.textContent = "";
+        element.textContent = title;
       });
     });
 
@@ -96,7 +89,9 @@ export const CenteredTitle = component$<CenteredTitleProps>(
             class="centered-title-typed-title"
             hidden
             ref={typedTitleElement}
-          />
+          >
+            {typeTitle$ ? title : ""}
+          </span>
         </h2>
         <strong class="centered-title-subtitle" id={subtitleId}>
           {subtitle}

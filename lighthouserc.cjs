@@ -1,4 +1,5 @@
 const { existsSync, readFileSync } = require("node:fs");
+const { homedir } = require("node:os");
 const { join } = require("node:path");
 
 const DIST_DIRECTORY = join(__dirname, "dist");
@@ -10,6 +11,11 @@ function findChromePath() {
   }
 
   return [
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+    join(homedir(), "Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+    join(homedir(), "Applications/Chromium.app/Contents/MacOS/Chromium"),
     "/opt/homebrew/bin/chromium",
     "/usr/local/bin/chromium",
     "/usr/bin/chromium",
@@ -40,7 +46,7 @@ module.exports = {
       headful: false,
       numberOfRuns: 1,
       settings: {
-        preset: "desktop",
+        formFactor: "mobile",
       },
       staticDistDir: DIST_DIRECTORY,
       url: discoverPageUrls(),

@@ -40,18 +40,18 @@ export default component$((): QwikJSX.Element => {
 
   return (
     <>
+      {!isHomepage && <NavigationHeader />}
+
+      <main class={isHomepage ? "is-homepage" : null}>
+        <Slot />
+      </main>
+
       <GlyphRaster
         anchor={isHomepage ? "viewport" : "auto"}
         initialFrameSources={initialFrameSources}
         opacity={0.6}
         source={{ type: "procedural-noise" }}
       />
-
-      {!isHomepage && <NavigationHeader />}
-
-      <main class={isHomepage ? "is-homepage" : null}>
-        <Slot />
-      </main>
 
       <GlyphTextReveal routeKey={url.pathname} />
     </>

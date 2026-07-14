@@ -37,6 +37,7 @@ interface InitialGlyphFrameOptions {
 
 interface InitialFrameCanvas extends HTMLCanvasElement {
   __disposeGlyphInitialFrame?: () => void;
+  __glyphRuntimeActive?: boolean;
 }
 
 interface InitialGlyphModifierOptions {
@@ -77,7 +78,7 @@ interface InitialGlyphFrameGlobal {
 function drawInitialGlyphFrame(options: InitialGlyphFrameOptions): void {
   try {
     const canvas = document.getElementById(options.canvasId) as InitialFrameCanvas | null;
-    if (!canvas) {
+    if (!canvas || canvas.__glyphRuntimeActive) {
       return;
     }
 
@@ -879,7 +880,13 @@ function createInitialGlyphFrameScript(
     vertexSource,
   }).replaceAll("<", "\\u003c");
 
-  return `(${drawInitialGlyphFrame.toString()})(${serializedOptions});`;
+  const drawFrame = `(${drawInitialGlyphFrame.toString()})(${serializedOptions});`;
+
+  // Keep the sizeable first-frame payload after the content in the document,
+  // then let the browser paint that content before compiling shaders and
+  // building the glyph atlas. The resumed renderer marks the canvas so a very
+  // fast client startup cannot race this delayed fallback.
+  return `requestAnimationFrame(()=>requestAnimationFrame(()=>{${drawFrame}}));`;
 }
 
 function createInitialGlyphModifierScript(options: InitialGlyphModifierOptions): string {

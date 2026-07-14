@@ -7,7 +7,7 @@ const config = {
     mdx: true,
   },
   entry: [
-    "lighthouserc.cjs",
+    "lighthouserc*.cjs",
     "src/entry.*.tsx",
     "src/routes/**/*.{tsx,mdx}",
     // Article MDX imports this component through generated renderer code.

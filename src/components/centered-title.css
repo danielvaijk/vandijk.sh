@@ -33,4 +33,16 @@
       font-size: 1rem;
     }
   }
+
+  .centered-title-static-title::after,
+  .centered-title-typed-title:not([hidden])::after {
+    content: "|";
+    display: inline-block;
+    width: 0;
+    font-family: var(--ti-cursor-font-family);
+    font-size: var(--ti-cursor-font-size);
+    font-weight: var(--ti-cursor-font-weight);
+    color: var(--ti-cursor-color);
+    transform: translateX(-0.125em);
+  }
 }

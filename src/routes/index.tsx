@@ -13,17 +13,6 @@ import { CenteredTitle } from "src/components/centered-title";
 import { GlyphRaster } from "src/components/glyph-raster";
 import styles from "src/routes/index.css?inline";
 
-// This rule is rendered after the splash subtree so its unconditional
-// prerender cannot get ahead of the homepage's streamed first-paint markup.
-const BLOG_NAVIGATION_PRERENDER_RULES = JSON.stringify({
-  prerender: [
-    {
-      eagerness: "immediate",
-      urls: ["/blog/"],
-    },
-  ],
-});
-
 export default component$((): QwikJSX.Element => {
   const continuePrompt = useSignal("press any key to continue");
 
@@ -78,11 +67,9 @@ export default component$((): QwikJSX.Element => {
               .type(".")
               .pause(10_000);
           })}
-          typeTitleOptions={{ loop: true, startDelay: 6000, startDelete: true }}
+          typeTitleOptions={{ cursor: false, loop: true, startDelay: 6000, startDelete: true }}
         />
       </section>
-
-      <script type="speculationrules" dangerouslySetInnerHTML={BLOG_NAVIGATION_PRERENDER_RULES} />
     </>
   );
 });
