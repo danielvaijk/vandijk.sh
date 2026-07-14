@@ -13,11 +13,7 @@ declare module "refractor" {
 
   const refractor: Refractor;
 
-  export {
-    type Refractor,
-    type RefractorSyntax,
-    refractor,
-  };
+  export { type Refractor, type RefractorSyntax, refractor };
 }
 
 declare module "refractor/tsx" {

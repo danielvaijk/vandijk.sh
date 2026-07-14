@@ -5,11 +5,10 @@ import {
   useDocumentHead,
   useLocation,
 } from "@builder.io/qwik-city";
-import styles from "src/global.css?url";
+import styles from "src/global.css?inline";
 
-// Qwik will try to inline this file in production mode if the amount
-// Of CSS is less than 10KB. If the file is larger than 10KB, it will
-// Be loaded as a separate file.
+// Keep the small global stylesheet on the initial document's critical path
+// without adding a render-blocking network request.
 
 // Moderate document rules wait for user intent, so destination startup work
 // happens before activation without competing with the current first paint.
@@ -62,7 +61,7 @@ const RootHead = component$((): QwikJSX.Element => {
         ),
       )}
 
-      <link rel="stylesheet" href={styles} />
+      <style dangerouslySetInnerHTML={styles} />
     </head>
   );
 });

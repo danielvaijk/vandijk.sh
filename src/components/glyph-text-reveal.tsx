@@ -61,7 +61,7 @@ interface WrappedTextNode {
 
 const activeReveals = new Set<ActiveGlyphReveal>();
 let sharedAnimationFrame = 0;
-let randomSeed = Math.floor(Math.random() * 0xFF_FF_FF_FF) || 1;
+let randomSeed = Math.floor(Math.random() * 0xff_ff_ff_ff) || 1;
 
 const randomUnit = (): number => {
   randomSeed ^= randomSeed << 13;

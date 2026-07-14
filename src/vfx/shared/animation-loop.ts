@@ -45,12 +45,6 @@ function removeActiveGlyphRaster(raster: ActiveGlyphRaster): void {
   activeGlyphRasters.delete(raster);
 }
 
-export {
-  addActiveGlyphRaster,
-  removeActiveGlyphRaster,
-  scheduleActiveGlyphRasters,
-};
+export { addActiveGlyphRaster, removeActiveGlyphRaster, scheduleActiveGlyphRasters };
 
-export type {
-  ActiveGlyphRaster,
-};
+export type { ActiveGlyphRaster };

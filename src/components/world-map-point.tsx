@@ -4,25 +4,21 @@ import { WorldMapContext } from "src/components/world-map-context";
 
 interface WorldMapPointProps {
   delay: number;
-  pointX: number;
-  pointY: number;
+  x: number;
+  y: number;
 }
 
-export const WorldMapPoint = component$(
-  ({ delay, pointX, pointY }: WorldMapPointProps): QwikJSX.Element => {
-    const { dotDiameter } = useContext(WorldMapContext);
-    const dotRadius = dotDiameter / 2;
+export const WorldMapPoint = component$(({ delay, x, y }: WorldMapPointProps): QwikJSX.Element => {
+  const { dotDiameter } = useContext(WorldMapContext);
+  const dotRadius = dotDiameter / 2;
 
-    return (
-      <g class="world-map__point">
-        <circle
-          cx={pointX}
-          cy={pointY}
-          r={dotRadius}
-          class="world-map__point-dot"
-          style={{ animationDelay: `${delay}s` }}
-        />
-      </g>
-    );
-  },
-);
+  return (
+    <circle
+      cx={x}
+      cy={y}
+      r={dotRadius}
+      class="world-map__point-dot"
+      style={{ animationDelay: `${delay}s` }}
+    />
+  );
+});

@@ -73,7 +73,7 @@
         margin-bottom: var(--glyph-space-y);
       }
 
-      > h4 {
+      > h2 {
         margin: 0;
         font-size: 1.125rem;
         text-align: left;

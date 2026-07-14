@@ -5,6 +5,12 @@ article {
   line-height: 1.32;
   padding: 0 0 var(--glyph-space-y);
 
+  p > a,
+  li > a {
+    text-decoration: underline;
+    text-underline-offset: 0.12em;
+  }
+
   @media (width >= 46rem) {
     font-size: 1.125rem;
     line-height: 1.28;

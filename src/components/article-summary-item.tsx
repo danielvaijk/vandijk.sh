@@ -62,7 +62,7 @@ export const ArticleSummaryItem = component$<ArticleSummaryProps>(
 
           <div class="article-summary-content">
             <time dateTime={dateParsed.toISOString()}>{dateFormatted}</time>
-            <h4>{title}</h4>
+            <h2>{title}</h2>
 
             <p>{description}</p>
 

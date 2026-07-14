@@ -19,5 +19,5 @@
     "types": ["node", "vite/client"],
     "baseUrl": "."
   },
-  "include": ["src", "./*.d.ts", "./*.config.ts", "adapters"]
+  "include": ["src", "./*.d.ts", "./*.config.ts", "adapters", "scripts"]
 }
