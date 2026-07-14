@@ -134,6 +134,9 @@ article {
           }
 
           a {
+            display: inline-block;
+            min-height: 24px;
+            line-height: 24px;
             color: inherit;
           }
         }

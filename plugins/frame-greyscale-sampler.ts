@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { gunzipSync, gzipSync } from "node:zlib";
 
 import sharp, { type Sharp } from "sharp";
 import type { Plugin, ResolvedConfig } from "vite";
@@ -358,12 +359,15 @@ function createGlyphFramePoster(
   source: Buffer,
   options: GlyphRasterFrameOptions,
 ): GlyphFramePoster {
-  const headerEnd = source.indexOf(10);
+  const decodedSource = gunzipSync(source);
+  const headerEnd = decodedSource.indexOf(10);
   if (headerEnd === -1) {
     throw new Error("Unable to parse glyph frame poster source.");
   }
 
-  const header = JSON.parse(source.subarray(0, headerEnd).toString("utf8")) as GlyphFrameHeader;
+  const header = JSON.parse(
+    decodedSource.subarray(0, headerEnd).toString("utf8"),
+  ) as GlyphFrameHeader;
   const frameSize = header.cols * header.rows;
   if (
     header.version !== GLYPH_FRAME_FORMAT_VERSION ||
@@ -374,7 +378,7 @@ function createGlyphFramePoster(
   }
 
   const encodedFrameSize = getPackedGlyphFrameSize(frameSize);
-  const frame = source.subarray(headerEnd + 1, headerEnd + 1 + encodedFrameSize);
+  const frame = decodedSource.subarray(headerEnd + 1, headerEnd + 1 + encodedFrameSize);
   if (frame.length !== encodedFrameSize) {
     throw new Error("Glyph frame poster source does not contain a complete first frame.");
   }
@@ -431,8 +435,9 @@ async function generateGreyscaleFrameSource(
     dimensions,
   );
   const framesFile = createFramesFile(fps, dimensions, rawFrames);
+  const compressedFramesFile = gzipSync(framesFile, { level: 9 });
   const { base, dir } = path.parse(source.output);
-  const contentHash = createAssetContentHash(framesFile);
+  const contentHash = createAssetContentHash(compressedFramesFile);
   const output = path.join(dir, `${contentHash}-${base}`);
 
   await mkdir(dir, { recursive: true });
@@ -445,7 +450,7 @@ async function generateGreyscaleFrameSource(
       await rm(path.join(dir, entry.name), { force: true });
     }
   }
-  await writeFile(output, framesFile);
+  await writeFile(output, compressedFramesFile);
 
   return output;
 }

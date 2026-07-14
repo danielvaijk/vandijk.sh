@@ -21,8 +21,6 @@
   --article-summary-glyph-columns: 90;
   --text-narrow-glyph-columns: 80;
 
-  transition: all 0.3s ease;
-
   @media (width >= 46rem) {
     --glyph-font-size: 0.8125rem;
     --glyph-cell-width: 0.5rem;

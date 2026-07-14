@@ -1,4 +1,6 @@
 /*
+  Content-Security-Policy: {{CONTENT_SECURITY_POLICY}}
+  Cross-Origin-Opener-Policy: same-origin
   X-Frame-Options: DENY
   X-Content-Type-Options: nosniff
   Referrer-Policy: no-referrer

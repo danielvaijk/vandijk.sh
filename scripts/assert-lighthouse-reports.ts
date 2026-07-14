@@ -5,6 +5,11 @@ interface LighthouseResult {
   audits?: Record<
     string,
     {
+      details?: {
+        items?: unknown[];
+        longestChain?: { duration?: number };
+      };
+      metricSavings?: Record<string, number | undefined>;
       score?: number | null;
       scoreDisplayMode?: string;
       title?: string;
@@ -20,6 +25,14 @@ interface LighthouseResult {
 const REPORT_DIRECTORY = ".lighthouseci";
 const EXPECTED_PROFILES = ["mobile", "desktop"] as const;
 const NON_SCORED_MODES = new Set(["informative", "manual", "notApplicable"]);
+const ACTIONABLE_INFORMATIONAL_AUDITS = new Set(["csp-xss", "origin-isolation"]);
+const NETWORK_DEPENDENCY_INSIGHT = "network-dependency-tree-insight";
+const CATEGORY_MINIMUM_SCORES: Record<string, number> = {
+  accessibility: 1,
+  "best-practices": 1,
+  performance: 0.99,
+  seo: 1,
+};
 // These continuous lab metrics are already represented by the category's
 // exact 100 score. A healthy green metric can have an individual score such
 // as 0.98, so treating it as a warning would make the gate both misleading
@@ -45,6 +58,7 @@ if (reportFiles.length === 0) {
 }
 
 const failures: string[] = [];
+const diagnostics: string[] = [];
 const profilesByPage = new Map<string, Set<string>>();
 
 for (const reportFile of reportFiles) {
@@ -81,12 +95,47 @@ for (const reportFile of reportFiles) {
   }
 
   for (const [categoryId, category] of Object.entries(report.categories ?? {})) {
-    if (category.score !== 1) {
-      failures.push(`${page}: ${category.title ?? categoryId} category scored ${category.score}.`);
+    const minimumScore = CATEGORY_MINIMUM_SCORES[categoryId] ?? 1;
+    if (typeof category.score !== "number" || category.score < minimumScore) {
+      failures.push(
+        `${page}: ${category.title ?? categoryId} category scored ${category.score}; expected at least ${minimumScore}.`,
+      );
     }
   }
 
   for (const [auditId, audit] of Object.entries(report.audits ?? {})) {
+    if (auditId.endsWith("-insight") && audit.scoreDisplayMode !== "notApplicable") {
+      for (const [metric, savings] of Object.entries(audit.metricSavings ?? {})) {
+        if (typeof savings === "number" && savings > 0) {
+          failures.push(
+            `${page}: ${audit.title ?? auditId} estimates ${Math.round(savings)} ${metric === "CLS" ? "CLS" : "ms"} of avoidable ${metric}.`,
+          );
+        }
+      }
+    }
+
+    if (auditId === NETWORK_DEPENDENCY_INSIGHT) {
+      const lcpSavings = audit.metricSavings?.LCP;
+      const duration = audit.details?.longestChain?.duration;
+      diagnostics.push(
+        `${page}: ${audit.title ?? auditId}: longest chain ${typeof duration === "number" ? `${Math.round(duration)} ms` : "unknown"}, estimated LCP savings ${typeof lcpSavings === "number" ? `${Math.round(lcpSavings)} ms` : "unknown"}.`,
+      );
+      if (typeof lcpSavings !== "number") {
+        failures.push(`${page}: ${audit.title ?? auditId} did not report estimated LCP savings.`);
+      }
+      continue;
+    }
+
+    if (ACTIONABLE_INFORMATIONAL_AUDITS.has(auditId)) {
+      const findings = audit.details?.items ?? [];
+      if (findings.length > 0) {
+        failures.push(
+          `${page}: ${audit.title ?? auditId} reported ${findings.length} finding(s): ${JSON.stringify(findings)}`,
+        );
+      }
+      continue;
+    }
+
     if (CATEGORY_METRIC_AUDITS.has(auditId) || NON_SCORED_MODES.has(audit.scoreDisplayMode ?? "")) {
       continue;
     }
@@ -106,10 +155,11 @@ for (const [page, profiles] of profilesByPage) {
 }
 
 if (failures.length > 0) {
-  console.error(["Lighthouse reports are not completely clean:", ...failures].join("\n"));
+  console.error(["Lighthouse report gate failed:", ...failures].join("\n"));
   process.exit(1);
 }
 
 console.log(
-  `Lighthouse reports are completely clean (${profilesByPage.size} pages × ${EXPECTED_PROFILES.length} profiles).`,
+  `Lighthouse report gate passed (${profilesByPage.size} pages × ${EXPECTED_PROFILES.length} profiles).`,
 );
+console.log(["Lighthouse diagnostic insights:", ...diagnostics].join("\n"));

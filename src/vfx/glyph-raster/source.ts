@@ -196,9 +196,17 @@ async function createFrameModifierBrightnessGrids({
     throw new Error(`Unable to load character animation frames from ${source.url}.`);
   }
 
-  const reader = response.body?.getReader();
+  const reader = response.body?.pipeThrough(new DecompressionStream("gzip")).getReader();
   if (!reader) {
-    const bytes = new Uint8Array(await response.arrayBuffer());
+    const compressedBytes = await response.arrayBuffer();
+    const decompressedBody = new Response(compressedBytes).body?.pipeThrough(
+      new DecompressionStream("gzip"),
+    );
+    if (!decompressedBody) {
+      throw new Error(`Unable to decompress character animation frames from ${source.url}.`);
+    }
+
+    const bytes = new Uint8Array(await new Response(decompressedBody).arrayBuffer());
     const frameSource = parseSourceHeader(bytes, source.url);
     const sampledFrameSize = FIELD_MODIFIER_SAMPLE_SIZE * FIELD_MODIFIER_SAMPLE_SIZE;
     const grids = new Uint8Array(frameSource.frameCount * sampledFrameSize);
