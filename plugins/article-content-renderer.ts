@@ -253,7 +253,10 @@ function getWordCount(text: string): number {
 }
 
 function stripMarkdownCodeBlocks(markdown: string): string {
-  return markdown.replace(MARKDOWN_CODE_BLOCK_REGEX, "$1");
+  return markdown.replaceAll(
+    /(^|\n)[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?\n[ \t]*\2[ \t]*(?=\n|$)/gu,
+    "$1",
+  );
 }
 
 function stripFrontmatter(markdown: string): string {
@@ -819,4 +822,4 @@ function articleContentRendererPlugin(
   };
 }
 
-export { articleContentRendererPlugin, wrapMarkdownCodeBlocks };
+export { addArticleContents, articleContentRendererPlugin, wrapMarkdownCodeBlocks };
